@@ -12,10 +12,11 @@ export interface Log {
   debug(...args: unknown[]): void;
   info(...args: unknown[]): void;
   warn(...args: unknown[]): void;
-  error(...args: unknown[]): void;
+  /** Returns the logged entry's error id (for linking to it), if any. */
+  error(...args: unknown[]): string | undefined;
 }
 
-const SILENT: Log = { debug() {}, info() {}, warn() {}, error() {} };
+const SILENT: Log = { debug() {}, info() {}, warn() {}, error: () => undefined };
 
 let current: Log = SILENT;
 

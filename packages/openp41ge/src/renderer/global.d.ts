@@ -38,7 +38,8 @@ declare global {
       };
       windowManager: {
         open: () => void;
-        openLogsWindow: () => void;
+        /** With `{ errorId }`, the window opens that error's log entry. */
+        openLogsWindow: (target?: { errorId: string }) => void;
         openWindowSummaries: () => Promise<Array<{ windowId: string; windowType: "workspace" | "manager" | "logs"; workspacePath: string | null }>>;
         openWorkspaceWindow: (workspacePath: string) => void;
         focusWorkspaceWindow: (workspacePath: string) => Promise<boolean>;
@@ -302,6 +303,12 @@ declare global {
           cursor: LogBackCursorShape | null,
           limit?: number,
         ) => Promise<LogBackPageShape>;
+        /** The persisted entry with this errorId, or null. */
+        findError: (errorId: string) => Promise<PersistedLogEntryShape | null>;
+        /** The error a logs window was opened for (its launch), or null. */
+        getLaunchErrorId: () => string | null;
+        /** Fired when an open logs window is asked to open an error. */
+        onRevealError: (callback: (errorId: string) => void) => () => void;
       };
 
       onZoomIn: (callback: () => void) => () => void;
@@ -448,6 +455,7 @@ declare global {
     data?: Record<string, unknown>;
     process: "main" | "renderer";
     winId?: string;
+    errorId?: string;
   }
 
   /** Backward-paging cursor for window.openp41ge.logs.readBackward(). */

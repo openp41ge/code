@@ -25,6 +25,8 @@ export interface LogViewEntry {
   source: string;
   message: string;
   process: string;
+  /** Set on ERROR entries: the error's unique id (links open it). */
+  errorId?: string;
 }
 
 /** A page of entries (oldest → newest) plus a cursor to continue older. */
@@ -102,6 +104,7 @@ function toViewEntry(e: LogEntry): LogViewEntry {
     source: e.source,
     message: e.text,
     process: e.process,
+    ...(e.errorId ? { errorId: e.errorId } : {}),
   };
 }
 

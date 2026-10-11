@@ -36,6 +36,10 @@ export class AgentsChatPane extends HTMLElement {
       pane.send(detail?.text ?? "", detail?.thinkingLevel);
     });
     el.addEventListener("chat:abort", () => pane.abort());
+    el.addEventListener("chat:open-log", (e) => {
+      const errorId = (e as CustomEvent<{ errorId?: string }>).detail?.errorId;
+      if (errorId) pane.openLog(errorId);
+    });
     el.addEventListener("chat:tools-change", (e) => {
       const tools = (e as CustomEvent<{ tools?: string[] }>).detail?.tools;
       if (tools) pane.toolsChanged(tools);

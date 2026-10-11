@@ -41,6 +41,8 @@ export interface PersistedLogEntry {
   data?: Record<string, unknown>;
   process: "main" | "renderer";
   winId?: string;
+  /** Set on ERROR entries: the error's unique id (see `StoredLogEntry`). */
+  errorId?: string;
 }
 
 /** Cursor for backward paging through the daily log files. */
@@ -207,6 +209,9 @@ export class LogFileStore {
     if (entry.winId) {
       line.winId = entry.winId;
     }
+    if (entry.errorId) {
+      line.errorId = entry.errorId;
+    }
     return JSON.stringify(line);
   }
 
@@ -302,6 +307,7 @@ export class LogFileStore {
         ...(raw.data !== undefined ? { data: raw.data as Record<string, unknown> } : {}),
         process: raw.process === "main" ? "main" : "renderer",
         ...(typeof raw.winId === "string" ? { winId: raw.winId } : {}),
+        ...(typeof raw.errorId === "string" ? { errorId: raw.errorId } : {}),
       };
     } catch {
       return null;
@@ -583,5 +589,28 @@ export class LogFileStore {
     }
 
     return collected;
+  }
+
+  /**
+   * The persisted entry with this `errorId` (newest file first), or null. Used
+   * to open an error in the Logs window from a link elsewhere in the app.
+   */
+  findError(errorId: string): PersistedLogEntry | null {
+    const needle = JSON.stringify(errorId);
+    for (const file of this.listFiles()) {
+      let content = "";
+      try {
+        content = fs.readFileSync(path.join(this._logsDir, file.name), "utf-8");
+      } catch {
+        continue;
+      }
+      if (!content.includes(needle)) continue;
+      for (const line of content.split("\n")) {
+        if (!line.includes(needle)) continue;
+        const entry = this._parseLine(line);
+        if (entry?.errorId === errorId) return entry;
+      }
+    }
+    return null;
   }
 }

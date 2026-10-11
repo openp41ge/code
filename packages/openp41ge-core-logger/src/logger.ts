@@ -31,7 +31,9 @@ export interface ILogger {
   debug(...args: unknown[]): void;
   info(...args: unknown[]): void;
   warn(...args: unknown[]): void;
-  error(...args: unknown[]): void;
+  /** Logs an error and returns its entry's `errorId` (undefined when nothing
+   *  was logged), so a UI can link to it, e.g. open it in the Logs window. */
+  error(...args: unknown[]): string | undefined;
 }
 
 // ── Console transport is the default sink — installed once on first import ──
@@ -79,7 +81,7 @@ export function createLogger(system: string, name: string): ILogger {
   // also covers the case where the registry was reset (e.g. in tests).
   registerLogStream(system);
 
-  function emit(level: LogLevel, ...args: unknown[]): void {
+  function emit(level: LogLevel, ...args: unknown[]): string | undefined {
     let data: Record<string, unknown> | undefined;
     if (args.length >= 2 && isDataCandidate(args[args.length - 1])) {
       data = args[args.length - 1] as Record<string, unknown>;
@@ -96,6 +98,7 @@ export function createLogger(system: string, name: string): ILogger {
     if (entry) {
       registerLogStream(system);
     }
+    return entry?.errorId;
   }
 
   return {
@@ -109,7 +112,7 @@ export function createLogger(system: string, name: string): ILogger {
       emit(LogLevel.WARN, ...args);
     },
     error(...args: unknown[]) {
-      emit(LogLevel.ERROR, ...args);
+      return emit(LogLevel.ERROR, ...args);
     },
   };
 }
@@ -127,7 +130,7 @@ export function createNoopLogger(): ILogger {
       /* noop */
     },
     error() {
-      /* noop */
+      return undefined;
     },
   };
 }

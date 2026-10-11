@@ -73,4 +73,12 @@ export function registerLogHandlers(logStore: LogFileStore): void {
       return { entries: [], hasOlder: false, cursor: null, nextDay: null };
     }
   });
+
+  ipcMain.handle("log:find-error", (_event, errorId: unknown) => {
+    try {
+      return typeof errorId === "string" ? logStore.findError(errorId) : null;
+    } catch {
+      return null;
+    }
+  });
 }

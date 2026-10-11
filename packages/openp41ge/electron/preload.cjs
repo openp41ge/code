@@ -6,6 +6,7 @@ let _windowType = "workspace";
 let _workspacePath = null;
 let _dataDir = null;
 let _initialTab = null;
+let _revealErrorId = null;
 let _initResolve = null;
 /** Promise that resolves once openp41ge:init IPC message is received. */
 const _initPromise = new Promise((resolve) => {
@@ -20,6 +21,7 @@ ipcRenderer.on("openp41ge:init", (_event, data) => {
   _workspacePath = data.workspacePath ?? null;
   _dataDir = data.dataDir ?? null;
   _initialTab = data.initialTab ?? null;
+  _revealErrorId = data.revealErrorId ?? null;
   // Store initial workspace state for the renderer to pick up
   _initialState = data.workspace;
   if (_initResolve) {
@@ -267,9 +269,10 @@ contextBridge.exposeInMainWorld("openp41ge", {
     open: () => {
       ipcRenderer.send("window-manager:open");
     },
-    /** Open (or focus) a dedicated Logs window. */
-    openLogsWindow: () => {
-      ipcRenderer.send("logs-window:open");
+    /** Open (or focus) a dedicated Logs window; with `{ errorId }`, open
+     *  that error's log entry. */
+    openLogsWindow: (target) => {
+      ipcRenderer.send("logs-window:open", target ?? null);
     },
     /** List currently open windows (id, kind, workspace binding). */
     openWindowSummaries: () => {
@@ -745,6 +748,16 @@ contextBridge.exposeInMainWorld("openp41ge", {
     listFiles: () => ipcRenderer.invoke("log:files"),
     /** Read log entries backward from the bottom of the newest daily file. */
     readBackward: (cursor, limit) => ipcRenderer.invoke("log:read-backward", { cursor, limit }),
+    /** The persisted entry with this errorId, or null. */
+    findError: (errorId) => ipcRenderer.invoke("log:find-error", errorId),
+    /** The error a logs window was opened for (its launch), or null. */
+    getLaunchErrorId: () => _revealErrorId,
+    /** Fired when an open logs window is asked to open an error. */
+    onRevealError: (callback) => {
+      const handler = (_event, errorId) => callback(errorId);
+      ipcRenderer.on("logs-window:reveal-error", handler);
+      return () => ipcRenderer.removeListener("logs-window:reveal-error", handler);
+    },
   },
 
   lifecycle: {

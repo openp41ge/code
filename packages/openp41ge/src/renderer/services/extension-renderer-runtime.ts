@@ -52,6 +52,8 @@ export interface RendererSurfaceHostDeps {
   /** Open an editor/panel tab (platform action). `from` names the calling
    *  grid tab, for `placement: "next-column"`. */
   readonly openTab: (request: OpenTabRequest, from?: { readonly tabId: string }) => void;
+  /** Open the Logs window on an error (`SurfaceHost.openLog`). Inert when absent. */
+  readonly openLog?: (errorId: string) => void;
   /**
    * The extension's config (merged values, change notification, the editor).
    * Shared by every mount of the extension; each mount's subscriptions end
@@ -324,6 +326,9 @@ export function mountRendererSurface<S extends Record<string, unknown> = Record<
     },
     openTab(request) {
       deps.openTab(request);
+    },
+    openLog(errorId) {
+      deps.openLog?.(errorId);
     },
     config: {
       get: () => config.get(),

@@ -280,7 +280,11 @@ extensions use.
 
 This design adds `host.drag.*` (drop-target receivers) and `host.config.*`
 (merged config read/subscribe, open the config editor) to the host context
-described in §2.3. The authoritative shape is `SurfaceHost` in the contract
+described in §2.3. Errors are linkable: every ERROR log entry gets a unique,
+persisted `errorId`, which `log.error(...)` returns (view and backend), and
+`host.openLog(errorId)` opens the Logs window on that entry with its details
+open. Show a failure as a generic message linking to its log entry rather
+than putting the error text in the UI. The authoritative shape is `SurfaceHost` in the contract
 package (`registration.ts`), which also carries `surface`, `context`,
 `openTab`, `workspace` and `showContextMenu`.
 

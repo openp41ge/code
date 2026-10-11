@@ -218,6 +218,7 @@ export class Openp41geLogsWindow extends LitElement {
   private _offStreams: (() => void) | null = null;
   private _offLogs: (() => void) | null = null;
   private _detailUnsub: (() => void) | null = null;
+  private _offRevealError: (() => void) | null = null;
   private _orchestrator: DragOrchestrator | null = null;
   /** Column new streams are opened in (last active/focused column). */
   private _lastActiveCol = 0;
@@ -282,6 +283,13 @@ export class Openp41geLogsWindow extends LitElement {
       this.requestUpdate();
     });
     this._offLogs = subscribeLogs(() => this.requestUpdate());
+    // Open an error on request: the one this window was launched for, and any
+    // sent later (e.g. a "View log" link while the window is already open).
+    const logs = window.openp41ge?.logs;
+    this._offRevealError =
+      logs?.onRevealError?.((errorId) => void this.revealError(errorId)) ?? null;
+    const launchErrorId = logs?.getLaunchErrorId?.();
+    if (launchErrorId) void this.updateComplete.then(() => this.revealError(launchErrorId));
   }
 
   disconnectedCallback(): void {
@@ -309,6 +317,8 @@ export class Openp41geLogsWindow extends LitElement {
     this._offStreams = null;
     this._offLogs?.();
     this._offLogs = null;
+    this._offRevealError?.();
+    this._offRevealError = null;
     this._detachDetailListeners();
     for (const v of this._viewers.values()) {
       if (v.parentNode) v.parentNode.removeChild(v);
@@ -2348,6 +2358,26 @@ export class Openp41geLogsWindow extends LitElement {
         <span class="lw-search-msg">${this._escape(String(e.text ?? e.message))}</span>
       </div>
     `;
+  }
+
+  /**
+   * Open the error `errorId`: its stream's tab, scrolled to the entry, with the
+   * entry's detail drawer open. Resolves false (and opens nothing) when no log
+   * file has the error.
+   */
+  async revealError(errorId: string): Promise<boolean> {
+    const found = await window.openp41ge?.logs?.findError?.(errorId);
+    if (!found) {
+      log.warn(`logs window: no log entry has error id ${errorId}`);
+      return false;
+    }
+    this._openStream(found.system);
+    await this.updateComplete;
+    const tab = this._tabs.find((t) => t.system === found.system);
+    if (!tab) return false;
+    // The viewer must be mounted (connected) before it loads and can reveal.
+    await this._mountViewers();
+    return (await this._ensureViewer(tab).revealError(errorId)) !== null;
   }
 
   /** Open the system's stream (preview) and focus the viewer's find bar on the

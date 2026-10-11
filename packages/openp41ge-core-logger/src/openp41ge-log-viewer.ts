@@ -112,6 +112,10 @@ export class Openp41geLogViewer extends LitElement {
   private _unsubscribeLive: (() => void) | null = null;
   private _isScrolledUp = false;
   private _scrollToBottomPending = false;
+  /** The latest-page load started by `_start` (awaited by `revealError`). */
+  private _initialLoad: Promise<void> = Promise.resolve();
+  /** The entry `revealError` last revealed (marked in the list). */
+  @state() private _revealedEntry: LogViewEntry | null = null;
   /** Custom overlay scrollbar (both axes) drawn over the log list. */
   private _scrollbar: OverlayScrollbar | null = null;
   /** Cached monospace glyph advance (px); measured on first use. */
@@ -409,7 +413,8 @@ export class Openp41geLogViewer extends LitElement {
       this._searchDebounce = null;
     }
     this._unsubscribeLive = reader.subscribe((entry) => this._onLiveEntry(entry));
-    this._loadLatest(reader);
+    this._revealedEntry = null;
+    this._initialLoad = this._loadLatest(reader);
   }
 
   /** Fold a page's node-computed longest line into the local max (monotonic). */
@@ -722,6 +727,43 @@ export class Openp41geLogViewer extends LitElement {
    * lines, and jump to the first match. Used by the Logs window when a
    * cross-stream search result is opened, so the viewer lands on that hit.
    */
+  /**
+   * Show the ERROR entry with this `errorId`: page older (crossing day
+   * boundaries) until it is loaded, clear a stream filter that hides it, scroll
+   * to it, mark it, and open its detail — a `log-row-click`, as a click on the
+   * row would. Resolves to the entry, or null when no page has it.
+   */
+  async revealError(errorId: string): Promise<LogViewEntry | null> {
+    await this._initialLoad;
+    const reader = this._pageReader;
+    const find = (): LogViewEntry | null =>
+      this._entries.findLast((e) => e.errorId === errorId) ?? null;
+    let entry = find();
+    for (let pages = 0; !entry && pages < 1000; pages++) {
+      let target: unknown;
+      if (this._hasOlder) target = undefined;
+      else if (this._nextDayCursor !== null) target = this._nextDayCursor;
+      else break;
+      const before = this._entries.length;
+      await this._loadOlder(target);
+      if (this._pageReader !== reader) return null;
+      // Nothing was added: the source is exhausted (or the load failed).
+      if (this._entries.length === before) break;
+      entry = find();
+    }
+    if (!entry) return null;
+    if (!this._visible.includes(entry)) this._setSelectedStreams([]);
+    this._revealedEntry = entry;
+    this._layoutDirty = true;
+    await this.updateComplete;
+    this._scrollToEntry(entry);
+    this.requestUpdate();
+    this.dispatchEvent(
+      new CustomEvent("log-row-click", { detail: { entry }, bubbles: true, composed: true }),
+    );
+    return entry;
+  }
+
   setFindQuery(query: string): void {
     this._searchQuery = query;
     this._searchOpen = true;
@@ -910,7 +952,12 @@ export class Openp41geLogViewer extends LitElement {
     this._activeSegment = occ.segment;
     this._activeRange = occ.range;
     await this.updateComplete;
-    const visibleIndex = this._visible.indexOf(this._activeEntry);
+    this._scrollToEntry(this._activeEntry);
+  }
+
+  /** Jump the list to `entry` (a visible, rendered entry). */
+  private _scrollToEntry(entry: LogViewEntry): void {
+    const visibleIndex = this._visible.indexOf(entry);
     if (visibleIndex < 0) return;
     const itemIndex = visibleIndex + (this._nextDayCursor !== null ? 1 : 0);
     const list = this._listEl;
@@ -1274,6 +1321,10 @@ export class Openp41geLogViewer extends LitElement {
         .log-entry.level-error {
           color: #f44747;
         }
+        .log-entry.revealed {
+          background: #3a2a2a;
+          box-shadow: inset 2px 0 0 #f44747;
+        }
         .log-level-tag {
           display: inline;
           font-weight: bold;
@@ -1582,7 +1633,9 @@ export class Openp41geLogViewer extends LitElement {
                       `
                     : html`
                         <div
-                          class="log-entry level-${levelClass(item.entry.level)}"
+                          class="log-entry level-${levelClass(item.entry.level)}${
+                            item.entry === this._revealedEntry ? " revealed" : ""
+                          }"
                           data-item-key="${item.key}"
                           .entry=${item.entry}
                         >

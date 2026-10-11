@@ -49,6 +49,12 @@ export interface StoredLogEntry {
   process: LogProcess;
   /** Renderer window id (renderer process only). */
   winId?: string;
+  /**
+   * Unique id of an ERROR entry (absent at other levels). It is persisted with
+   * the entry, so a UI can link to the error later (e.g. open it in the Logs
+   * window). Unlike `id`, it is unique across processes and restarts.
+   */
+  errorId?: string;
 }
 
 export interface LogEntry extends StoredLogEntry {
@@ -111,6 +117,15 @@ function _renderText(message: string | readonly unknown[]): string {
     .join(" ");
 }
 
+/** A new error id: the time (base 36) and 8 random hex digits. Built from
+ *  `getRandomValues`, which (unlike `randomUUID`) every context has. */
+function newErrorId(): string {
+  const bytes = new Uint8Array(4);
+  globalThis.crypto.getRandomValues(bytes);
+  const rand = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${Date.now().toString(36)}-${rand}`;
+}
+
 /**
  * Push a structured entry to the global log bus.
  *
@@ -118,7 +133,8 @@ function _renderText(message: string | readonly unknown[]): string {
  * they are joined with spaces, as before).
  *
  * Returns the created entry, or `null` if it was dropped by the capture
- * threshold (level < `getMinLevel()`).
+ * threshold (level < `getMinLevel()`). An ERROR entry carries a new
+ * `errorId`.
  */
 export function pushLog(
   level: LogLevel,
@@ -139,6 +155,7 @@ export function pushLog(
     message: rendered,
     ...(data !== undefined ? { data } : {}),
     process: _defaultProcess,
+    ...(level >= LogLevel.ERROR ? { errorId: newErrorId() } : {}),
     name: source,
     text: rendered,
     args: Array.isArray(message) ? message : [message],

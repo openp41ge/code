@@ -18,6 +18,7 @@
 import type {
   Chat,
   ChatDeltaPayload,
+  ChatErrorPayload,
   ChatHeader,
   ChatLiveRatePayload,
   ChatReasoningPayload,
@@ -43,6 +44,8 @@ export interface ChatPaneHost {
     subscribe(fn: (config: Readonly<Record<string, unknown>>) => void): () => void;
   };
   readonly log: { error(...args: unknown[]): void };
+  /** Open the Logs window on an error (`SurfaceHost.openLog`). */
+  openLog(errorId: string): void;
 }
 
 /** The `<agents-chat>` methods the pane drives. */
@@ -61,6 +64,7 @@ export interface ChatElement {
   setProviderStatus(status: ChatRuntimeStatus): void;
   setUsage(usage: TokenUsage): void;
   setStreamRate(tps: number | null): void;
+  appendError(errorId: string | undefined): void;
   setTitle(title: string): void;
   setComposerContext(ctx: Parameters<AgentsChat["setComposerContext"]>[0]): void;
 }
@@ -141,6 +145,10 @@ export class ChatPane {
         "live-rate",
         forChat<ChatLiveRatePayload>((p) => this._el.setStreamRate(p.tps)),
       ),
+      this._host.subscribe(
+        "error",
+        forChat<ChatErrorPayload>((p) => this._el.appendError(p.errorId)),
+      ),
       this._host.subscribe("changed", () => void this._refreshTitle()),
       this._host.config.subscribe(() => void this._loadComposer()),
     );
@@ -168,6 +176,11 @@ export class ChatPane {
 
   abort(): void {
     void this._call("abort", { id: this.chatId });
+  }
+
+  /** Open an error's log entry in the Logs window (an error block's link). */
+  openLog(errorId: string): void {
+    this._host.openLog(errorId);
   }
 
   toolsChanged(tools: string[]): void {

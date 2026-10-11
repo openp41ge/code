@@ -208,13 +208,9 @@ export class AgentRuntime {
 
       this._setStatus(winId, chatId, { streaming: false, providerOk: ping });
     } catch (err) {
-      log.error("agent send error:", err);
+      const errorId = log.error("agent send error:", err);
       if (!controller.signal.aborted) {
-        this._store.appendMessage(chatId, {
-          id: this._id("msg"),
-          role: "assistant",
-          content: `[error] ${(err as Error).message}`,
-        });
+        this._appendError(chatId, winId, errorId);
         this._setStatus(winId, chatId, { streaming: false, providerOk: false });
       }
     } finally {
@@ -297,6 +293,8 @@ export class AgentRuntime {
             m.segments = appendTextSegment(m.segments, delta.text);
           });
           this._hooks.sendToWindow(winId, "chat:delta", { chatId, delta: delta.text });
+        } else if (delta.type === "error") {
+          this._appendError(chatId, winId, delta.errorId);
         } else if (delta.type === "tool_call") {
           toolCalls = this._mergeTool(toolCalls, delta);
           if (!currentAssistant) currentAssistant = this._beginAssistant(chatId);
@@ -370,6 +368,29 @@ export class AgentRuntime {
       if (signal.aborted) return;
       this._hooks.broadcast("chat:changed", {});
     }
+  }
+
+  /**
+   * End the turn with an error: an `error` segment on this turn's assistant
+   * message (a new one when the turn has none yet), pushed live as
+   * `chat:error`. The error's text stays in the log (`errorId`), never in the
+   * message, so it is not sent to the model.
+   */
+  private _appendError(chatId: string, winId: string, errorId: string | undefined): void {
+    const segment: MessageSegment = { type: "error", ...(errorId ? { errorId } : {}) };
+    const last = this._store.get(chatId)?.messages.at(-1);
+    if (last?.role === "assistant") {
+      this._store.updateMessage(chatId, last.id, (m) => {
+        m.segments = [...(m.segments ?? []), segment];
+      });
+    } else {
+      this._store.appendMessage(chatId, {
+        id: this._id("msg"),
+        role: "assistant",
+        segments: [segment],
+      });
+    }
+    this._hooks.sendToWindow(winId, "chat:error", { chatId, ...(errorId ? { errorId } : {}) });
   }
 
   private _beginAssistant(chatId: string): ChatMessage {

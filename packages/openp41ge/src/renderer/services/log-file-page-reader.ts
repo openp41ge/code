@@ -37,6 +37,7 @@ export class LogFilePageReader implements LogPageReader {
     source: string;
     message: string;
     process: string;
+    errorId?: string;
   }): LogViewEntry {
     return {
       timestamp: e.timestamp,
@@ -46,6 +47,7 @@ export class LogFilePageReader implements LogPageReader {
       source: e.source,
       message: e.message,
       process: e.process,
+      ...(e.errorId ? { errorId: e.errorId } : {}),
     };
   }
 
@@ -106,6 +108,7 @@ export class LogFilePageReader implements LogPageReader {
       source: string;
       message: string;
       process: string;
+      errorId?: string;
     }[];
     hasOlder: boolean;
     cursor: unknown;

@@ -24,13 +24,17 @@ export interface ToolCall {
   error?: string;
 }
 
-/** An ordered slice of an assistant message: streamed text or a tool call. */
+/** An ordered slice of an assistant message: streamed text, a tool call, or
+ *  an error that ended the turn. */
 export interface MessageSegment {
-  type: "text" | "tool";
+  type: "text" | "tool" | "error";
   /** Present when type === "text". */
   text?: string;
   /** Present when type === "tool". */
   toolCall?: ToolCall;
+  /** For type === "error": the error's log entry id (opens it in the Logs
+   *  window). Absent when nothing was logged. */
+  errorId?: string;
 }
 
 /** Token usage reported by the provider for a single completion. */
@@ -200,6 +204,12 @@ export interface ChatStatusPayload {
 export interface ChatUsagePayload {
   chatId: string;
   usage: TokenUsage;
+}
+
+/** Broadcast payload for `chat:error` (the turn failed; see the log entry). */
+export interface ChatErrorPayload {
+  chatId: string;
+  errorId?: string;
 }
 
 /** Broadcast payload for `chat:liveRate` (live gen rate during streaming). */

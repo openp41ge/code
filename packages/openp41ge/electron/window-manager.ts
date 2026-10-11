@@ -50,6 +50,8 @@ export interface Openp41geWindowMeta {
   workspacePath: string | null;
   /** Initial tab to open in a window-manager window ("workspaces" | "settings"). */
   initialTab?: WindowManagerTab;
+  /** A logs window's error to open on launch (an entry's `errorId`). */
+  revealErrorId?: string;
 }
 
 /** Tabs the compact Window Manager window can open with. */
@@ -153,6 +155,7 @@ export function createOpenp41geWindow(
     windowType: meta?.windowType ?? "workspace",
     workspacePath: meta?.workspacePath ?? null,
     initialTab: meta?.initialTab,
+    revealErrorId: meta?.revealErrorId,
   };
 
   // The Window Manager is a full-sized window (sidebar + main grid): it is
@@ -263,6 +266,7 @@ export function createOpenp41geWindow(
         windowType: windowMeta.windowType,
         workspacePath: windowMeta.workspacePath,
         initialTab: windowMeta.initialTab,
+        revealErrorId: windowMeta.revealErrorId,
         dataDir: resolveAppDataDir(app.isPackaged),
       });
     }
@@ -378,13 +382,14 @@ export function openWindowManager(sourceWindow?: BrowserWindow, tab?: WindowMana
 
 /**
  * Create a new resizable logs window (not bound to any workspace layout
- * Window). Returns the window id.
+ * Window), opening the error `revealErrorId` if given. Returns the window id.
  */
-export function createLogsWindow(sourceWindow?: BrowserWindow): string {
+export function createLogsWindow(sourceWindow?: BrowserWindow, revealErrorId?: string): string {
   const winId = `logs-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   createOpenp41geWindow(winId, false, sourceWindow, undefined, undefined, {
     windowType: "logs",
     workspacePath: null,
+    revealErrorId,
   });
   return winId;
 }
@@ -392,16 +397,18 @@ export function createLogsWindow(sourceWindow?: BrowserWindow): string {
 /**
  * Open (or focus) a logs window. Reuses an existing one if present so a second
  * "Logs" action brings the existing window to the front instead of stacking.
+ * With `revealErrorId`, the window opens that error's log entry.
  */
-export function openLogsWindow(sourceWindow?: BrowserWindow): void {
+export function openLogsWindow(sourceWindow?: BrowserWindow, revealErrorId?: string): void {
   for (const [id, bw] of openp41geWindows) {
     if (openp41geWindowMeta.get(id)?.windowType !== "logs") continue;
     if (bw.isDestroyed()) continue;
+    if (revealErrorId) bw.webContents.send("logs-window:reveal-error", revealErrorId);
     if (bw.isMinimized()) bw.restore();
     bw.focus();
     return;
   }
-  createLogsWindow(sourceWindow);
+  createLogsWindow(sourceWindow, revealErrorId);
 }
 
 /** Summaries of every open window (id, kind, workspace binding). */

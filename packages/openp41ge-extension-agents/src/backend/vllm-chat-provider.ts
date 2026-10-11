@@ -36,9 +36,14 @@ function resolveReasoningEffort(level?: string | null): string | undefined {
   return t;
 }
 
-/** Convert our chat messages to the OpenAI chat-completions wire format. */
+/** Convert our chat messages to the OpenAI chat-completions wire format. An
+ *  assistant message with no text and no tool calls (a turn that failed before
+ *  replying) is left out: errors are never sent to the model. */
 export function toOpenAIMessages(messages: ChatMessage[]): Array<Record<string, unknown>> {
-  return messages.map((m) => {
+  const sent = messages.filter(
+    (m) => m.role !== "assistant" || !!m.content || (m.toolCalls?.length ?? 0) > 0,
+  );
+  return sent.map((m) => {
     if (m.role === "system") {
       return { role: "system", content: m.content ?? "" };
     }
@@ -161,18 +166,16 @@ export class VllmChatProvider implements ChatProvider {
         signal: req.signal,
       });
     } catch (err) {
-      const msg = describeFetchError(err);
       if (req.signal?.aborted) return;
-      log.error("stream request failed:", msg);
-      yield { type: "text", text: `[provider error: ${msg}]` };
+      const errorId = log.error("stream request failed:", describeFetchError(err));
+      yield { type: "error", errorId };
       return;
     }
 
     if (!res.ok || !res.body) {
       const text = await res.text().catch(() => "");
-      const msg = `vLLM returned ${res.status}: ${text.slice(0, 200)}`;
-      log.error(msg);
-      yield { type: "text", text: `[provider error: ${msg}]` };
+      const errorId = log.error(`vLLM returned ${res.status}: ${text.slice(0, 200)}`);
+      yield { type: "error", errorId };
       return;
     }
 
@@ -250,7 +253,8 @@ export class VllmChatProvider implements ChatProvider {
       }
     } catch (err) {
       if (!req.signal?.aborted) {
-        log.error("stream read error:", (err as Error).message);
+        const errorId = log.error("stream read error:", describeFetchError(err));
+        yield { type: "error", errorId };
       }
     } finally {
       try {

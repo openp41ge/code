@@ -38,7 +38,9 @@ export type ProviderDelta =
   | { type: "text"; text: string }
   | { type: "reasoning"; text: string }
   | { type: "tool_call"; id: string; name: string; arguments: string }
-  | { type: "usage"; usage: TokenUsage; elapsedMs?: number; live?: boolean };
+  | { type: "usage"; usage: TokenUsage; elapsedMs?: number; live?: boolean }
+  /** The request failed; the details are in the log entry `errorId`. */
+  | { type: "error"; errorId?: string };
 
 /** Input to a streamChat call. */
 export interface ChatStreamRequest {

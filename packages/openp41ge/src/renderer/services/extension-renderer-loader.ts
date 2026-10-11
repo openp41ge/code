@@ -277,6 +277,9 @@ export function createRendererSurfaceDeps(
         }),
       );
     },
+    openLog(errorId) {
+      window.openp41ge?.windowManager?.openLogsWindow?.({ errorId });
+    },
     config: extensionConfigs().hostFor(extId, () =>
       deps.openTab({ appType: CONFIG_EDITOR_APP_TYPE, params: { extensionId: extId } }),
     ),

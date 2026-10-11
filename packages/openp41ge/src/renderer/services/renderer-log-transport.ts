@@ -48,6 +48,7 @@ function _serialize(e: StoredLogEntry): Record<string, unknown> {
   if (e.data !== undefined && e.data !== null) line.data = e.data;
   const winId = e.winId ?? _resolveWinId();
   if (winId) line.winId = winId;
+  if (e.errorId) line.errorId = e.errorId;
   return line;
 }
 

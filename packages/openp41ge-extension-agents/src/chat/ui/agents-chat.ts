@@ -12,6 +12,8 @@
  *   - `chat:provider-change` detail `{ providerId }` — user picked a provider/model.
  *   - `chat:thinking-change` detail `{ thinkingLevel }` — user picked a thinking level.
  *   - `chat:add-content` — user clicked the “+ / add content” button.
+ *   - `chat:open-log` detail `{ errorId }` — user clicked an error block's
+ *     "View log" link.
  */
 
 import { LitElement, html, type TemplateResult, type PropertyValues } from "lit";
@@ -323,6 +325,49 @@ class AgentsChat extends LitElement {
     this._messages = messages;
     this._streaming = true;
     this._scrollToBottom();
+  }
+
+  /** The turn failed: end the reply with an error block (a generic message
+   *  and, when `errorId` is set, a link to the error's log entry). */
+  appendError(errorId: string | undefined): void {
+    const messages = this._messages.map(deepCloneMessage);
+    let last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") {
+      last = {
+        id: `stream_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+        role: "assistant",
+        timestamp: Date.now(),
+      };
+      messages.push(last);
+    }
+    last.segments = [...(last.segments ?? []), { type: "error", ...(errorId ? { errorId } : {}) }];
+    this._messages = messages;
+    this._scrollToBottom();
+  }
+
+  /** An error block: a generic message; the details are in the log. */
+  private _renderError(errorId: string | undefined): TemplateResult {
+    return html`<div class="msg-error" data-testid="chat-error" role="alert">
+      <span class="msg-error-text">Something went wrong getting a reply.</span>
+      ${
+        errorId
+          ? html`<button
+              class="msg-error-log"
+              data-testid="chat-error-log"
+              @click=${() =>
+                this.dispatchEvent(
+                  new CustomEvent("chat:open-log", {
+                    bubbles: true,
+                    composed: true,
+                    detail: { errorId },
+                  }),
+                )}
+            >
+              View log
+            </button>`
+          : ""
+      }
+    </div>`;
   }
 
   /** Streamed reasoning/thinking text, shown above the final answer. */
@@ -2554,6 +2599,30 @@ class AgentsChat extends LitElement {
           white-space: pre-wrap;
           word-wrap: break-word;
         }
+        .msg-error {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          margin-top: 8px;
+          padding: 8px 12px;
+          font-size: 12px;
+          color: var(--text-primary, #ddd);
+          background: color-mix(in srgb, #f44747 12%, transparent);
+          border: 1px solid color-mix(in srgb, #f44747 40%, transparent);
+          border-radius: 6px;
+        }
+        .msg-error-text {
+          flex: 1;
+        }
+        .msg-error-log {
+          padding: 0;
+          border: none;
+          background: none;
+          color: var(--accent-color, #4daafc);
+          font: inherit;
+          cursor: pointer;
+          text-decoration: underline;
+        }
         .chat-message.assistant .msg-content p {
           margin: 0;
         }
@@ -3686,6 +3755,11 @@ class AgentsChat extends LitElement {
             i++;
           }
           out.push(this._renderToolCalls(run));
+          continue;
+        }
+        if (seg.type === "error") {
+          out.push(this._renderError(seg.errorId));
+          i++;
           continue;
         }
         const parts = seg.text

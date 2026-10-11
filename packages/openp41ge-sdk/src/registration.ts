@@ -156,6 +156,12 @@ export interface SurfaceHost<S = Readonly<Record<string, unknown>>> {
   readonly log: ILogger;
   /** Open an editor/panel tab (platform action). */
   openTab(request: OpenTabRequest): void;
+  /**
+   * Open the Logs window on an error's log entry: `errorId` is what
+   * `log.error(...)` returned (in the view or the backend). The window shows
+   * the entry with its details open.
+   */
+  openLog(errorId: string): void;
   /** The extension's config (its registered schema's defaults + the user's values). */
   readonly config: SurfaceConfigHost;
   /** Drag & drop: in-place drop receivers for this mount. */

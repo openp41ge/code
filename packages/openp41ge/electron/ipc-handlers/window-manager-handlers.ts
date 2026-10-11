@@ -38,8 +38,12 @@ export function registerWindowManagerHandlers(): void {
     openWindowManager(BrowserWindow.fromWebContents(event.sender) ?? undefined);
   });
 
-  ipcMain.on("logs-window:open", (event) => {
-    openLogsWindow(BrowserWindow.fromWebContents(event.sender) ?? undefined);
+  ipcMain.on("logs-window:open", (event, target: unknown) => {
+    const errorId = (target as { errorId?: unknown } | null)?.errorId;
+    openLogsWindow(
+      BrowserWindow.fromWebContents(event.sender) ?? undefined,
+      typeof errorId === "string" && errorId ? errorId : undefined,
+    );
   });
 
   ipcMain.handle("window-manager:open-window-summaries", () => {
