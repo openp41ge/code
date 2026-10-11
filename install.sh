@@ -65,6 +65,18 @@ command -v curl    >/dev/null 2>&1 || die "missing required tool: curl"
 command -v python3 >/dev/null 2>&1 || die "missing required tool: python3"
 command -v ditto   >/dev/null 2>&1 || die "missing required tool: ditto"
 
+APP_NAME="openp41ge.app"
+DEST="/Applications/$APP_NAME"
+
+# macOS (App Management) refuses to change or delete another developer's app
+# from a terminal, even with sudo ("Operation not permitted"), so the
+# installer only installs where nothing is installed yet.
+if [[ -e "$DEST" && "$DRY_RUN" != "1" ]]; then
+  die "$APP_NAME is already installed at $DEST.
+  To update, use the update in the app itself.
+  To reinstall, quit $APP_NAME, drag it from Applications to the Trash, and run the installer again."
+fi
+
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -167,8 +179,8 @@ ditto -x -k "$TMP/$ASSET_NAME" "$TMP/extracted"
 APP_DIR="$(find "$TMP/extracted" -maxdepth 1 -name "*.app" -type d | head -1)"
 [[ -n "$APP_DIR" ]] || die "No .app found in $ASSET_NAME"
 
-APP_NAME="$(basename "$APP_DIR")"
-DEST="/Applications/$APP_NAME"
+[[ "$(basename "$APP_DIR")" == "$APP_NAME" ]] || die "Expected $APP_NAME in $ASSET_NAME"
+
 say "Installing to $DEST"
 sudo ditto "$APP_DIR" "$DEST"
 # curl does not set the quarantine flag, but clear it defensively so the
