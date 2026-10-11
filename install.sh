@@ -4,7 +4,9 @@
 # Releases, verifies it, and installs the .app.
 #
 # Usage:
-#   curl -fsSL https://github.com/openp41ge/code/releases/latest/download/install.sh | sh
+#   curl -fsSL https://github.com/openp41ge/code/releases/latest/download/install.sh | bash
+#   curl -fsSL https://github.com/openp41ge/code/releases/download/v0.1.0-alpha.1/install.sh \
+#     | bash -s -- --channel alpha               # (`latest` skips prereleases)
 #   ./install.sh                                 # latest stable release
 #   ./install.sh --channel alpha                 # latest alpha prerelease
 #   ./install.sh --version 0.1.0-alpha.1         # a specific version
@@ -22,7 +24,18 @@ VERSION=""
 ARCH=""
 DRY_RUN=0
 
-usage() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; }
+# Printed inline (not read back from "$0"), so it also works when piped to bash.
+usage() {
+  cat <<'USAGE'
+Usage: install.sh [options]
+  --channel, -c <stable|alpha|beta|rc>  latest release on a channel (default: stable)
+  --version, -v <semver>                a specific version, e.g. 0.1.0-alpha.1
+  --arch, -a <arm64|x64|universal>      build to install (default: this Mac's)
+  --repo <owner/name>                   release repo (default: openp41ge/code)
+  --dry-run                             show the selected build, download nothing
+  -h, --help                            show this help
+USAGE
+}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -90,7 +103,7 @@ fi
 
 # ---- Select the artifact + checksum URL --------------------------------
 read -r ASSET_NAME ASSET_URL SHA_URL <<<"$(
-  python3 "$ARCH" "$TMP/release.json" <<'PY'
+  python3 - "$ARCH" "$TMP/release.json" <<'PY'
 import json, sys
 arch = sys.argv[1]
 data = json.load(open(sys.argv[2]))
@@ -125,7 +138,7 @@ fi
 say "Downloading $ASSET_NAME"
 curl -fL --progress-bar -o "$TMP/$ASSET_NAME" "$ASSET_URL"
 say "Downloading SHA256SUMS"
-curl -fL -o "$TMP/SHA256SUMS" "$SHA_URL"
+curl -fsSL -o "$TMP/SHA256SUMS" "$SHA_URL"
 
 # ---- Verify SHA256 -----------------------------------------------------
 EXPECTED="$(awk -v n="$ASSET_NAME" '$2 == n {print $1}' "$TMP/SHA256SUMS")"
