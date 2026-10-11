@@ -52,6 +52,7 @@ mac:
   target:
     - dmg
     - zip
+  icon: build/icon.icns
   hardenedRuntime: true
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.inherit.plist

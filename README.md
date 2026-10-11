@@ -1,4 +1,9 @@
-# Openp41ge
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/wordmark-dark.svg">
+    <img src="brand/wordmark-light.svg" alt="openp41ge" height="56">
+  </picture>
+</h1>
 
 A desktop pane manager built with Electron. Organise running processes, file editors, terminals, git repositories, and AI chat panels into a column-based grid layout with tabs, drag-and-drop, and multi-window support.
 
