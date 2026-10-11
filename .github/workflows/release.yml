@@ -25,9 +25,9 @@ on:
         type: choice
         options: [universal, arm64, x64]
       draft:
-        description: "Create as a draft (publish manually after review)"
+        description: "Create as a draft instead of publishing (publish manually after review)"
         required: false
-        default: true
+        default: false
         type: boolean
   push:
     tags: ["v*"]
