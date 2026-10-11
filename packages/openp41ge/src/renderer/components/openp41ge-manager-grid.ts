@@ -19,7 +19,7 @@
  * drag-out) does not restore them. Test seam: the static `deps`.
  */
 
-import { html, nothing, type TemplateResult } from "lit";
+import { html, type TemplateResult } from "lit";
 import { LitElement } from "lit";
 import { state } from "lit/decorators.js";
 import { createLogger } from "openp41ge-core-logger";
@@ -28,6 +28,7 @@ import { settingsTabIcon } from "./grid-tab-decorations";
 import type { TabController } from "../controllers/types";
 import type { TabGrid } from "../openp41ge-tabs-adapter";
 import { parseManagerGrid, serializeManagerGrid } from "../services/manager-grid-layout";
+import { PlaceholderController } from "./manager-grid-placeholder";
 
 const log = createLogger("openp41ge", "manager-grid");
 
@@ -445,12 +446,10 @@ export class Openp41geManagerGrid extends LitElement {
     if (from < 0) return;
     const target = Math.max(0, Math.min(targetCol, this._placements.length - 1));
     if (from === target) return;
-    const fromP = this._placements[from];
     const boxes = this._placements.map((p) => ({
       tabIds: [...p.tabIds],
       activeTabId: p.activeTabId,
     }));
-    const tab = boxes[from];
     boxes.splice(from, 1);
     if (boxes[target]) {
       // Insert before the existing column's first tab (move into the column).
@@ -634,36 +633,6 @@ export class Openp41geManagerGrid extends LitElement {
       ></tab-grid>
     `;
   }
-}
-
-/** Fallback controller when an app type isn't registered (e.g. extension not
- *  loaded) so the cell still renders a labelled placeholder. */
-class PlaceholderController implements TabController {
-  private _container: HTMLElement | null = null;
-  constructor(
-    readonly tabId: string,
-    readonly appType: string,
-  ) {}
-
-  mount(container: HTMLElement): void {
-    this._container = container;
-    container.style.display = "flex";
-    container.style.alignItems = "center";
-    container.style.justifyContent = "center";
-    container.style.height = "100%";
-    container.style.color = "var(--text-secondary, #999)";
-    container.style.fontSize = "13px";
-    container.textContent = `${this.appType} (app type not registered)`;
-  }
-
-  unmount(): void {
-    if (this._container) this._container.textContent = "";
-  }
-  setVisible(_visible: boolean): void {}
-  snapshot(): Record<string, unknown> {
-    return {};
-  }
-  restore(_state: Record<string, unknown>): void {}
 }
 
 declare global {

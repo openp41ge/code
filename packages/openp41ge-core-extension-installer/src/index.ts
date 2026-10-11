@@ -15,10 +15,6 @@ export {
   type FetchBinary,
   type ExtractTgz,
 } from "./github-release-source";
-export {
-  fetchCatalog,
-  type CatalogEntry,
-  type ExtensionCatalog,
-} from "./catalog";
+export { fetchCatalog, type CatalogEntry, type ExtensionCatalog } from "./catalog";
 export { extractTgz, isUnsafeEntryPath, type ExtractOptions } from "./extract";
 export { readState, writeState, type ExtensionState, type InstalledEntry } from "./state";

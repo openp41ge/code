@@ -17,7 +17,9 @@ import {
 import { showConfirm } from "../confirm-dialog-manager.js";
 
 /** Resolve the dispatcher for the window that sent an IPC message. */
-export type DispatcherResolver = (event: { sender: Electron.WebContents }) => OperationDispatcher | null;
+export type DispatcherResolver = (event: {
+  sender: Electron.WebContents;
+}) => OperationDispatcher | null;
 
 export function registerDispatchHandlers(resolve: DispatcherResolver): void {
   ipcMain.handle("openp41ge:get-state", (event) => {

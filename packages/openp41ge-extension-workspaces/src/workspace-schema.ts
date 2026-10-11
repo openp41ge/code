@@ -68,8 +68,7 @@ export function mergeEditableFields(
     if (!(field in edited)) continue;
     const value = edited[field];
     const authored = field in baseline;
-    const changed =
-      JSON.stringify(value) !== JSON.stringify(WORKSPACE_EDITABLE_DEFAULTS[field]);
+    const changed = JSON.stringify(value) !== JSON.stringify(WORKSPACE_EDITABLE_DEFAULTS[field]);
     if (authored || changed) out[field] = value;
   }
   return out;

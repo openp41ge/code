@@ -21,7 +21,7 @@
  */
 
 import { render, nothing, html, type TemplateResult } from "lit";
-import type { ILogger } from "openp41ge-core-logger";
+import { createLogger, type ILogger } from "openp41ge-core-logger";
 import {
   qualifyName,
   type ConfigSchema,
@@ -141,15 +141,13 @@ export interface RendererSurfaceInstance {
 
 // ── Backend → renderer topic routing (Phase 3 dispatch bus) ──────────────
 
+const log = createLogger("openp41ge", "extension-runtime");
+
 const _topicSubs = new Map<string, Set<(payload: unknown) => void>>();
 let _bridgeWired = false;
 
 function ensureEventBridge(): void {
-  if (
-    _bridgeWired ||
-    typeof window === "undefined" ||
-    !window.openp41ge?.extension?.onEvent
-  ) {
+  if (_bridgeWired || typeof window === "undefined" || !window.openp41ge?.extension?.onEvent) {
     return;
   }
   _bridgeWired = true;
@@ -163,13 +161,13 @@ function ensureEventBridge(): void {
         } catch (err) {
           // Topic subscriber failures are isolated so one surface never breaks
           // the whole bus.
-          console.debug("extension topic subscriber threw", err);
+          log.debug("extension topic subscriber threw", err);
         }
       }
     });
   } catch (err) {
     // Bridge may be absent in some test environments; subscribe becomes inert.
-    console.debug("extension event bridge unavailable", err);
+    log.debug("extension event bridge unavailable", err);
   }
 }
 
@@ -278,8 +276,7 @@ export function mountRendererSurface<S extends Record<string, unknown> = Record<
   const log = deps.log;
   const dispatch =
     deps.dispatch ??
-    (() =>
-      Promise.reject(new Error(`dispatch is not wired yet (surface '${surface}')`)));
+    (() => Promise.reject(new Error(`dispatch is not wired yet (surface '${surface}')`)));
   const subscribe = deps.subscribe ?? (() => () => void 0);
   const config = deps.config ?? UNWIRED_CONFIG;
   const configSubs = new Set<() => void>();

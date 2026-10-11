@@ -1,7 +1,7 @@
 {
   "id": "2026-10-09-chat-threads-per-workspace",
   "description": "Chat threads live in their workspaces: move each global chat thread to the workspace it names (else the oldest), and the old chats.json into the oldest workspace.",
-  "release": "0.1.0-alpha.11",
+  "release": "0.1.0-alpha.1",
   "steps": [
     {
       "op": "forEachEntry",

@@ -21,8 +21,6 @@ import {
   NOTCH_OVERFLOW,
 } from "openp41ge-core-constants";
 
-import type { Openp41geSidebar } from "./openp41ge-sidebar";
-
 import "./openp41ge-sidebar";
 // Registers <drag-line>, the shared translucent blue hover affordance used by
 // the resize notches (the "you can drag this" sibling of <drop-line>).

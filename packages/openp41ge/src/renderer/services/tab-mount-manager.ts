@@ -253,10 +253,14 @@ export class TabMountManager {
       // later tab and (b) leave the unregistered container behind to be
       // re-created (duplicated) on the next sync.
       container.remove();
-      log.error("controller-mount failed, skipping tab", {
-        tabId: tab.id,
-        appType: tab.appType,
-      }, err);
+      log.error(
+        "controller-mount failed, skipping tab",
+        {
+          tabId: tab.id,
+          appType: tab.appType,
+        },
+        err,
+      );
       return undefined;
     }
 

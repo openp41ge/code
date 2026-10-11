@@ -16,12 +16,7 @@
  * name them unambiguously; platform consumer ids are bare.
  */
 
-import {
-  qualifyName,
-  type DragConsumerDecl,
-  type DragKind,
-  type DragPayload,
-} from "openp41ge-sdk";
+import { qualifyName, type DragConsumerDecl, type DragKind, type DragPayload } from "openp41ge-sdk";
 
 /** A platform consumer: a declaration plus how its app reads the payload. */
 export interface PlatformDragConsumer extends DragConsumerDecl {

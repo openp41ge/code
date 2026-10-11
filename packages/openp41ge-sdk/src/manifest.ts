@@ -53,9 +53,7 @@ export type ExtensionManifestMeta = ExtensionManifest["openp41ge"];
  * The shape is open (extra fields are allowed) so the manifest can carry
  * future metadata without breaking older hosts.
  */
-export function parseExtensionManifest(
-  raw: unknown,
-): ExtensionManifest {
+export function parseExtensionManifest(raw: unknown): ExtensionManifest {
   return extensionManifestSchema.parse(raw);
 }
 

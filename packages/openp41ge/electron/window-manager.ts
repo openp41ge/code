@@ -86,9 +86,7 @@ export function windowIdForSender(event: { sender: Electron.WebContents }): stri
 }
 
 /** The workspace path a webContents (window) is bound to, or null if unbound. */
-export function workspacePathForSender(
-  event: { sender: Electron.WebContents },
-): string | null {
+export function workspacePathForSender(event: { sender: Electron.WebContents }): string | null {
   for (const [id, bw] of openp41geWindows) {
     if (bw.webContents === event.sender) {
       return openp41geWindowMeta.get(id)?.workspacePath ?? null;

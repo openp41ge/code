@@ -12,7 +12,7 @@
  * A release without sets gets no file. Without the key it fails: a release
  * never carries unsigned migrations. Plain Node, no build step.
  *
- *   node release-migrations.mjs --version 0.1.0-alpha.11 --dir migrations --out release-assets
+ *   node release-migrations.mjs --version 0.1.0-alpha.1 --dir migrations --out release-assets
  */
 
 import crypto from "node:crypto";

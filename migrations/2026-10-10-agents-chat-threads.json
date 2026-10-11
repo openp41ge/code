@@ -1,7 +1,7 @@
 {
   "id": "2026-10-10-agents-chat-threads",
   "description": "Chat threads belong to the agents extension: move each workspace's chat threads into the extension's folder in that workspace.",
-  "release": "0.1.0-alpha.11",
+  "release": "0.1.0-alpha.1",
   "steps": [
     {
       "op": "forEachWorkspace",

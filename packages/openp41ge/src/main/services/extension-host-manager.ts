@@ -33,9 +33,7 @@ export interface ExtensionHostManagerOptions {
   /** Extra discovery roots (e.g. the repo's `packages/` dir in dev). */
   readonly extraDiscoveryDirs?: readonly string[];
   /** Override host creation (tests). */
-  readonly createHost?: (
-    opts: Pick<ExtensionHostOptions, "discoveryDirs">,
-  ) => ExtensionHost;
+  readonly createHost?: (opts: Pick<ExtensionHostOptions, "discoveryDirs">) => ExtensionHost;
   /** Invoked whenever the active-extension set changes (e.g. to broadcast). */
   readonly onStateChange?: (active: ActiveExtensionSummary[]) => void;
   /** Invoked when a backend handler publishes a topic push. The platform

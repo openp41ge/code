@@ -251,18 +251,13 @@ export class ConfigService {
    *  @param updateChannel The platform-default update channel. Callers pass
    *  `updateChannelForVersion(app.getVersion())` so a prerelease build (e.g.
    *  v0.1.0-alpha.10) checks its own track; tests/dev default to "latest". */
-  constructor(
-    openp41geDir?: string,
-    updateChannel: UserConfig["updateChannel"] = "latest",
-  ) {
+  constructor(openp41geDir?: string, updateChannel: UserConfig["updateChannel"] = "latest") {
     // Callers pass the resolved app-data root. `~/.openp41ge` is only a safety
     // default for direct construction without the resolved root.
     const baseDir = openp41geDir ?? path.join(os.homedir(), APP_DATA_DIR_PRODUCTION);
     this._configDir = path.join(baseDir, ".config");
     this._configPath = path.join(this._configDir, "config.json");
-    this._platformDefaults = JSON.parse(
-      JSON.stringify(DEFAULT_CONFIG),
-    ) as UserConfig;
+    this._platformDefaults = JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as UserConfig;
     this._platformDefaults.updateChannel = updateChannel;
     this._config = { ...this._platformDefaults };
   }
@@ -332,7 +327,11 @@ export class ConfigService {
    *  disk, so settings editors can distinguish user-written values from implied
    *  defaults. */
   getOverrides(): UserConfig {
-    return sortedOverrides(this._config, this._explicitKeys, this._platformDefaults) as unknown as UserConfig;
+    return sortedOverrides(
+      this._config,
+      this._explicitKeys,
+      this._platformDefaults,
+    ) as unknown as UserConfig;
   }
 
   /** Set a config key (dot-separated) and persist to disk. */
@@ -404,7 +403,11 @@ export class ConfigService {
       const tmpPath = this._configPath + ".tmp";
       fs.writeFileSync(
         tmpPath,
-        JSON.stringify(sortedOverrides(config, this._explicitKeys, this._platformDefaults), null, 2),
+        JSON.stringify(
+          sortedOverrides(config, this._explicitKeys, this._platformDefaults),
+          null,
+          2,
+        ),
         "utf-8",
       );
       fs.renameSync(tmpPath, this._configPath);

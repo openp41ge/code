@@ -98,7 +98,8 @@ function pruneUnregisteredSystemTabs(ws: Workspace, windowId: string): Workspace
     if (getSystemTabRegistration(appType)) continue;
     // Remove the orphan from whichever shared sidebar lists reference it.
     for (const side of ["left", "right"] as const) {
-      const list = side === "left" ? result.sidebar.leftSidebarTabs : result.sidebar.rightSidebarTabs;
+      const list =
+        side === "left" ? result.sidebar.leftSidebarTabs : result.sidebar.rightSidebarTabs;
       if ((list as string[]).includes(id)) {
         result = closeSystemTab(result, windowId, side, id, true);
       }

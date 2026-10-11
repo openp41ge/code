@@ -58,9 +58,7 @@ async function readManifest(root: string): Promise<DiscoveredExtension | null> {
 }
 
 /** Discover all installed extensions across the given directories. */
-export async function discoverExtensions(
-  dirs: readonly string[],
-): Promise<DiscoveredExtension[]> {
+export async function discoverExtensions(dirs: readonly string[]): Promise<DiscoveredExtension[]> {
   const results: DiscoveredExtension[] = [];
   for (const dir of dirs) {
     results.push(...(await scanDir(dir)));

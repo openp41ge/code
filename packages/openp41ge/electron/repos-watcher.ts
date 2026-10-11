@@ -81,7 +81,11 @@ export class ReposWatcher {
       fs.mkdirSync(this._root, { recursive: true });
     } catch (err) {
       // Root dir may be unavailable (e.g. unmounted) — watch will retry next start.
-      log.warn("repos-watcher root dir unavailable; watch will retry on next start:", this._root, err);
+      log.warn(
+        "repos-watcher root dir unavailable; watch will retry on next start:",
+        this._root,
+        err,
+      );
     }
     this._watchRecursive();
   }
@@ -176,7 +180,11 @@ export class ReposWatcher {
       this._watchers.set(dir, watcher);
     } catch (err) {
       /* directory disappeared or unreadable */
-      log.debug("repos-watcher cannot add dir watcher; directory disappeared or unreadable:", dir, err);
+      log.debug(
+        "repos-watcher cannot add dir watcher; directory disappeared or unreadable:",
+        dir,
+        err,
+      );
     }
   }
 

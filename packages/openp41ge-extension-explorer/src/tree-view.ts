@@ -128,7 +128,10 @@ export const MAX_PREFETCH_DEPTH = 4;
 export interface ExplorerHost {
   readonly context: Readonly<Record<string, unknown>>;
   readonly state: Readonly<Record<string, unknown>>;
-  readonly dispatch: (command: string, payload?: Readonly<Record<string, unknown>>) => Promise<unknown>;
+  readonly dispatch: (
+    command: string,
+    payload?: Readonly<Record<string, unknown>>,
+  ) => Promise<unknown>;
   readonly setState: (update: (prev: ExplorerState) => ExplorerState) => void;
   readonly openTab: (request: {
     appType: string;
@@ -325,10 +328,7 @@ function followContext(host: ExplorerHost, prev: Partial<ExplorerState>): Explor
 }
 
 /** Convert backend listing entries into tree nodes (nested prefetched set). */
-export function entriesToNodes(
-  entries: ReadonlyArray<ReadDirEntry>,
-  root: string,
-): TreeNode[] {
+export function entriesToNodes(entries: ReadonlyArray<ReadDirEntry>, root: string): TreeNode[] {
   return entries.map((e) => {
     if (e.kind === "file") {
       return {
@@ -386,7 +386,10 @@ export function setNodeExpanded(
   path: string,
   expanded: boolean,
 ): ExplorerState {
-  return { ...prev, roots: mapNodes(prev.roots, (n) => (n.path === path ? { ...n, expanded } : n)) };
+  return {
+    ...prev,
+    roots: mapNodes(prev.roots, (n) => (n.path === path ? { ...n, expanded } : n)),
+  };
 }
 
 /** Mark a node with an error (e.g. a read/open failure) and collapse it. */
@@ -582,8 +585,7 @@ function registerExplorerBarButtons(el: Element | undefined, host: ExplorerHost)
     id: "collapse-all",
     icon: "collapse",
     title: "Collapse all",
-    onClick: () =>
-      host.setState((prev) => ({ roots: collapseAll(withRoots(host, prev).roots) })),
+    onClick: () => host.setState((prev) => ({ roots: collapseAll(withRoots(host, prev).roots) })),
   });
   shell.registerBottomBarButton({
     id: "explorer-settings",
@@ -602,13 +604,45 @@ export function renderExplorer(host: ExplorerHost): TemplateResult {
   const roots: TreeNode[] = followContext(host, state).roots;
   return html`
     <style>
-      .explorer-tree{min-height:100%;font-family:var(--ui-sans,ui-sans-serif,system-ui,sans-serif);font-size:12px;color:var(--fg-primary,inherit);background:transparent}
-      .explorer-root{display:flex;flex-direction:column;padding:4px 0}
-      .row{display:flex;align-items:center;gap:5px;height:28px;padding-right:8px;cursor:pointer;white-space:nowrap;user-select:none}
-      .row:hover{background:var(--row-hover,rgba(128,128,128,0.12))}
-      .row.row--error{background:rgba(244,71,71,0.12);color:var(--accent-error,#f44747)}
-      .row.pending-row{cursor:default;font-style:italic;color:var(--text-muted,#888)}
-      .row.pending-row .pending-status{margin-left:auto;flex:none;font-size:11px}
+      .explorer-tree {
+        min-height: 100%;
+        font-family: var(--ui-sans, ui-sans-serif, system-ui, sans-serif);
+        font-size: 12px;
+        color: var(--fg-primary, inherit);
+        background: transparent;
+      }
+      .explorer-root {
+        display: flex;
+        flex-direction: column;
+        padding: 4px 0;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        height: 28px;
+        padding-right: 8px;
+        cursor: pointer;
+        white-space: nowrap;
+        user-select: none;
+      }
+      .row:hover {
+        background: var(--row-hover, rgba(128, 128, 128, 0.12));
+      }
+      .row.row--error {
+        background: rgba(244, 71, 71, 0.12);
+        color: var(--accent-error, #f44747);
+      }
+      .row.pending-row {
+        cursor: default;
+        font-style: italic;
+        color: var(--text-muted, #888);
+      }
+      .row.pending-row .pending-status {
+        margin-left: auto;
+        flex: none;
+        font-size: 11px;
+      }
       /* Row focus: the last-clicked / keyboard-focused row carries the blue
          focused-row bar + border (same outline the ext-tree paints). The
          row--focused class is applied to the inline create row while it is
@@ -624,46 +658,125 @@ export function renderExplorer(host: ExplorerHost): TemplateResult {
         box-shadow: inset 0 0 0 1px var(--tree-focus, #4a9eff);
         outline: none !important;
       }
-      .row .chevron{width:12px;flex:none;text-align:center;color:var(--fg-muted,inherit);opacity:.75}
-      .row .icon{width:14px;flex:none;text-align:center;font-size:13px}
-      .row .label{overflow:hidden;text-overflow:ellipsis;font-weight:400}
-      .row.add-row{color:var(--text-muted,#666);opacity:.6}
-      .row.add-row:hover{color:var(--fg-primary,inherit);opacity:1}
-      .row.add-row .icon{font-size:12px}
-      .new-entry-row{cursor:default;gap:4px}
+      .row .chevron {
+        width: 12px;
+        flex: none;
+        text-align: center;
+        color: var(--fg-muted, inherit);
+        opacity: 0.75;
+      }
+      .row .icon {
+        width: 14px;
+        flex: none;
+        text-align: center;
+        font-size: 13px;
+      }
+      .row .label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        font-weight: 400;
+      }
+      .row.add-row {
+        color: var(--text-muted, #666);
+        opacity: 0.6;
+      }
+      .row.add-row:hover {
+        color: var(--fg-primary, inherit);
+        opacity: 1;
+      }
+      .row.add-row .icon {
+        font-size: 12px;
+      }
+      .new-entry-row {
+        cursor: default;
+        gap: 4px;
+      }
       /* In edit mode the plus chevron and the kind glyph stay the muted
          colour they had on the idle add row — only the label becomes the input. */
       .new-entry-row .chevron,
-      .new-entry-row .icon{color:var(--text-muted,#888)}
+      .new-entry-row .icon {
+        color: var(--text-muted, #888);
+      }
       /* The inline input is invisible — no background, no border, no focus
          ring. The ROW owns the visual state: while editing it carries the
          same blue focused-row outline (bar + border) as a focused row. */
-      .new-entry-input{flex:1;min-width:0;height:20px;padding:0 2px;font:inherit;color:var(--fg-primary,inherit);background:transparent;border:none;outline:none}
-      .new-entry-input::placeholder{color:var(--text-muted,#888);opacity:1}
+      .new-entry-input {
+        flex: 1;
+        min-width: 0;
+        height: 20px;
+        padding: 0 2px;
+        font: inherit;
+        color: var(--fg-primary, inherit);
+        background: transparent;
+        border: none;
+        outline: none;
+      }
+      .new-entry-input::placeholder {
+        color: var(--text-muted, #888);
+        opacity: 1;
+      }
       .new-entry-input:focus,
-      .new-entry-input:focus-visible{outline:none;box-shadow:none}
-      .row.new-entry-row:hover{background:transparent}
+      .new-entry-input:focus-visible {
+        outline: none;
+        box-shadow: none;
+      }
+      .row.new-entry-row:hover {
+        background: transparent;
+      }
       .explorer-tree:focus-within .row.new-entry-row:focus,
       .explorer-tree:focus-within .row.new-entry-row:focus-visible,
       .explorer-tree:focus-within .row.new-entry-row.row--focused,
       .explorer-tree:focus-within .row.new-entry-row:has(.new-entry-input:focus),
-      .explorer-tree:focus-within .row.new-entry-row:has(.new-entry-input:focus-visible){background:rgba(74,158,255,0.12);box-shadow:inset 0 0 0 1px var(--tree-focus,#4a9eff);outline:none !important}
-      .new-entry-btn{flex:none;display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;padding:0;border:none;background:transparent;color:var(--fg-muted,inherit);cursor:pointer;border-radius:3px}
-      .new-entry-btn:hover{background:rgba(128,128,128,0.16);color:var(--fg-primary,inherit)}
+      .explorer-tree:focus-within .row.new-entry-row:has(.new-entry-input:focus-visible) {
+        background: rgba(74, 158, 255, 0.12);
+        box-shadow: inset 0 0 0 1px var(--tree-focus, #4a9eff);
+        outline: none !important;
+      }
+      .new-entry-btn {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        padding: 0;
+        border: none;
+        background: transparent;
+        color: var(--fg-muted, inherit);
+        cursor: pointer;
+        border-radius: 3px;
+      }
+      .new-entry-btn:hover {
+        background: rgba(128, 128, 128, 0.16);
+        color: var(--fg-primary, inherit);
+      }
       /* Grid focus: the tree grid shows a subtle background while it owns
          focus (tabbed into, or the panel is the focused tab). */
       /* No background change when the grid is focused — the row focus bar
          (above) is the only focus affordance. Keep any global outline off. */
       .explorer-tree:focus,
-      .explorer-tree:focus-visible{outline:none !important}
-      .empty{padding:8px 10px;color:var(--fg-muted,inherit);font-style:italic}
+      .explorer-tree:focus-visible {
+        outline: none !important;
+      }
+      .empty {
+        padding: 8px 10px;
+        color: var(--fg-muted, inherit);
+        font-style: italic;
+      }
     </style>
     <openp41ge-sidebar-tab-content ${ref((el) => registerExplorerBarButtons(el, host))}>
-      <div class="explorer-tree" role="tree" tabindex="0" @keydown=${(e: KeyboardEvent) => onTreeKey(host, e)}>
+      <div
+        class="explorer-tree"
+        role="tree"
+        tabindex="0"
+        @keydown=${(e: KeyboardEvent) => onTreeKey(host, e)}
+      >
         <div class="explorer-root">
-          ${roots.length === 0
-            ? html`<div class="empty">No repositories in this workspace yet.</div>`
-            : roots.map((n) => renderNode(host, n, 0))}
+          ${
+            roots.length === 0
+              ? html`<div class="empty">No repositories in this workspace yet.</div>`
+              : roots.map((n) => renderNode(host, n, 0))
+          }
           ${renderCreateRow(host, { path: "", kind: "repo" }, 0)}
         </div>
       </div>
@@ -680,7 +793,8 @@ export function renderExplorer(host: ExplorerHost): TemplateResult {
 function nodeIcon(node: TreeNode): TemplateResult {
   if (node.nodeType === "repo") return html`${unsafeHTML(repoIcon(14))}`;
   if (node.nodeType === "worktree") return html`${unsafeHTML(worktreeIcon(14))}`;
-  if (node.kind === "dir") return html`<openp41ge-icon name="folder-closed" size="14"></openp41ge-icon>`;
+  if (node.kind === "dir")
+    return html`<openp41ge-icon name="folder-closed" size="14"></openp41ge-icon>`;
   return html`<file-extension-svg filename=${node.name} size="14"></file-extension-svg>`;
 }
 
@@ -754,7 +868,10 @@ function openRowMenu(host: ExplorerHost, node: TreeNode, e: MouseEvent): void {
           (res) => {
             if (res.ok || res.cancelled) return;
             const message = `Delete failed: ${res.error ?? "unknown error"}`;
-            host.setState((prev) => ({ ...withRoots(host, prev), rowError: { path: node.path, message } }));
+            host.setState((prev) => ({
+              ...withRoots(host, prev),
+              rowError: { path: node.path, message },
+            }));
           },
           (err: unknown) =>
             host.setState((prev) => ({
@@ -826,13 +943,14 @@ function createRowPlaceholder(kind: NewEntryKind): string {
 function createRowIcon(kind: NewEntryKind): TemplateResult {
   if (kind === "repo") return html`${unsafeHTML(repoIcon(14))}`;
   if (kind === "worktree") return html`${unsafeHTML(worktreeIcon(14))}`;
-  if (kind === "folder") return html`<openp41ge-icon name="folder-closed" size="14"></openp41ge-icon>`;
+  if (kind === "folder")
+    return html`<openp41ge-icon name="folder-closed" size="14"></openp41ge-icon>`;
   return html`<openp41ge-icon name="file" size="14"></openp41ge-icon>`;
 }
 
 /** Glyph in the chevron column of a create row: the `+` for every kind,
  *  aligned with the grouping rows' chevron column. */
-function createRowChevron(kind: NewEntryKind): TemplateResult | typeof nothing {
+function createRowChevron(): TemplateResult {
   return html`<openp41ge-icon name="plus" size="12"></openp41ge-icon>`;
 }
 
@@ -840,7 +958,7 @@ function createRowChevron(kind: NewEntryKind): TemplateResult | typeof nothing {
  *  the same text column as the grouping rows. Every create row puts the `+` in
  *  the chevron column and its kind glyph in the icon column. */
 function createRowLeading(kind: NewEntryKind): TemplateResult | typeof nothing {
-  return html`<span class="chevron">${createRowChevron(kind)}</span
+  return html`<span class="chevron">${createRowChevron()}</span
     ><span class="icon">${createRowIcon(kind)}</span>`;
 }
 
@@ -850,11 +968,7 @@ function createRowLeading(kind: NewEntryKind): TemplateResult | typeof nothing {
  * with confirm/cancel buttons; otherwise a muted, hoverable row that enters
  * edit mode on click.
  */
-function renderCreateRow(
-  host: ExplorerHost,
-  target: CreateTarget,
-  depth: number,
-): TemplateResult {
+function renderCreateRow(host: ExplorerHost, target: CreateTarget, depth: number): TemplateResult {
   const state = (host.state ?? {}) as Partial<ExplorerState>;
   const editing =
     !!state.newEntry && state.newEntry.path === target.path && state.newEntry.kind === target.kind;
@@ -867,7 +981,14 @@ function renderCreateRow(
         ? `Cloning${pending.percent ? ` ${pending.percent}%` : "…"}`
         : "Checking out…";
     return html`
-      <div class="row pending-row" role="treeitem" data-depth=${depth} style="padding-left:${padding}px" data-new-entry=${target.kind} data-path=${target.path}>
+      <div
+        class="row pending-row"
+        role="treeitem"
+        data-depth=${depth}
+        style="padding-left:${padding}px"
+        data-new-entry=${target.kind}
+        data-path=${target.path}
+      >
         <span class="chevron"></span>
         <span class="icon">${createRowIcon(target.kind)}</span>
         <span class="label">${pending.name}</span>
@@ -879,7 +1000,17 @@ function renderCreateRow(
     const name = state.newEntryName ?? "";
     const failed = state.createError?.key === key ? state.createError.message : null;
     return html`
-      <div class="row new-entry-row row--focused ${failed ? "row--error" : ""}" title=${failed ?? nothing} role="treeitem" tabindex="0" data-depth=${depth} style="padding-left:${padding}px" data-new-entry=${target.kind} data-path=${target.path} data-root=${target.root ?? undefined}>
+      <div
+        class="row new-entry-row row--focused ${failed ? "row--error" : ""}"
+        title=${failed ?? nothing}
+        role="treeitem"
+        tabindex="0"
+        data-depth=${depth}
+        style="padding-left:${padding}px"
+        data-new-entry=${target.kind}
+        data-path=${target.path}
+        data-root=${target.root ?? undefined}
+      >
         ${createRowLeading(target.kind)}
         <input
           class="new-entry-input"
@@ -903,7 +1034,9 @@ function renderCreateRow(
             e.stopPropagation();
             onConfirmCreate(host, target);
           }}
-        >${unsafeHTML(checkIcon(14))}</button>
+        >
+          ${unsafeHTML(checkIcon(14))}
+        </button>
         <button
           type="button"
           class="new-entry-btn new-entry-cancel"
@@ -913,7 +1046,9 @@ function renderCreateRow(
             e.stopPropagation();
             host.setState((prev) => clearNewEntry(prev));
           }}
-        >${unsafeHTML(closeIcon(14))}</button>
+        >
+          ${unsafeHTML(closeIcon(14))}
+        </button>
       </div>
     `;
   }
@@ -932,7 +1067,7 @@ function renderCreateRow(
         onBeginCreate(host, target, e);
       }}
     >
-      <span class="chevron">${createRowChevron(target.kind)}</span>
+      <span class="chevron">${createRowChevron()}</span>
       <span class="icon">${createRowIcon(target.kind)}</span>
       <span class="label add-label">${createRowLabel(target.kind)}</span>
     </div>
@@ -1051,7 +1186,11 @@ export function onTreeKey(host: ExplorerHost, e: KeyboardEvent): void {
       const row = rows[idx];
       e.preventDefault();
       const key = rowFocusKey(row);
-      if (key && row.getAttribute("data-kind") === "dir" && row.getAttribute("data-expanded") === "true") {
+      if (
+        key &&
+        row.getAttribute("data-kind") === "dir" &&
+        row.getAttribute("data-expanded") === "true"
+      ) {
         toggleNode(host, key, false);
       } else {
         // Ascend to the nearest earlier row at a shallower depth (the parent).
@@ -1097,7 +1236,9 @@ function onOpenFile(host: ExplorerHost, node: TreeNode, e: MouseEvent): void {
         host.log?.error(`explorer: cannot open "${node.path}": ${r?.error ?? "open failed"}`);
       }
     })
-    .catch((err) => host.log?.error(`explorer: open-file failed for "${node.path}": ${String(err)}`));
+    .catch((err) =>
+      host.log?.error(`explorer: open-file failed for "${node.path}": ${String(err)}`),
+    );
 }
 
 /** Double-click detection for pinning: a second click on the same file path
@@ -1178,7 +1319,7 @@ function createFsEntry(
       if (r && !r.ok) {
         host.log?.error(`explorer: cannot create ${kind} "${name}": ${r?.error ?? "failed"}`);
       }
-      refreshDir(host, target.path, target.root ?? target.path);
+      refreshDir(host, target.path);
     })
     .catch((err) =>
       host.log?.error(`explorer: create ${kind} failed for "${targetPath}": ${String(err)}`),
@@ -1186,7 +1327,7 @@ function createFsEntry(
 }
 
 /** Re-read a directory so a newly-created entry appears in the sorted list. */
-function refreshDir(host: ExplorerHost, path: string, root: string): void {
+function refreshDir(host: ExplorerHost, path: string): void {
   void host
     .dispatch("read-dir", { path, depth: prefetchDepthOf(host) })
     .then((res) => {

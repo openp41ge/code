@@ -17,7 +17,7 @@ from `packages/` in dev.
 
 - [x] **Bundle the official extensions into release builds** (done
       2026-10-11): `scripts/bundle-extensions.ts` / `nx run
-    openp41ge:bundle-extensions` builds each as a self-contained extension
+openp41ge:bundle-extensions` builds each as a self-contained extension
       dir; electron-builder packs them into the app's resources and the
       packaged app discovers them there (AGENTS.md §2.7). Checked with a local
       unsigned packaged build; the first CI release is the first signed one.

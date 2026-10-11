@@ -135,7 +135,9 @@ export function scanWorkspaceFiles(
       file: path.join(dir, name),
       workspace,
       name: typeof data.name === "string" ? data.name : workspace.id,
-      ...(typeof data.lastActivatedAt === "string" ? { lastActivatedAt: data.lastActivatedAt } : {}),
+      ...(typeof data.lastActivatedAt === "string"
+        ? { lastActivatedAt: data.lastActivatedAt }
+        : {}),
       ...(typeof data.createdAt === "string" ? { createdAt: data.createdAt } : {}),
       repoNames,
     });

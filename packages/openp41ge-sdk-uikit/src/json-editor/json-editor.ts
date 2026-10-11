@@ -2172,7 +2172,10 @@ export class JsonEditorElement extends LitElement {
     const b = this._hlBlock();
     if (!b) return nothing;
     return html`
-      <div class="je-hl-border" style="top:${b.top}px; height:${b.height}px; --je-hl:${b.color}"></div>
+      <div
+        class="je-hl-border"
+        style="top:${b.top}px; height:${b.height}px; --je-hl:${b.color}"
+      ></div>
     `;
   }
 

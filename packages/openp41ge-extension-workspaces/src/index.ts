@@ -108,7 +108,10 @@ export async function readWorkspaceProcess(payload: HandlerPayload): Promise<Wor
   if (!target) return { ok: false, error: "Path is outside the workspaces directory" };
   try {
     const raw = await fs.readFile(target, "utf-8");
-    return { ok: true, entry: { filePath: target, data: migrateWorkspaceFileData(JSON.parse(raw)) } };
+    return {
+      ok: true,
+      entry: { filePath: target, data: migrateWorkspaceFileData(JSON.parse(raw)) },
+    };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
@@ -203,7 +206,10 @@ function fallbackId(): string {
 
 /** A filename-safe version of a workspace name (or "" when empty). */
 function sanitizeFileName(name: string): string {
-  return name.replace(/[^\w.-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64);
+  return name
+    .replace(/[^\w.-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
 }
 
 /** True when a path exists (file or dir). */

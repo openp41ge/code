@@ -31,15 +31,12 @@ import { directive, Directive } from "lit/directive.js";
 import type { ElementPart } from "lit/directive.js";
 import { deriveRepoName, validateRepoUrl, type SurfaceHost } from "openp41ge-sdk";
 import "openp41ge-sdk-uikit/json-editor";
+import { autofocus } from "./autofocus-directive.js";
 import "./workspace-bottom-bar.js";
 import type { WorkspaceBottomBarButton } from "./workspace-bottom-bar.js";
 import type { WorkspaceFileData, WorkspaceRepo } from "./workspace-file.js";
 import { findRepoByName, mergeWorkspaceEdits, migrateWorkspaceFileData } from "./workspace-file.js";
-import {
-  WORKSPACE_FILE_SCHEMA,
-  editableView,
-  mergeEditableFields,
-} from "./workspace-schema.js";
+import { WORKSPACE_FILE_SCHEMA, editableView, mergeEditableFields } from "./workspace-schema.js";
 
 /** Save icon (floppy+disk outline), as SVG markup for the bottom-bar button. */
 const SAVE_ICON =
@@ -52,41 +49,6 @@ const LOCK_ICON =
 /** Open-padlock icon (unlocked workspace name), as SVG markup. */
 const UNLOCK_ICON =
   '<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="M240-640h360v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85h-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640Zm0 480h480v-400H240v400Zm296.5-143.5Q560-327 560-360t-23.5-56.5Q513-440 480-440t-56.5 23.5Q400-393 400-360t23.5 56.5Q447-280 480-280t56.5-23.5ZM240-160v-400 400Z"/></svg>';
-
-/** Focus the inline URL editor the moment it is mounted. The grid surface
- *  renders into a container that may not yet be attached to the document, so
- *  focus can only take effect once the element is connected — poll briefly. */
-class AutofocusDirective extends Directive {
-  private timer: number | undefined;
-  render(): unknown {
-    return undefined;
-  }
-  update(part: ElementPart): unknown {
-    if (this.timer !== undefined) {
-      window.clearInterval(this.timer);
-      this.timer = undefined;
-    }
-    const el = part.element as HTMLElement;
-    if (el.isConnected) {
-      el.focus();
-      return undefined;
-    }
-    let tries = 0;
-    const id = window.setInterval(() => {
-      if (el.isConnected) {
-        el.focus();
-        window.clearInterval(id);
-        this.timer = undefined;
-      } else if (++tries > 100) {
-        window.clearInterval(id);
-        this.timer = undefined;
-      }
-    }, 10);
-    this.timer = id;
-    return undefined;
-  }
-}
-const autofocus = directive(AutofocusDirective);
 
 // --- Global surface shortcuts (Cmd/Ctrl+S save, Cmd/Ctrl+Z undo) ---
 //
@@ -339,7 +301,9 @@ export function followWorkspaceFile(host: WorkspaceEditorHost): () => void {
 /** The repositories (by name) `before` lists and `after` does not. */
 function droppedRepos(before: WorkspaceFileData | undefined, after: WorkspaceFileData): string[] {
   const names = (d: WorkspaceFileData | undefined) =>
-    new Set((d?.repos ?? []).flatMap((r) => (validateRepoUrl(r.url) ? [] : [deriveRepoName(r.url)])));
+    new Set(
+      (d?.repos ?? []).flatMap((r) => (validateRepoUrl(r.url) ? [] : [deriveRepoName(r.url)])),
+    );
   const kept = names(after);
   return [...names(before)].filter((name) => !kept.has(name));
 }
@@ -399,9 +363,11 @@ export function startRepoClone(host: WorkspaceEditorHost, url: string): void {
       cloneStates: { ...(prev.cloneStates ?? {}), [url]: state },
     }));
   setCloneState({ phase: "cloning" });
-  void host.workspace.cloneRepository(url, host.state.path).done.then((res) =>
-    setCloneState(res.ok ? { phase: "done" } : { phase: "failed", error: res.error }),
-  );
+  void host.workspace
+    .cloneRepository(url, host.state.path)
+    .done.then((res) =>
+      setCloneState(res.ok ? { phase: "done" } : { phase: "failed", error: res.error }),
+    );
 }
 
 /** Restore the most recent data edit (per-tab undo history). */
@@ -556,19 +522,88 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
 
   return html`
     <style>
-      .we-root { display:flex; flex-direction:column; height:100%; box-sizing:border-box; font-family:inherit; overflow:hidden; background:var(--bg-primary, #161616); }
-      .we-body { flex:1; min-height:0; overflow:hidden; display:flex; flex-direction:column; }
-      .we-note { padding:12px; font-size:12px; color:var(--text-secondary, #999); }
-      .we-error { padding:4px 12px; font-size:11px; color:var(--danger, #f44336); background:rgba(244,67,54,.08); border-top:1px solid var(--border-divider, #2a2a2a); flex-shrink:0; }
-      .we-json { flex:1; min-height:0; display:flex; flex-direction:column; }
-      .we-json > json-editor { flex:1; min-height:0; }
-      .we-ui { flex:1; min-height:0; overflow:auto; padding:12px; display:flex; flex-direction:column; gap:12px; box-sizing:border-box; }
-      .we-field { display:flex; flex-direction:column; gap:4px; }
-      .we-field > span { font-size:11px; color:var(--text-secondary, #999); }
-      .we-input { background:var(--bg-tertiary, #2a2a2a); border:1px solid var(--border-divider, #333); color:var(--text, #ddd); border-radius:4px; padding:5px 8px; font-size:12px; font-family:inherit; box-sizing:border-box; }
-      .we-input:focus { outline:none; border-color:var(--accent, #569cd6); }
-      .we-card { background:var(--bg-tertiary, #222); border:1px solid var(--border-divider, #333); border-radius:6px; box-sizing:border-box; overflow:hidden; }
-      .we-card--detached { border-color:var(--border-divider, #333); }
+      .we-root {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        box-sizing: border-box;
+        font-family: inherit;
+        overflow: hidden;
+        background: var(--bg-primary, #161616);
+      }
+      .we-body {
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      .we-note {
+        padding: 12px;
+        font-size: 12px;
+        color: var(--text-secondary, #999);
+      }
+      .we-error {
+        padding: 4px 12px;
+        font-size: 11px;
+        color: var(--danger, #f44336);
+        background: rgba(244, 67, 54, 0.08);
+        border-top: 1px solid var(--border-divider, #2a2a2a);
+        flex-shrink: 0;
+      }
+      .we-json {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .we-json > json-editor {
+        flex: 1;
+        min-height: 0;
+      }
+      .we-ui {
+        flex: 1;
+        min-height: 0;
+        overflow: auto;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        box-sizing: border-box;
+      }
+      .we-field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .we-field > span {
+        font-size: 11px;
+        color: var(--text-secondary, #999);
+      }
+      .we-input {
+        background: var(--bg-tertiary, #2a2a2a);
+        border: 1px solid var(--border-divider, #333);
+        color: var(--text, #ddd);
+        border-radius: 4px;
+        padding: 5px 8px;
+        font-size: 12px;
+        font-family: inherit;
+        box-sizing: border-box;
+      }
+      .we-input:focus {
+        outline: none;
+        border-color: var(--accent, #569cd6);
+      }
+      .we-card {
+        background: var(--bg-tertiary, #222);
+        border: 1px solid var(--border-divider, #333);
+        border-radius: 6px;
+        box-sizing: border-box;
+        overflow: hidden;
+      }
+      .we-card--detached {
+        border-color: var(--border-divider, #333);
+      }
       /* The repositories accordion: each git-repo URL is a flush segment.
          Collapsed, all segments sit in one card; the open segment DETACHES
          into its own accent card, splitting the remaining segments into
@@ -576,107 +611,528 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
          bottom card is the ＋ Add repository row). An open segment reveals its
          worktrees as a sub-list. Delete (✕) buttons sit INSIDE at the end of
          each row. */
-      .we-card > .we-seg { border-top:1px solid var(--border-divider, #2a2a2a); }
-      .we-card > .we-seg:first-child { border-top:none; }
-      .we-seg { display:flex; flex-direction:column; box-sizing:border-box; }
-      .we-seg--open { background:transparent; }
-      .we-seg-head { display:flex; align-items:center; gap:8px; padding:6px 8px; cursor:pointer; user-select:none; }
-      .we-seg-head:hover { background:var(--bg-tertiary, #2a2a2a); }
-      .we-seg--add .we-seg-head { cursor:default; }
-      .we-seg--add .we-seg-head:hover { background:transparent; }
-      .we-seg--add .we-card-main { padding-left:22px; }
-      .we-card-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
-      .we-card-main .we-input { width:100%; box-sizing:border-box; }
-      .we-card-name { font-size:13px; line-height:18px; color:var(--text, #ddd); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .we-card-meta { font-size:11px; color:var(--text-secondary, #999); }
-      .we-card-url { font-size:11px; line-height:15px; color:var(--text-secondary, #999); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .we-repo-error { font-size:11px; color:#f44336; }
-      .we-seg--invalid .we-card-name, .we-seg--invalid .we-card-url { color:#f44336; }
-      .we-clone-status { font-style: italic; margin-left:8px; position:relative; }
-      .we-clone-status--live { color:var(--text-secondary, #999); }
-      .we-clone-status:not(.we-clone-status--live) { color:#c98a4b; }
+      .we-card > .we-seg {
+        border-top: 1px solid var(--border-divider, #2a2a2a);
+      }
+      .we-card > .we-seg:first-child {
+        border-top: none;
+      }
+      .we-seg {
+        display: flex;
+        flex-direction: column;
+        box-sizing: border-box;
+      }
+      .we-seg--open {
+        background: transparent;
+      }
+      .we-seg-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 8px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .we-seg-head:hover {
+        background: var(--bg-tertiary, #2a2a2a);
+      }
+      .we-seg--add .we-seg-head {
+        cursor: default;
+      }
+      .we-seg--add .we-seg-head:hover {
+        background: transparent;
+      }
+      .we-seg--add .we-card-main {
+        padding-left: 22px;
+      }
+      .we-card-main {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .we-card-main .we-input {
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .we-card-name {
+        font-size: 13px;
+        line-height: 18px;
+        color: var(--text, #ddd);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .we-card-meta {
+        font-size: 11px;
+        color: var(--text-secondary, #999);
+      }
+      .we-card-url {
+        font-size: 11px;
+        line-height: 15px;
+        color: var(--text-secondary, #999);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .we-repo-error {
+        font-size: 11px;
+        color: #f44336;
+      }
+      .we-seg--invalid .we-card-name,
+      .we-seg--invalid .we-card-url {
+        color: #f44336;
+      }
+      .we-clone-status {
+        font-style: italic;
+        margin-left: 8px;
+        position: relative;
+      }
+      .we-clone-status--live {
+        color: var(--text-secondary, #999);
+      }
+      .we-clone-status:not(.we-clone-status--live) {
+        color: #c98a4b;
+      }
       /* Hover tooltip showing the underlying clone error ("inline modal"). */
       .we-clone-tip {
-        position:absolute; top:calc(100% + 4px); left:0; z-index:30;
-        display:none; width:max-content; max-width:340px; max-height:160px; overflow:auto;
-        padding:6px 8px; border:1px solid #4a4a4a; border-radius:4px;
-        background:#1c1c1c; color:#d8d8d8; font-style:normal; font-weight:400;
-        font-size:11px; line-height:1.4; white-space:normal; word-break:break-word;
-        box-shadow:0 6px 16px rgba(0,0,0,.45);
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        z-index: 30;
+        display: none;
+        width: max-content;
+        max-width: 340px;
+        max-height: 160px;
+        overflow: auto;
+        padding: 6px 8px;
+        border: 1px solid #4a4a4a;
+        border-radius: 4px;
+        background: #1c1c1c;
+        color: #d8d8d8;
+        font-style: normal;
+        font-weight: 400;
+        font-size: 11px;
+        line-height: 1.4;
+        white-space: normal;
+        word-break: break-word;
+        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
       }
-      .we-clone-status:hover .we-clone-tip { display:block; }
-      .we-dots { display:inline-block; margin-left:1px; }
-      .we-dot { display:inline-block; opacity:0; animation:weDot 1.4s infinite; }
-      .we-dot::before { content:"."; }
-      .we-dot:nth-child(2) { animation-delay:.18s; }
-      .we-dot:nth-child(3) { animation-delay:.36s; }
-      @keyframes weDot { 0%, 50%, 100% { opacity:0; } 30% { opacity:1; } }
-      .we-chev { align-self:flex-start; flex-shrink:0; width:14px; height:16px; display:flex; align-items:center; justify-content:center; color:var(--text-secondary, #999); font-size:12px; transition:transform .15s ease; }
-      .we-seg--open .we-chev { transform:rotate(90deg); }
-      .we-card-x { flex-shrink:0; box-sizing:border-box; padding:0; width:22px; height:22px; display:flex; align-items:center; justify-content:center; background:#3a3a3a; border:none; color:var(--text-secondary, #999); border-radius:4px; cursor:pointer; transition:color .12s ease, background-color .12s ease; }
-      .we-card-x svg { width:17px; height:17px; }
-      .we-card-x:hover { background:#4a2f2f; color:#f44336; }
-      .we-card-edit { flex-shrink:0; box-sizing:border-box; padding:0; width:22px; height:22px; display:flex; align-items:center; justify-content:center; background:#3a3a3a; border:none; color:var(--text-secondary, #999); border-radius:4px; cursor:pointer; transition:color .12s ease, background-color .12s ease; }
-      .we-card-edit svg { width:14px; height:14px; }
-      .we-card-edit:hover { background:#2e404f; color:#569cd6; }
-      .we-card-edit--active { background:#2e404f; color:#569cd6; }
-      .we-reorder { display:flex; align-items:center; gap:2px; flex-shrink:0; }
-      .we-reorder-btn { flex-shrink:0; box-sizing:border-box; padding:0; width:22px; height:22px; display:flex; align-items:center; justify-content:center; background:#3a3a3a; border:none; color:var(--text-secondary, #999); border-radius:4px; cursor:pointer; transition:color .12s ease, background-color .12s ease, opacity .12s ease; }
-      .we-reorder-btn svg { width:14px; height:14px; }
-      .we-reorder-btn:hover:not([disabled]) { background:#2e404f; color:#569cd6; }
-      .we-reorder-btn[disabled] { opacity:.35; cursor:default; }
-      .we-inline { display:inline-flex; align-items:center; gap:2px; min-width:0; max-width:100%; font-size:13px; color:var(--text, #ddd); height:18px; line-height:18px; }
-      .we-inline-field { position:relative; display:inline-block; margin-right:8px; }
-      .we-inline-mirror { visibility:hidden; white-space:pre; font:inherit; color:var(--text, #ddd); }
-      .we-inline-input { position:absolute; inset:0; width:100%; background:transparent; border:none; padding:0; margin:0; font:inherit; color:var(--text, #ddd); outline:none; }
-      .we-inline-btn { flex-shrink:0; box-sizing:border-box; padding:0; width:22px; height:22px; display:flex; align-items:center; justify-content:center; background:#3a3a3a; border:none; color:var(--text-secondary, #999); cursor:pointer; border-radius:4px; transition:color .12s ease, background-color .12s ease; }
-      .we-inline-btn svg { width:17px; height:17px; }
-      .we-inline-btn--ok:hover { color:#4caf50; background:#2f4a34; }
-      .we-inline-btn--no:hover { color:#f44336; background:#4a2f2f; }
-      .we-seg-body { display:flex; flex-direction:column; padding:2px 8px 4px 26px; }
-      .we-seg-body .we-input { flex:1; width:100%; box-sizing:border-box; }
-      .we-tree-row { position:relative; display:flex; align-items:center; gap:4px; width:100%; box-sizing:border-box; min-height:26px; padding-left:22px; }
-      .we-tree-row::before { content:""; position:absolute; left:9px; top:0; bottom:0; width:1px; background:var(--text-secondary, #999); }
-      .we-tree-row::after { content:""; position:absolute; left:9px; top:13px; width:11px; height:1px; background:var(--text-secondary, #999); }
-      .we-tree-row--last::before { bottom:50%; }
-      .we-tree-main { flex:1; min-width:0; display:flex; align-items:center; }
-      .we-tree-name { font-size:13px; line-height:18px; color:var(--text, #ddd); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .we-name-text { flex:1; min-width:0; font-size:13px; line-height:18px; color:var(--text, #ddd); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-      .we-name-card { display:flex; align-items:center; gap:6px; min-width:0; background:var(--bg-tertiary, #222); border:1px solid var(--border-divider, #333); border-radius:4px; padding:3px 8px; box-sizing:border-box; }
-      .we-name-card--hidden { background:transparent; border-color:transparent; }
-      .we-name-input { flex:1; min-width:0; background:transparent; border:none; outline:none; color:var(--text, #ddd); font-size:13px; font-family:inherit; padding:0; }
-      .we-lock-btn { flex-shrink:0; box-sizing:border-box; padding:0; width:22px; height:22px; display:flex; align-items:center; justify-content:center; border:none; border-radius:4px; cursor:pointer; transition:background-color .12s ease; }
-      .we-lock-btn svg { width:16px; height:16px; display:block; }
-      .we-lock-btn--locked { background:#3a3a3a; }
-      .we-lock-btn--locked:hover { background:#464646; }
-      .we-lock-btn--unlocked { background:#2e404f; }
-      .we-lock-btn--unlocked:hover { background:#38566f; }
-      .we-seg-body .we-tree-row .we-reorder { margin-left:auto; }
-      .we-seg-body .we-card-addrow { border-top:none; padding-left:9px; gap:0; margin-top:6px; }
-      .we-card-addrow { width:100%; box-sizing:border-box; display:flex; align-items:center; justify-content:flex-start; gap:0; padding:6px 8px; background:transparent; border:none; border-top:1px solid var(--border-divider, #2a2a2a); color:var(--text-secondary, #999); font-size:11px; cursor:pointer; }
-      .we-card-addrow:hover { background:var(--bg-tertiary, #2a2a2a); color:var(--text, #ddd); }
-      .we-addplus { flex-shrink:0; }
-      .we-card > .we-card-addrow { gap:8px; }
-      .we-card > .we-card-addrow .we-addplus { width:14px; text-align:center; }
-      .we-seg-body .we-addplus { width:13px; text-align:center; transform:translateX(-6.5px); }
+      .we-clone-status:hover .we-clone-tip {
+        display: block;
+      }
+      .we-dots {
+        display: inline-block;
+        margin-left: 1px;
+      }
+      .we-dot {
+        display: inline-block;
+        opacity: 0;
+        animation: weDot 1.4s infinite;
+      }
+      .we-dot::before {
+        content: ".";
+      }
+      .we-dot:nth-child(2) {
+        animation-delay: 0.18s;
+      }
+      .we-dot:nth-child(3) {
+        animation-delay: 0.36s;
+      }
+      @keyframes weDot {
+        0%,
+        50%,
+        100% {
+          opacity: 0;
+        }
+        30% {
+          opacity: 1;
+        }
+      }
+      .we-chev {
+        align-self: flex-start;
+        flex-shrink: 0;
+        width: 14px;
+        height: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-secondary, #999);
+        font-size: 12px;
+        transition: transform 0.15s ease;
+      }
+      .we-seg--open .we-chev {
+        transform: rotate(90deg);
+      }
+      .we-card-x {
+        flex-shrink: 0;
+        box-sizing: border-box;
+        padding: 0;
+        width: 22px;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #3a3a3a;
+        border: none;
+        color: var(--text-secondary, #999);
+        border-radius: 4px;
+        cursor: pointer;
+        transition:
+          color 0.12s ease,
+          background-color 0.12s ease;
+      }
+      .we-card-x svg {
+        width: 17px;
+        height: 17px;
+      }
+      .we-card-x:hover {
+        background: #4a2f2f;
+        color: #f44336;
+      }
+      .we-card-edit {
+        flex-shrink: 0;
+        box-sizing: border-box;
+        padding: 0;
+        width: 22px;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #3a3a3a;
+        border: none;
+        color: var(--text-secondary, #999);
+        border-radius: 4px;
+        cursor: pointer;
+        transition:
+          color 0.12s ease,
+          background-color 0.12s ease;
+      }
+      .we-card-edit svg {
+        width: 14px;
+        height: 14px;
+      }
+      .we-card-edit:hover {
+        background: #2e404f;
+        color: #569cd6;
+      }
+      .we-card-edit--active {
+        background: #2e404f;
+        color: #569cd6;
+      }
+      .we-reorder {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        flex-shrink: 0;
+      }
+      .we-reorder-btn {
+        flex-shrink: 0;
+        box-sizing: border-box;
+        padding: 0;
+        width: 22px;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #3a3a3a;
+        border: none;
+        color: var(--text-secondary, #999);
+        border-radius: 4px;
+        cursor: pointer;
+        transition:
+          color 0.12s ease,
+          background-color 0.12s ease,
+          opacity 0.12s ease;
+      }
+      .we-reorder-btn svg {
+        width: 14px;
+        height: 14px;
+      }
+      .we-reorder-btn:hover:not([disabled]) {
+        background: #2e404f;
+        color: #569cd6;
+      }
+      .we-reorder-btn[disabled] {
+        opacity: 0.35;
+        cursor: default;
+      }
+      .we-inline {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        min-width: 0;
+        max-width: 100%;
+        font-size: 13px;
+        color: var(--text, #ddd);
+        height: 18px;
+        line-height: 18px;
+      }
+      .we-inline-field {
+        position: relative;
+        display: inline-block;
+        margin-right: 8px;
+      }
+      .we-inline-mirror {
+        visibility: hidden;
+        white-space: pre;
+        font: inherit;
+        color: var(--text, #ddd);
+      }
+      .we-inline-input {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        background: transparent;
+        border: none;
+        padding: 0;
+        margin: 0;
+        font: inherit;
+        color: var(--text, #ddd);
+        outline: none;
+      }
+      .we-inline-btn {
+        flex-shrink: 0;
+        box-sizing: border-box;
+        padding: 0;
+        width: 22px;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #3a3a3a;
+        border: none;
+        color: var(--text-secondary, #999);
+        cursor: pointer;
+        border-radius: 4px;
+        transition:
+          color 0.12s ease,
+          background-color 0.12s ease;
+      }
+      .we-inline-btn svg {
+        width: 17px;
+        height: 17px;
+      }
+      .we-inline-btn--ok:hover {
+        color: #4caf50;
+        background: #2f4a34;
+      }
+      .we-inline-btn--no:hover {
+        color: #f44336;
+        background: #4a2f2f;
+      }
+      .we-seg-body {
+        display: flex;
+        flex-direction: column;
+        padding: 2px 8px 4px 26px;
+      }
+      .we-seg-body .we-input {
+        flex: 1;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .we-tree-row {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        width: 100%;
+        box-sizing: border-box;
+        min-height: 26px;
+        padding-left: 22px;
+      }
+      .we-tree-row::before {
+        content: "";
+        position: absolute;
+        left: 9px;
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        background: var(--text-secondary, #999);
+      }
+      .we-tree-row::after {
+        content: "";
+        position: absolute;
+        left: 9px;
+        top: 13px;
+        width: 11px;
+        height: 1px;
+        background: var(--text-secondary, #999);
+      }
+      .we-tree-row--last::before {
+        bottom: 50%;
+      }
+      .we-tree-main {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+      }
+      .we-tree-name {
+        font-size: 13px;
+        line-height: 18px;
+        color: var(--text, #ddd);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .we-name-text {
+        flex: 1;
+        min-width: 0;
+        font-size: 13px;
+        line-height: 18px;
+        color: var(--text, #ddd);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .we-name-card {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+        background: var(--bg-tertiary, #222);
+        border: 1px solid var(--border-divider, #333);
+        border-radius: 4px;
+        padding: 3px 8px;
+        box-sizing: border-box;
+      }
+      .we-name-card--hidden {
+        background: transparent;
+        border-color: transparent;
+      }
+      .we-name-input {
+        flex: 1;
+        min-width: 0;
+        background: transparent;
+        border: none;
+        outline: none;
+        color: var(--text, #ddd);
+        font-size: 13px;
+        font-family: inherit;
+        padding: 0;
+      }
+      .we-lock-btn {
+        flex-shrink: 0;
+        box-sizing: border-box;
+        padding: 0;
+        width: 22px;
+        height: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.12s ease;
+      }
+      .we-lock-btn svg {
+        width: 16px;
+        height: 16px;
+        display: block;
+      }
+      .we-lock-btn--locked {
+        background: #3a3a3a;
+      }
+      .we-lock-btn--locked:hover {
+        background: #464646;
+      }
+      .we-lock-btn--unlocked {
+        background: #2e404f;
+      }
+      .we-lock-btn--unlocked:hover {
+        background: #38566f;
+      }
+      .we-seg-body .we-tree-row .we-reorder {
+        margin-left: auto;
+      }
+      .we-seg-body .we-card-addrow {
+        border-top: none;
+        padding-left: 9px;
+        gap: 0;
+        margin-top: 6px;
+      }
+      .we-card-addrow {
+        width: 100%;
+        box-sizing: border-box;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0;
+        padding: 6px 8px;
+        background: transparent;
+        border: none;
+        border-top: 1px solid var(--border-divider, #2a2a2a);
+        color: var(--text-secondary, #999);
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .we-card-addrow:hover {
+        background: var(--bg-tertiary, #2a2a2a);
+        color: var(--text, #ddd);
+      }
+      .we-addplus {
+        flex-shrink: 0;
+      }
+      .we-card > .we-card-addrow {
+        gap: 8px;
+      }
+      .we-card > .we-card-addrow .we-addplus {
+        width: 14px;
+        text-align: center;
+      }
+      .we-seg-body .we-addplus {
+        width: 13px;
+        text-align: center;
+        transform: translateX(-6.5px);
+      }
       .we-card > .we-card-addrow:first-child,
-      .we-card > .we-addseg:first-child { border-top:none; }
-      .we-addseg { display:flex; align-items:center; gap:6px; padding:6px 8px; border-top:1px solid var(--border-divider, #2a2a2a); box-sizing:border-box; }
-      .we-addseg .we-input { flex:1; }
-      .we-btn { background:transparent; border:1px solid var(--border-divider, #2a2a2a); color:var(--text, #ddd); border-radius:4px; padding:2px 8px; font-size:11px; cursor:pointer; }
-      .we-btn:hover { background:var(--bg-tertiary, #2a2a2a); }
-      .we-btn--icon { padding:0 4px; font-size:12px; }
-      .we-btn--add { align-self:flex-start; }
+      .we-card > .we-addseg:first-child {
+        border-top: none;
+      }
+      .we-addseg {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 8px;
+        border-top: 1px solid var(--border-divider, #2a2a2a);
+        box-sizing: border-box;
+      }
+      .we-addseg .we-input {
+        flex: 1;
+      }
+      .we-btn {
+        background: transparent;
+        border: 1px solid var(--border-divider, #2a2a2a);
+        color: var(--text, #ddd);
+        border-radius: 4px;
+        padding: 2px 8px;
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .we-btn:hover {
+        background: var(--bg-tertiary, #2a2a2a);
+      }
+      .we-btn--icon {
+        padding: 0 4px;
+        font-size: 12px;
+      }
+      .we-btn--add {
+        align-self: flex-start;
+      }
     </style>
     <div class="we-root" ${surfaceRoot(host)}>
       <div class="we-body">
-        ${loading
-          ? html`<div class="we-note">Loading…</div>`
-          : !data
-            ? html`<div class="we-note">${error ?? "Unable to load workspace file."}</div>`
-            : mode === "json"
-              ? renderJsonView(host)
-              : renderUiView(host)}
+        ${
+          loading
+            ? html`<div class="we-note">Loading…</div>`
+            : !data
+              ? html`<div class="we-note">${error ?? "Unable to load workspace file."}</div>`
+              : mode === "json"
+                ? renderJsonView(host)
+                : renderUiView(host)
+        }
         ${error && loaded ? html`<div class="we-error">${error}</div>` : nothing}
       </div>
       <we-bottom-bar .buttons=${barButtons}></we-bottom-bar>
@@ -700,10 +1156,7 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
               // Only the editable fields may come back from the JSON view; merge
               // them onto the preserved full data so platform-owned metadata and
               // session state survive the round-trip.
-              const editable = mergeEditableFields(
-                prev.data,
-                value as Record<string, unknown>,
-              );
+              const editable = mergeEditableFields(prev.data, value as Record<string, unknown>);
               const data = migrateWorkspaceFileData({ ...prev.data, ...editable });
               const undoStack = [...(prev.undoStack ?? []), prev.data].slice(-MAX_UNDO);
               return { ...prev, data, undoStack, saved: data === prev.savedData };
@@ -727,8 +1180,22 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
     // View-local UI state (never persisted): which accordion segment is
     // expanded (detached, revealing its worktrees), and whether the add-row
     // inputs are showing.
-    const setUi = (patch: Partial<Pick<WorkspaceEditorState, "openRepos" | "editingRepo" | "editingValue" | "editingWorktree" | "editingWorktreeValue" | "addingRepoValue" | "addingWorktree" | "nameLocked" | "repoError">>): void =>
-      h.setState((prev) => ({ ...prev, ...patch }));
+    const setUi = (
+      patch: Partial<
+        Pick<
+          WorkspaceEditorState,
+          | "openRepos"
+          | "editingRepo"
+          | "editingValue"
+          | "editingWorktree"
+          | "editingWorktreeValue"
+          | "addingRepoValue"
+          | "addingWorktree"
+          | "nameLocked"
+          | "repoError"
+        >
+      >,
+    ): void => h.setState((prev) => ({ ...prev, ...patch }));
     // Record a repo's live clone status (merges by URL, never persisted).
     const cloneStates = h.state.cloneStates ?? {};
 
@@ -845,9 +1312,13 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
     const setWorktrees = (ri: number, worktrees: string[]): void =>
       setData({ repos: repos.map((r, idx) => (idx === ri ? { ...r, worktrees } : r)) });
     const removeWorktree = (ri: number, wi: number): void => {
-      setWorktrees(ri, (repos[ri]?.worktrees ?? []).filter((_, k) => k !== wi));
+      setWorktrees(
+        ri,
+        (repos[ri]?.worktrees ?? []).filter((_, k) => k !== wi),
+      );
       if (editingWorktree?.repo !== ri) return;
-      if (editingWorktree.index === wi) setUi({ editingWorktree: null, editingWorktreeValue: null });
+      if (editingWorktree.index === wi)
+        setUi({ editingWorktree: null, editingWorktreeValue: null });
       else if (editingWorktree.index > wi)
         setUi({ editingWorktree: { repo: ri, index: editingWorktree.index - 1 } });
     };
@@ -941,7 +1412,15 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
                             commitEdit();
                           }}
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor"><path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/></svg>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            height="24"
+                            viewBox="0 -960 960 960"
+                            width="24"
+                            fill="currentColor"
+                          >
+                            <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z" />
+                          </svg>
                         </button>
                         <button
                           type="button"
@@ -953,27 +1432,58 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
                             cancelEdit();
                           }}
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            height="24"
+                            viewBox="0 -960 960 960"
+                            width="24"
+                            fill="currentColor"
+                          >
+                            <path
+                              d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"
+                            />
+                          </svg>
                         </button>
                       </span>
                     `
-                  : html`<div class="we-card-name">${r.url ? deriveRepoName(r.url) : "(unset)"}</div>
+                  : html`<div class="we-card-name">
+                        ${r.url ? deriveRepoName(r.url) : "(unset)"}
+                      </div>
                       ${r.url ? html`<div class="we-card-url">${r.url}</div>` : nothing}`
               }
-              ${repoError && repoError.at === i
-                ? html`<div class="we-repo-error">${repoError.message}</div>`
-                : invalidUrl
-                  ? html`<div class="we-repo-error" data-invalid-url>
-                      Not a clone URL, so it is not cloned. ${invalidUrl}
-                    </div>`
-                  : nothing}
-              <div class="we-card-meta">${wtCount} worktree${wtCount === 1 ? "" : "s"}${cloneStatus
-                ? html`<span class="we-clone-status${cloneStatus.live ? " we-clone-status--live" : ""}">${cloneStatus.label}${cloneStatus.live
-                    ? html`<span class="we-dots" aria-hidden="true"><span class="we-dot"></span><span class="we-dot"></span><span class="we-dot"></span></span>`
-                    : nothing}${cloneStatus.error
-                    ? html`<span class="we-clone-tip" role="tooltip">${cloneStatus.error}</span>`
-                    : nothing}</span>`
-                : nothing}</div>
+              ${
+                repoError && repoError.at === i
+                  ? html`<div class="we-repo-error">${repoError.message}</div>`
+                  : invalidUrl
+                    ? html`<div class="we-repo-error" data-invalid-url>
+                        Not a clone URL, so it is not cloned. ${invalidUrl}
+                      </div>`
+                    : nothing
+              }
+              <div class="we-card-meta">
+                ${wtCount}
+                worktree${wtCount === 1 ? "" : "s"}${
+                  cloneStatus
+                    ? html`<span
+                        class="we-clone-status${cloneStatus.live ? " we-clone-status--live" : ""}"
+                        >${cloneStatus.label}${
+                          cloneStatus.live
+                            ? html`<span class="we-dots" aria-hidden="true"
+                                ><span class="we-dot"></span><span class="we-dot"></span
+                                ><span class="we-dot"></span
+                              ></span>`
+                            : nothing
+                        }${
+                          cloneStatus.error
+                            ? html`<span class="we-clone-tip" role="tooltip"
+                                >${cloneStatus.error}</span
+                              >`
+                            : nothing
+                        }</span
+                      >`
+                    : nothing
+                }
+              </div>
             </div>
             <div class="we-reorder">
               <button
@@ -986,7 +1496,15 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
                   moveRepo(i, -1);
                 }}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor"><path d="M440-160v-487L216-423l-56-57 320-320 320 320-56 57-224-224v487h-80Z"/></svg>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  height="24"
+                  viewBox="0 -960 960 960"
+                  width="24"
+                  fill="currentColor"
+                >
+                  <path d="M440-160v-487L216-423l-56-57 320-320 320 320-56 57-224-224v487h-80Z" />
+                </svg>
               </button>
               <button
                 type="button"
@@ -998,7 +1516,15 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
                   moveRepo(i, 1);
                 }}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></svg>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  height="24"
+                  viewBox="0 -960 960 960"
+                  width="24"
+                  fill="currentColor"
+                >
+                  <path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z" />
+                </svg>
               </button>
             </div>
             <button
@@ -1010,7 +1536,17 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
                 startEdit(i);
               }}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                height="24"
+                viewBox="0 -960 960 960"
+                width="24"
+                fill="currentColor"
+              >
+                <path
+                  d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"
+                />
+              </svg>
             </button>
             <button
               type="button"
@@ -1021,7 +1557,17 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
                 removeRepoHandler(i);
               }}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                height="24"
+                viewBox="0 -960 960 960"
+                width="24"
+                fill="currentColor"
+              >
+                <path
+                  d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"
+                />
+              </svg>
             </button>
           </div>
           ${
@@ -1040,7 +1586,9 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
                                 ? html`
                                     <span class="we-inline">
                                       <span class="we-inline-field">
-                                        <span class="we-inline-mirror">${editingWorktreeValue}</span>
+                                        <span class="we-inline-mirror"
+                                          >${editingWorktreeValue}</span
+                                        >
                                         <input
                                           type="text"
                                           class="we-inline-input"
@@ -1071,7 +1619,17 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
                                           commitEditWorktree();
                                         }}
                                       >
-                                        <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor"><path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/></svg>
+                                        <svg
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          height="24"
+                                          viewBox="0 -960 960 960"
+                                          width="24"
+                                          fill="currentColor"
+                                        >
+                                          <path
+                                            d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"
+                                          />
+                                        </svg>
                                       </button>
                                       <button
                                         type="button"
@@ -1083,7 +1641,17 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
                                           cancelEditWorktree();
                                         }}
                                       >
-                                        <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
+                                        <svg
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          height="24"
+                                          viewBox="0 -960 960 960"
+                                          width="24"
+                                          fill="currentColor"
+                                        >
+                                          <path
+                                            d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"
+                                          />
+                                        </svg>
                                       </button>
                                     </span>
                                   `
@@ -1101,7 +1669,17 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
                                 moveWorktree(i, wi, -1);
                               }}
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor"><path d="M440-160v-487L216-423l-56-57 320-320 320 320-56 57-224-224v487h-80Z"/></svg>
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                height="24"
+                                viewBox="0 -960 960 960"
+                                width="24"
+                                fill="currentColor"
+                              >
+                                <path
+                                  d="M440-160v-487L216-423l-56-57 320-320 320 320-56 57-224-224v487h-80Z"
+                                />
+                              </svg>
                             </button>
                             <button
                               type="button"
@@ -1113,7 +1691,17 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
                                 moveWorktree(i, wi, 1);
                               }}
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor"><path d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"/></svg>
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                height="24"
+                                viewBox="0 -960 960 960"
+                                width="24"
+                                fill="currentColor"
+                              >
+                                <path
+                                  d="M440-800v487L216-537l-56 57 320 320 320-320-56-57-224 224v-487h-80Z"
+                                />
+                              </svg>
                             </button>
                           </div>
                           <button
@@ -1125,7 +1713,17 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
                               startEditWorktree(i, wi);
                             }}
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor"><path d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"/></svg>
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              height="24"
+                              viewBox="0 -960 960 960"
+                              width="24"
+                              fill="currentColor"
+                            >
+                              <path
+                                d="M200-200h57l391-391-57-57-391 391v57Zm-80 80v-170l528-527q12-11 26.5-17t30.5-6q16 0 31 6t26 18l55 56q12 11 17.5 26t5.5 30q0 16-5.5 30.5T817-647L290-120H120Zm640-584-56-56 56 56Zm-141 85-28-29 57 57-29-28Z"
+                              />
+                            </svg>
                           </button>
                           <button
                             type="button"
@@ -1136,7 +1734,17 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
                               removeWorktree(i, wi);
                             }}
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              height="24"
+                              viewBox="0 -960 960 960"
+                              width="24"
+                              fill="currentColor"
+                            >
+                              <path
+                                d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"
+                              />
+                            </svg>
                           </button>
                         </div>
                       `;
@@ -1145,7 +1753,9 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
                       <div class="we-tree-main">
                         <span class="we-inline">
                           <span class="we-inline-field">
-                            <span class="we-inline-mirror">${addingWorktreeValueOf(i) || "worktree branch"}</span>
+                            <span class="we-inline-mirror"
+                              >${addingWorktreeValueOf(i) || "worktree branch"}</span
+                            >
                             <input
                               type="text"
                               class="we-inline-input"
@@ -1168,34 +1778,56 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
                               }}
                             />
                           </span>
-                          ${addingWorktreeValueOf(i)
-                            ? html`
-                                <button
-                                  type="button"
-                                  class="we-inline-btn we-inline-btn--ok"
-                                  title="Confirm"
-                                  @mousedown=${(e: MouseEvent) => e.preventDefault()}
-                                  @click=${(e: Event) => {
-                                    e.stopPropagation();
-                                    commitAddWorktree();
-                                  }}
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor"><path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/></svg>
-                                </button>
-                                <button
-                                  type="button"
-                                  class="we-inline-btn we-inline-btn--no"
-                                  title="Cancel"
-                                  @mousedown=${(e: MouseEvent) => e.preventDefault()}
-                                  @click=${(e: Event) => {
-                                    e.stopPropagation();
-                                    cancelWorktree();
-                                  }}
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
-                                </button>
-                              `
-                            : nothing}
+                          ${
+                            addingWorktreeValueOf(i)
+                              ? html`
+                                  <button
+                                    type="button"
+                                    class="we-inline-btn we-inline-btn--ok"
+                                    title="Confirm"
+                                    @mousedown=${(e: MouseEvent) => e.preventDefault()}
+                                    @click=${(e: Event) => {
+                                      e.stopPropagation();
+                                      commitAddWorktree();
+                                    }}
+                                  >
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      height="24"
+                                      viewBox="0 -960 960 960"
+                                      width="24"
+                                      fill="currentColor"
+                                    >
+                                      <path
+                                        d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"
+                                      />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    class="we-inline-btn we-inline-btn--no"
+                                    title="Cancel"
+                                    @mousedown=${(e: MouseEvent) => e.preventDefault()}
+                                    @click=${(e: Event) => {
+                                      e.stopPropagation();
+                                      cancelWorktree();
+                                    }}
+                                  >
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      height="24"
+                                      viewBox="0 -960 960 960"
+                                      width="24"
+                                      fill="currentColor"
+                                    >
+                                      <path
+                                        d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"
+                                      />
+                                    </svg>
+                                  </button>
+                                `
+                              : nothing
+                          }
                         </span>
                       </div>
                     </div>
@@ -1213,7 +1845,9 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
           <div class="we-card-main">
             <span class="we-inline">
               <span class="we-inline-field">
-                <span class="we-inline-mirror">${addingRepoValue || "git@github.com:org/repo.git"}</span>
+                <span class="we-inline-mirror"
+                  >${addingRepoValue || "git@github.com:org/repo.git"}</span
+                >
                 <input
                   type="text"
                   class="we-inline-input"
@@ -1234,48 +1868,67 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
                   }}
                 />
               </span>
-              ${addingRepoValue
-                ? html`
-                    <button
-                      type="button"
-                      class="we-inline-btn we-inline-btn--ok"
-                      title="Confirm"
-                      @mousedown=${(e: MouseEvent) => e.preventDefault()}
-                      @click=${(e: Event) => {
-                        e.stopPropagation();
-                        commitAddRepo();
-                      }}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor"><path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/></svg>
-                    </button>
-                    <button
-                      type="button"
-                      class="we-inline-btn we-inline-btn--no"
-                      title="Cancel"
-                      @mousedown=${(e: MouseEvent) => e.preventDefault()}
-                      @click=${(e: Event) => {
-                        e.stopPropagation();
-                        cancelAddRepo();
-                      }}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg>
-                    </button>
-                  `
-                : nothing}
+              ${
+                addingRepoValue
+                  ? html`
+                      <button
+                        type="button"
+                        class="we-inline-btn we-inline-btn--ok"
+                        title="Confirm"
+                        @mousedown=${(e: MouseEvent) => e.preventDefault()}
+                        @click=${(e: Event) => {
+                          e.stopPropagation();
+                          commitAddRepo();
+                        }}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          height="24"
+                          viewBox="0 -960 960 960"
+                          width="24"
+                          fill="currentColor"
+                        >
+                          <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z" />
+                        </svg>
+                      </button>
+                      <button
+                        type="button"
+                        class="we-inline-btn we-inline-btn--no"
+                        title="Cancel"
+                        @mousedown=${(e: MouseEvent) => e.preventDefault()}
+                        @click=${(e: Event) => {
+                          e.stopPropagation();
+                          cancelAddRepo();
+                        }}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          height="24"
+                          viewBox="0 -960 960 960"
+                          width="24"
+                          fill="currentColor"
+                        >
+                          <path
+                            d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"
+                          />
+                        </svg>
+                      </button>
+                    `
+                  : nothing
+              }
             </span>
-            ${repoError?.at === "add"
-              ? html`<div class="we-repo-error">${repoError.message}</div>`
-              : html`<div class="we-card-meta">0 worktrees</div>`}
+            ${
+              repoError?.at === "add"
+                ? html`<div class="we-repo-error">${repoError.message}</div>`
+                : html`<div class="we-card-meta">0 worktrees</div>`
+            }
           </div>
         </div>
       </div>
     `;
 
     const card = (items: { r: WorkspaceRepo; i: number }[], trailing?: TemplateResult) => html`
-      <div class="we-card">
-        ${items.map(({ r, i }) => segNode(r, i))}
-        ${trailing ?? nothing}
-      </div>
+      <div class="we-card">${items.map(({ r, i }) => segNode(r, i))} ${trailing ?? nothing}</div>
     `;
 
     // Each open repo is a detached card; runs of closed repos share a card,
@@ -1315,15 +1968,15 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
             <button
               type="button"
               class="we-lock-btn ${nameLocked ? "we-lock-btn--locked" : "we-lock-btn--unlocked"}"
-              title=${nameLocked
-                ? "Unlock to edit the workspace name"
-                : "Lock the workspace name"}
+              title=${nameLocked ? "Unlock to edit the workspace name" : "Lock the workspace name"}
               aria-pressed=${nameLocked}
               @click=${() => setUi({ nameLocked: !nameLocked })}
             >
-              ${nameLocked
-                ? html`<span .innerHTML=${LOCK_ICON}></span>`
-                : html`<span .innerHTML=${UNLOCK_ICON}></span>`}
+              ${
+                nameLocked
+                  ? html`<span .innerHTML=${LOCK_ICON}></span>`
+                  : html`<span .innerHTML=${UNLOCK_ICON}></span>`
+              }
             </button>
           </div>
         </div>

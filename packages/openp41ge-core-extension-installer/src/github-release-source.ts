@@ -14,18 +14,22 @@
  */
 
 import { createHash, randomUUID } from "node:crypto";
-import { mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ExtensionAcquireResult, ExtensionSource, InstalledExtension } from "./source";
 import { createLogger, type ILogger } from "openp41ge-core-logger";
 import { fetchCatalog, type CatalogEntry, type ExtensionCatalog } from "./catalog";
 import { extractTgz, type ExtractOptions } from "./extract";
-import { readState, writeState, type ExtensionState } from "./state";
+import { readState, writeState } from "./state";
 
 export type FetchJson = (url: string) => Promise<unknown>;
 export type FetchBinary = (url: string) => Promise<Uint8Array>;
-export type ExtractTgz = (tgzPath: string, destDir: string, options?: ExtractOptions) => Promise<void>;
+export type ExtractTgz = (
+  tgzPath: string,
+  destDir: string,
+  options?: ExtractOptions,
+) => Promise<void>;
 
 export interface GithubReleaseSourceOptions {
   /** Publisher/owner of official extensions, e.g. "openp41ge". */

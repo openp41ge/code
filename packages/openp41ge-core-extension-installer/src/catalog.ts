@@ -25,7 +25,10 @@ export interface ExtensionCatalog {
 export type FetchJson = (url: string) => Promise<unknown>;
 
 /** Fetch + loosely validate the catalog. Throws on invalid shape. */
-export async function fetchCatalog(catalogUrl: string, fetchJson: FetchJson): Promise<ExtensionCatalog> {
+export async function fetchCatalog(
+  catalogUrl: string,
+  fetchJson: FetchJson,
+): Promise<ExtensionCatalog> {
   const raw = await fetchJson(catalogUrl);
   const obj = raw as { extensions?: unknown } | null;
   if (!obj || typeof obj !== "object" || !Array.isArray(obj.extensions)) {

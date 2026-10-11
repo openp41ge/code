@@ -7,9 +7,9 @@ coverage
 double quotes, so it can never be stable under prettier --write).
 pnpm-lock.yaml
 
-# Pact contract tests — auto-generated JSON files
-packages/openp41ge/test/contract/pacts
-
 /.nx/cache
 /.nx/workspace-data
 .nx/self-healing
+
+# Storybook build output (gitignored)
+storybook/storybook-static

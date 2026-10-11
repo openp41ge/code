@@ -44,10 +44,7 @@ export function looksBinary(buffer: Uint8Array): boolean {
  * Confines the path to the workspace root, rejects non-files, oversize files,
  * and binary files. Never throws — resolves to an `OpenFileResult`.
  */
-export async function inspectFile(
-  filePath: string,
-  root: string,
-): Promise<OpenFileResult> {
+export async function inspectFile(filePath: string, root: string): Promise<OpenFileResult> {
   if (!isWithinRoot(filePath, root)) {
     return { ok: false, error: "File is outside the workspace root" };
   }

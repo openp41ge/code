@@ -211,7 +211,9 @@ export class SidebarTabContent extends LitElement {
     // left-docked sidebar it's the right edge (spacer first, run at the end).
     const dockLeft = this._docked === "right";
     return html`
-      <style>${TAB_STYLES}</style>
+      <style>
+        ${TAB_STYLES}
+      </style>
       <div class="viewport" part="viewport" ${ref(this._viewportRef)}>
         <div class="content" part="content" ${ref(this._contentRef)}>
           <slot></slot>

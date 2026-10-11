@@ -67,7 +67,7 @@ release pipeline merges every set whose `release` is that version into
 `migrations.json` and signs it (`migrations.json.sig`):
 
 ```jsonc
-{ "release": "0.1.0-alpha.11", "sets": [/* instruction sets, by id */] }
+{ "release": "0.1.0-alpha.1", "sets": [/* instruction sets, by id */] }
 ```
 
 ### Operations (the app's fixed vocabulary)
@@ -148,7 +148,7 @@ symlink escapes); a step that would leave it is refused, and so is the set.
    `migrations/` folder at startup; release builds still run the built-in
    repositories migration until phase 3–4. First set:
    `migrations/2026-10-10-repositories-per-workspace.json` (release
-   0.1.0-alpha.11). A dry run on a copy of the already-migrated dev data
+   0.1.0-alpha.1). A dry run on a copy of the already-migrated dev data
    applied it as a no-op (it removed only the empty `repositories` folder).
 3. ~~Signing + verification; downloading across several versions~~ — done
    as a library (`versions.ts`, `signature.ts` ed25519 via Node `crypto`,
@@ -182,7 +182,7 @@ symlink escapes); a step that would leave it is refused, and so is the set.
    with an owner from a JSON field, `removeJsonField`, `forEachWorkspace`
    `only: "oldest"`, and the dedicated `importLegacyChats`, which converts the
    old `chats.json`) and `2026-10-10-repositories-per-workspace`; both for
-   release 0.1.0-alpha.11, both required. Their tests now run against the
+   release 0.1.0-alpha.1, both required. Their tests now run against the
    sets. Unlike the built-in chat migration, the set runs once: an install
    with old chats but no workspace keeps its `chats.json` unconverted.
 

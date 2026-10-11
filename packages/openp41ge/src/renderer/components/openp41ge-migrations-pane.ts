@@ -88,12 +88,12 @@ export class Openp41geMigrationsPane extends LitElement {
                           <div class="mp-title">${a.description ?? a.id}</div>
                           <div class="mp-meta">${a.id} · ${when(a.at)}</div>
                           ${
-                          a.done.length > 0
-                            ? html`<ul class="mp-done">
-                                ${a.done.map((line) => html`<li>${line}</li>`)}
-                              </ul>`
-                            : html`<div class="mp-meta">Nothing needed changing.</div>`
-                        }
+                            a.done.length > 0
+                              ? html`<ul class="mp-done">
+                                  ${a.done.map((line) => html`<li>${line}</li>`)}
+                                </ul>`
+                              : html`<div class="mp-meta">Nothing needed changing.</div>`
+                          }
                         </li>`,
                     )}
                   </ul>

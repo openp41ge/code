@@ -67,8 +67,6 @@ const DRAG_THRESHOLD = 4;
 /** Mini workspace-window skeleton: width/height (at half the old carousel size). */
 const THUMB_W = 66;
 const THUMB_H = 42;
-/** Maximum window skeletons shown side by side in each workspace row. */
-const MAX_VISIBLE_THUMBS = 3;
 
 interface OpenWindowSummary {
   windowId: string;
@@ -741,9 +739,7 @@ export class Openp41geWindowManager extends LitElement {
    * settings row its settings editor. Null for anything else (or a workspace
    * row in delete mode).
    */
-  private _rowDragSpec(
-    target: Element | null,
-  ): {
+  private _rowDragSpec(target: Element | null): {
     row: HTMLElement;
     title: string;
     appType: string;
@@ -2631,31 +2627,31 @@ export class Openp41geWindowManager extends LitElement {
                               ? html`<div class="wm-settings-pane">
                                   <openp41ge-settings-list
                                     .onOpen=${(id: string, pinned: boolean) => {
-                                        // The click ending a row drag is not an open.
-                                        if (this._suppressClick) {
-                                          this._suppressClick = false;
-                                          return;
-                                        }
-                                        this._openSettings(id, pinned);
-                                      }}
+                                      // The click ending a row drag is not an open.
+                                      if (this._suppressClick) {
+                                        this._suppressClick = false;
+                                        return;
+                                      }
+                                      this._openSettings(id, pinned);
+                                    }}
                                   ></openp41ge-settings-list>
                                 </div>`
                               : html`
                                   <div class="wm-workspaces-pane">
                                     ${
-                                        this._loaded &&
-                                        this._workspaces.length === 0 &&
-                                        !this._addingWorkspace
-                                          ? html`<p class="empty">No workspaces yet.</p>`
-                                          : this._searchOpen &&
-                                              this._workspaces.length > 0 &&
-                                              filtered.length === 0
-                                            ? html`<p class="empty">
-                                                No workspaces match “${this._searchQuery}”.
-                                              </p>`
-                                            : html`
-                                                <ul>
-                                                  ${
+                                      this._loaded &&
+                                      this._workspaces.length === 0 &&
+                                      !this._addingWorkspace
+                                        ? html`<p class="empty">No workspaces yet.</p>`
+                                        : this._searchOpen &&
+                                            this._workspaces.length > 0 &&
+                                            filtered.length === 0
+                                          ? html`<p class="empty">
+                                              No workspaces match “${this._searchQuery}”.
+                                            </p>`
+                                          : html`
+                                              <ul>
+                                                ${
                                                   this._addingWorkspace
                                                     ? html`
                                                         <li class="ws-row ws-row--new">
@@ -2666,9 +2662,9 @@ export class Openp41geWindowManager extends LitElement {
                                                               spellcheck="false"
                                                               @keydown=${(e: KeyboardEvent) => this._onNewWorkspaceKeydown(e)}
                                                               @blur=${() => {
-                                                          if (this._addingWorkspace)
-                                                            void this._createWorkspaceFromInput();
-                                                        }}
+                                                                if (this._addingWorkspace)
+                                                                  void this._createWorkspaceFromInput();
+                                                              }}
                                                             />
                                                             <div class="ws-meta">
                                                               <span
@@ -2683,9 +2679,9 @@ export class Openp41geWindowManager extends LitElement {
                                                               title="Create workspace"
                                                               @mousedown=${(e: MouseEvent) => e.preventDefault()}
                                                               @click=${(e: Event) => {
-                                                          e.stopPropagation();
-                                                          void this._createWorkspaceFromInput();
-                                                        }}
+                                                                e.stopPropagation();
+                                                                void this._createWorkspaceFromInput();
+                                                              }}
                                                             >
                                                               <svg
                                                                 xmlns="http://www.w3.org/2000/svg"
@@ -2705,9 +2701,9 @@ export class Openp41geWindowManager extends LitElement {
                                                               title="Cancel"
                                                               @mousedown=${(e: MouseEvent) => e.preventDefault()}
                                                               @click=${(e: Event) => {
-                                                          e.stopPropagation();
-                                                          this._addingWorkspace = false;
-                                                        }}
+                                                                e.stopPropagation();
+                                                                this._addingWorkspace = false;
+                                                              }}
                                                             >
                                                               <svg
                                                                 xmlns="http://www.w3.org/2000/svg"
@@ -2726,7 +2722,7 @@ export class Openp41geWindowManager extends LitElement {
                                                       `
                                                     : nothing
                                                 }
-                                                  ${filtered.map((w, i) => {
+                                                ${filtered.map((w, i) => {
                                                   const name = w.data.name?.trim() || "Unnamed";
                                                   const repos = w.data.repos?.length ?? 0;
                                                   const worktrees = (w.data.repos ?? []).reduce(
@@ -2740,28 +2736,30 @@ export class Openp41geWindowManager extends LitElement {
                                                       class="ws-row ${this._workspaceDeleteMode ? "ws-row--select" : ""} ${isOpen && !this._workspaceDeleteMode ? "ws-row--open" : ""} ${isLast ? "ws-row--last" : ""} ${isLast && !this._listOverflows ? "ws-row--last-visible" : ""}"
                                                       data-workspace-path=${w.filePath}
                                                       @click=${(e: Event) => {
-                                                  e.stopPropagation();
-                                                  if (this._suppressClick) {
-                                                    this._suppressClick = false;
-                                                    return;
-                                                  }
-                                                  if (this._workspaceDeleteMode) {
-                                                    this._toggleWorkspaceSelection(w.filePath);
-                                                    return;
-                                                  }
-                                                  // Normal mode: open the workspace
-                                                  // editor as a grid cell (the edit
-                                                  // button is gone — the row itself
-                                                  // opens the editor).
-                                                  this._openWorkspaceEditor(w);
-                                                }}
+                                                        e.stopPropagation();
+                                                        if (this._suppressClick) {
+                                                          this._suppressClick = false;
+                                                          return;
+                                                        }
+                                                        if (this._workspaceDeleteMode) {
+                                                          this._toggleWorkspaceSelection(
+                                                            w.filePath,
+                                                          );
+                                                          return;
+                                                        }
+                                                        // Normal mode: open the workspace
+                                                        // editor as a grid cell (the edit
+                                                        // button is gone — the row itself
+                                                        // opens the editor).
+                                                        this._openWorkspaceEditor(w);
+                                                      }}
                                                       @dblclick=${(e: Event) => {
-                                                  // Double-tap pins the workspace
-                                                  // editor tab in the grid.
-                                                  e.stopPropagation();
-                                                  if (this._workspaceDeleteMode) return;
-                                                  this._openWorkspaceEditor(w, true);
-                                                }}
+                                                        // Double-tap pins the workspace
+                                                        // editor tab in the grid.
+                                                        e.stopPropagation();
+                                                        if (this._workspaceDeleteMode) return;
+                                                        this._openWorkspaceEditor(w, true);
+                                                      }}
                                                     >
                                                       <div class="ws-info">
                                                         <div class="ws-name">${name}</div>
@@ -2771,39 +2769,41 @@ export class Openp41geWindowManager extends LitElement {
                                                         </div>
                                                       </div>
                                                       ${
-                                                  this._workspaceDeleteMode
-                                                    ? html`<span
-                                                        class="dw-checkbox ${this._selectedWorkspaces.has(w.filePath) ? "dw-checkbox--checked" : ""}"
-                                                      ></span>`
-                                                    : html`<button
-                                                        class="ws-open-btn"
-                                                        type="button"
-                                                        title="Open workspace window"
-                                                        aria-label="Open workspace window"
-                                                        @click=${(e: Event) => {
-                                                      e.stopPropagation();
-                                                      this._openWorkspaceWindow(w.filePath);
-                                                    }}
-                                                      >
-                                                        <svg
-                                                          xmlns="http://www.w3.org/2000/svg"
-                                                          height="16px"
-                                                          viewBox="0 -960 960 960"
-                                                          width="16px"
-                                                          fill="currentColor"
-                                                        >
-                                                          <path
-                                                            d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h560v-280h80v280q0 33-23.5 56.5T760-120H200Zm188-212-56-56 372-372H560v-80h280v280h-80v-144L388-332Z"
-                                                          />
-                                                        </svg>
-                                                      </button>`
-                                                }
+                                                        this._workspaceDeleteMode
+                                                          ? html`<span
+                                                              class="dw-checkbox ${this._selectedWorkspaces.has(w.filePath) ? "dw-checkbox--checked" : ""}"
+                                                            ></span>`
+                                                          : html`<button
+                                                              class="ws-open-btn"
+                                                              type="button"
+                                                              title="Open workspace window"
+                                                              aria-label="Open workspace window"
+                                                              @click=${(e: Event) => {
+                                                                e.stopPropagation();
+                                                                this._openWorkspaceWindow(
+                                                                  w.filePath,
+                                                                );
+                                                              }}
+                                                            >
+                                                              <svg
+                                                                xmlns="http://www.w3.org/2000/svg"
+                                                                height="16px"
+                                                                viewBox="0 -960 960 960"
+                                                                width="16px"
+                                                                fill="currentColor"
+                                                              >
+                                                                <path
+                                                                  d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h560v-280h80v280q0 33-23.5 56.5T760-120H200Zm188-212-56-56 372-372H560v-80h280v280h-80v-144L388-332Z"
+                                                                />
+                                                              </svg>
+                                                            </button>`
+                                                      }
                                                     </li>
                                                   `;
                                                 })}
-                                                </ul>
-                                              `
-                                      }
+                                              </ul>
+                                            `
+                                    }
                                     <div class="wm-workspaces-bottom">
                                       ${this._searchOpen ? this._workspaceSearchBar() : nothing}
                                       ${this._workspaceListFooter()}

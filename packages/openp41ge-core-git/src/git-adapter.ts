@@ -25,5 +25,4 @@ export interface GitAdapter {
   getDefaultBranch(repoName: string): Promise<string | null>;
   pullBranch(repoName: string, branch: string): Promise<void>;
   fetch(repoName: string): Promise<void>;
-
 }
