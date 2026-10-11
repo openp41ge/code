@@ -1,0 +1,23 @@
+{
+  "name": "openp41ge-core-git",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "vite build && npx tsc --emitDeclarationOnly --outDir dist 2>/dev/null",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^6.0.0"
+  }
+}

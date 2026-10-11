@@ -1,0 +1,31 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "targetDefaults": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "{projectRoot}/src/**/*",
+        "{projectRoot}/tsconfig*.json",
+        "{projectRoot}/vite.config.*",
+        "{projectRoot}/package.json",
+        { "dependentTasksOutputFiles": "**/*", "transitive": false }
+      ],
+      "outputs": ["{projectRoot}/dist", "{projectRoot}/dist-electron"],
+      "cache": true
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "cache": true
+    },
+    // Lint is cheap (oxlint, seconds) and must never be served stale — a cached
+    // ESLint/oxlint pass once hid real violations. Always run it fresh.
+    "lint": {
+      "inputs": ["{workspaceRoot}/packages/**/*"],
+      "cache": false
+    }
+  },
+  "defaultBase": "master",
+  "neverConnectToCloud": true,
+  "useDaemonProcess": false,
+  "analytics": false
+}

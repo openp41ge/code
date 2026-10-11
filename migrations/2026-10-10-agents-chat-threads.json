@@ -1,0 +1,29 @@
+{
+  "id": "2026-10-10-agents-chat-threads",
+  "description": "Chat threads belong to the agents extension: move each workspace's chat threads into the extension's folder in that workspace.",
+  "release": "0.1.0-alpha.11",
+  "steps": [
+    {
+      "op": "forEachWorkspace",
+      "do": [
+        {
+          "op": "if",
+          "exists": "${workspace.dataDir}/chat-threads",
+          "do": [
+            {
+              "op": "if",
+              "missing": "${workspace.dataDir}/extensions/openp41ge-extension-agents/chat-threads",
+              "do": [
+                {
+                  "op": "move",
+                  "from": "${workspace.dataDir}/chat-threads",
+                  "to": "${workspace.dataDir}/extensions/openp41ge-extension-agents/chat-threads"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

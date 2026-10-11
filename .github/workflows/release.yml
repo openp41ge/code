@@ -1,0 +1,365 @@
+name: Release
+
+# One release pipeline for all channels, parameterised by the version/tag.
+#
+#   alpha / beta / rc  -> run manually (workflow_dispatch), or push a tag:
+#                          v0.1.0-alpha.1   (prerelease)
+#                          v0.1.0-beta.2    (prerelease)
+#   stable             -> push a tag:   v0.1.0
+#
+# Channel is derived from the semver: `-alpha` / `-beta` / `-rc` -> prerelease.
+# Pick the exact commit to release by choosing the branch/tag or commit sha in
+# the "Run workflow" dialog (or `gh workflow run release.yml --ref <sha>`).
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semver, e.g. 0.1.0-alpha.1 / 0.1.0-beta.2 / 0.1.0"
+        required: true
+        type: string
+      arch:
+        description: "Target architecture"
+        required: false
+        default: universal
+        type: choice
+        options: [universal, arm64, x64]
+      draft:
+        description: "Create as a draft (publish manually after review)"
+        required: false
+        default: true
+        type: boolean
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  meta:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      channel: ${{ steps.meta.outputs.channel }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
+    steps:
+      - id: meta
+        name: Resolve version, tag, and channel
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION="${{ inputs.version }}"
+          fi
+          if [ -z "$VERSION" ]; then
+            echo "::error::No release version provided (pass inputs.version or push a v* tag)."
+            exit 1
+          fi
+          PRERELEASE="false"
+          CHANNEL="stable"
+          case "$VERSION" in
+            *-alpha*) CHANNEL="alpha";  PRERELEASE="true" ;;
+            *-beta*)  CHANNEL="beta";   PRERELEASE="true" ;;
+            *-rc*)    CHANNEL="rc";     PRERELEASE="true" ;;
+          esac
+          {
+            echo "version=$VERSION"
+            echo "tag=v$VERSION"
+            echo "channel=$CHANNEL"
+            echo "prerelease=$PRERELEASE"
+          } >> "$GITHUB_OUTPUT"
+
+  gate:
+    # Refuse to release a commit that never got a green prerequisites run
+    # (quality / build) and a passing code-tests status (the private tests). Guards manual dispatch on an
+    # arbitrary commit as well as tag-triggered releases.
+    #
+    # A tag push and its prerequisites push land at the same time, so the gate
+    # can observe the run still in progress. Treat that as "not yet decided":
+    # wait for the newest prerequisites run for this commit to finish and only
+    # then judge its conclusion. Pass immediately if a successful run already
+    # exists; fail only when no run appears, or the latest one is not success.
+    needs: meta
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      statuses: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Require successful prerequisites for this commit (wait for in-progress)
+        run: |
+          set -euo pipefail
+          SHA="${{ github.sha }}"
+          REPO="$GITHUB_REPOSITORY"
+          POLL=15
+          WAIT_MIN=25
+
+          # Fast path: a completed successful run already exists.
+          PASSED="$(gh run list --repo "$REPO" --workflow prerequisites.yml \
+            --commit "$SHA" --status completed --conclusion success \
+            --limit 1 --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null || true)"
+          if [ -n "$PASSED" ]; then
+            echo "prerequisites already green for $SHA (run $PASSED)."
+            exit 0
+          fi
+
+          # Otherwise find the newest run for this commit and wait for it. The
+          # run may not exist yet (tag + prerequisites push are concurrent), so
+          # poll briefly for one to appear before giving up.
+          echo "No completed successful prerequisites run for $SHA; waiting..."
+          RUN_ID=""
+          START="$(date +%s)"
+          while [ -z "$RUN_ID" ]; do
+            RUN_ID="$(gh run list --repo "$REPO" --workflow prerequisites.yml \
+              --commit "$SHA" --limit 1 --json databaseId --jq '.[0].databaseId // empty' 2>/dev/null || true)"
+            if [ -n "$RUN_ID" ]; then break; fi
+            if [ "$(( $(date +%s) - START ))" -ge "$(( WAIT_MIN * 60 ))" ]; then
+              echo "::error::No prerequisites run appeared for $SHA within ${WAIT_MIN}min. Release only commits that have a prerequisites run."
+              exit 1
+            fi
+            sleep "$POLL"
+          done
+
+          echo "Found prerequisites run $RUN_ID for $SHA - waiting for it to finish..."
+          LAST_STATUS=""
+          while :; do
+            CONCLUSION="$(gh run view "$RUN_ID" --repo "$REPO" \
+              --json conclusion --jq '.conclusion // empty' 2>/dev/null || true)"
+            if [ -n "$CONCLUSION" ]; then break; fi
+            STATUS="$(gh run view "$RUN_ID" --repo "$REPO" \
+              --json status --jq '.status // "unknown"' 2>/dev/null || echo unknown)"
+            if [ "$STATUS" != "$LAST_STATUS" ]; then
+              echo "  prerequisites run $RUN_ID is $STATUS..."
+              LAST_STATUS="$STATUS"
+            fi
+            if [ "$(( $(date +%s) - START ))" -ge "$(( WAIT_MIN * 60 ))" ]; then
+              echo "::error::Timed out after ${WAIT_MIN}min waiting for prerequisites run $RUN_ID (last status: $STATUS)."
+              exit 1
+            fi
+            sleep "$POLL"
+          done
+
+          echo "prerequisites run $RUN_ID for $SHA -> $CONCLUSION"
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "::error::Prerequisites run $RUN_ID for $SHA finished as ${CONCLUSION:-unknown}. Release only commits that passed quality/build."
+            exit 1
+          fi
+
+      # The tests run in the private openp41ge/code-tests repo (dispatched by
+      # prerequisites), which reports the `code-tests` commit status.
+      - name: Require passing code-tests for this commit (wait while pending)
+        run: |
+          set -euo pipefail
+          SHA="${{ github.sha }}"
+          REPO="$GITHUB_REPOSITORY"
+          POLL=15
+          WAIT_MIN=40
+          START="$(date +%s)"
+          LAST=""
+          while :; do
+            # Statuses are listed newest first.
+            STATE="$(gh api "repos/$REPO/commits/$SHA/statuses" --paginate \
+              --jq '[.[] | select(.context == "code-tests")][0].state // empty' 2>/dev/null | head -1 || true)"
+            case "$STATE" in
+              success) echo "code-tests passed for $SHA."; exit 0 ;;
+              failure|error)
+                echo "::error::code-tests reported $STATE for $SHA. Release only commits whose tests pass."
+                exit 1 ;;
+            esac
+            if [ "${STATE:-none}" != "$LAST" ]; then
+              echo "  code-tests status for $SHA: ${STATE:-none yet}..."
+              LAST="${STATE:-none}"
+            fi
+            if [ "$(( $(date +%s) - START ))" -ge "$(( WAIT_MIN * 60 ))" ]; then
+              echo "::error::Timed out after ${WAIT_MIN}min waiting for the code-tests status on $SHA (last: ${STATE:-none})."
+              exit 1
+            fi
+            sleep "$POLL"
+          done
+
+  build-macos:
+    needs: [meta, gate]
+    runs-on: macos-14 # Apple Silicon
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      NX_NO_CLOUD: "true"
+      # electron-builder notarization (see docs: code-signing/notarization)
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Import the Developer ID Application certificate (base64 .p12) into a
+      # temporary keychain so electron-builder picks it up for signing.
+      - uses: apple-actions/import-codesign-certs@v4
+        with:
+          p12-file-base64: ${{ secrets.MAC_CSC_LINK }}
+          p12-password: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: nx-${{ runner.os }}-
+
+      - name: Set release version
+        working-directory: packages/openp41ge
+        run: |
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json','utf8'));p.version=process.env.RELEASE_VERSION;fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+        env:
+          RELEASE_VERSION: ${{ needs.meta.outputs.version }}
+
+      - name: Build renderer + main process
+        run: pnpm nx build openp41ge
+        env:
+          # Baked into the bundle via esbuild --define / Vite define so the
+          # app's Sentry release & environment match the version/channel the
+          # source maps are uploaded under.
+          APP_VERSION: ${{ needs.meta.outputs.version }}
+          APP_CHANNEL: ${{ needs.meta.outputs.channel }}
+
+      # The official extensions ship with the app (electron-builder
+      # `extraResources` packs dist-extensions/).
+      - name: Bundle the official extensions
+        run: pnpm nx bundle-extensions openp41ge
+
+      - name: Upload source maps to Sentry
+        working-directory: packages/openp41ge
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          VERSION: ${{ needs.meta.outputs.version }}
+        run: bash scripts/upload-sourcemaps.sh
+
+      - name: Package, sign, and notarize
+        working-directory: packages/openp41ge
+        run: |
+          ARCH="${{ inputs.arch || 'universal' }}"
+          case "$ARCH" in
+            universal) FLAG="--universal" ;;
+            arm64)     FLAG="--arm64" ;;
+            x64)       FLAG="--x64" ;;
+            *) echo "::error::Unsupported arch: $ARCH"; exit 1 ;;
+          esac
+          # electron-builder's GitHub provider emits ONLY the configured channel's
+          # update-info file (latest-mac.yml / alpha-mac.yml / …), so set the
+          # channel from the release channel (stable -> latest). This is what
+          # the in-app auto-updater fetches by channel.
+          BUILD_CHANNEL="${{ needs.meta.outputs.channel }}"
+          [ "$BUILD_CHANNEL" = "stable" ] && BUILD_CHANNEL="latest"
+          CHANNEL_FLAG=""
+          [ "$BUILD_CHANNEL" != "latest" ] && CHANNEL_FLAG="-c.publish.channel=$BUILD_CHANNEL"
+          echo "Building update channel: $BUILD_CHANNEL"
+          pnpm exec electron-builder --mac "$FLAG" --publish never $CHANNEL_FLAG
+
+      - name: Verify signature + notarization
+        working-directory: packages/openp41ge
+        run: |
+          APP=$(find release -maxdepth 3 -name "*.app" -type d | head -1)
+          echo "Verifying: $APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          spctl --assess --verbose --type execute "$APP"
+          xcrun stapler validate "$APP"
+
+      - name: Generate SHA256 checksums
+        working-directory: packages/openp41ge
+        run: |
+          cd release
+          shasum -a 256 *.dmg *.zip > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: |
+            packages/openp41ge/release/*.dmg
+            packages/openp41ge/release/*.zip
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-release
+          path: |
+            packages/openp41ge/release/*.dmg
+            packages/openp41ge/release/*.zip
+            packages/openp41ge/release/*-mac.yml
+            packages/openp41ge/release/SHA256SUMS
+
+  release:
+    needs: [meta, build-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos-release
+          path: release-assets
+
+      # Data migrations: merge this release's sets (migrations/) into one
+      # signed migrations.json — the app downloads and verifies it. No sets,
+      # no file; no key, the release fails (never unsigned migrations).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Data migrations (merge + sign)
+        env:
+          MIGRATIONS_SIGNING_KEY: ${{ secrets.MIGRATIONS_SIGNING_KEY }}
+        run: |
+          node packages/openp41ge/scripts/release-migrations.mjs \
+            --version "${{ needs.meta.outputs.version }}" \
+            --dir migrations \
+            --out release-assets
+
+      - name: Create / update release
+        run: |
+          set -euo pipefail
+          TAG="${{ needs.meta.outputs.tag }}"
+          PRERELEASE="${{ needs.meta.outputs.prerelease }}"
+
+          PREREL_FLAG=""
+          [ "$PRERELEASE" = "true" ] && PREREL_FLAG="--prerelease"
+          DRAFT_FLAG=""
+          [ "${{ inputs.draft || 'false' }}" = "true" ] && DRAFT_FLAG="--draft"
+
+          # Ship install.sh as a release asset so it can be fetched directly.
+          cp install.sh release-assets/install.sh
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG exists — updating."
+            gh release edit "$TAG" --title "$TAG" $PREREL_FLAG $DRAFT_FLAG
+          else
+            echo "Creating release $TAG."
+            gh release create "$TAG" \
+              --target "${{ github.sha }}" \
+              --title "$TAG" \
+              --generate-notes \
+              $PREREL_FLAG $DRAFT_FLAG
+          fi
+
+          gh release upload "$TAG" release-assets/* --clobber

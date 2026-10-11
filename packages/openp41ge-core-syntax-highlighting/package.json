@@ -1,0 +1,58 @@
+{
+  "name": "openp41ge-core-syntax-highlighting",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./textmate-init": {
+      "types": "./dist/textmate-init.d.ts",
+      "import": "./dist/textmate-init.js"
+    },
+    "./token-registry": {
+      "types": "./dist/token-registry.d.ts",
+      "import": "./dist/token-registry.js"
+    },
+    "./line-tokens": {
+      "types": "./dist/line-tokens.d.ts",
+      "import": "./dist/line-tokens.js"
+    },
+    "./lazy-tokenization-manager": {
+      "types": "./dist/lazy-tokenization-manager.d.ts",
+      "import": "./dist/lazy-tokenization-manager.js"
+    },
+    "./tokenizer": {
+      "types": "./dist/tokenizer.d.ts",
+      "import": "./dist/tokenizer.js"
+    },
+    "./contiguous-tokens-store": {
+      "types": "./dist/contiguous-tokens-store.d.ts",
+      "import": "./dist/contiguous-tokens-store.js"
+    },
+    "./encoded-token-attributes": {
+      "types": "./dist/encoded-token-attributes.d.ts",
+      "import": "./dist/encoded-token-attributes.js"
+    }
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build && npx tsc --emitDeclarationOnly --outDir dist 2>/dev/null",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "vscode-textmate": "^9.1.0",
+    "vscode-oniguruma": "^2.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^6.0.0"
+  }
+}

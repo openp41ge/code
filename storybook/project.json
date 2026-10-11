@@ -1,0 +1,20 @@
+{
+  "name": "openp41ge-storybook",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
+  "targets": {
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "storybook dev -p 6006",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "storybook build",
+        "cwd": "{projectRoot}"
+      }
+    }
+  }
+}

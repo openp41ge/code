@@ -1,0 +1,91 @@
+{
+  "name": "openp41ge",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist", "{projectRoot}/dist-electron"],
+      "dependsOn": ["^build"],
+      "options": {
+        "commands": [
+          "vite build",
+          "tsc -p tsconfig.node.json",
+          "esbuild dist-electron/electron/main.js --bundle --platform=node --format=esm --target=node20 --external:electron --outfile=dist-electron/electron/main.js --allow-overwrite --sourcemap=external --banner:js='import { createRequire } from \"module\"; const require = /* @__PURE__ */ createRequire(import.meta.url);' --define:__OPENP41GE_VERSION__=\\\"${APP_VERSION:-0.0.0-dev}\\\" --define:__OPENP41GE_CHANNEL__=\\\"${APP_CHANNEL:-development}\\\"",
+          "cp electron/preload.cjs dist-electron/electron/preload.cjs"
+        ],
+        "parallel": false,
+        "cwd": "{projectRoot}"
+      }
+    },
+    "bundle-extensions": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist-extensions"],
+      "dependsOn": ["^build"],
+      "options": {
+        "command": "node scripts/bundle-extensions.ts --out dist-extensions",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "build:renderer": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "command": "vite build",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "build:electron": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist-electron"],
+      "options": {
+        "command": "tsc -p tsconfig.node.json && cp electron/preload.cjs dist-electron/electron/preload.cjs",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "clean": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "rm -rf dist dist-electron dist-extensions",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "dev:vite": {
+      "executor": "@nx/vite:dev-server",
+      "dependsOn": ["^build"],
+      "options": {
+        "buildTarget": "openp41ge:build"
+      }
+    },
+    "dev:electron": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build:electron"],
+      "options": {
+        "commands": ["node scripts/wait-for-vite.mjs", "electron ."],
+        "parallel": false,
+        "cwd": "{projectRoot}"
+      }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "dependsOn": [
+        "^build",
+        "build:electron",
+        {
+          "projects": ["openp41ge-extension-*"],
+          "target": "build"
+        }
+      ],
+      "options": {
+        "command": "concurrently --kill-others \"vite\" \"node scripts/wait-for-vite.mjs && electron .\"",
+        "cwd": "{projectRoot}"
+      }
+    }
+  }
+}

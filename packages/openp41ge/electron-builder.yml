@@ -1,0 +1,61 @@
+# electron-builder config for openp41ge (macOS).
+# Built + signed + notarized + stapled in CI (.github/workflows/release.yml).
+#
+# Signing identity is discovered from the keychain (imported by
+# apple-actions/import-codesign-certs). Notarization credentials come from
+# the environment: APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID.
+
+appId: com.openp41ge.app
+productName: openp41ge
+copyright: Copyright © openp41ge
+artifactName: ${productName}-${version}-${arch}.${ext}
+
+# Keep electron-builder output out of vite's `dist` (renderer) directory.
+directories:
+  output: release
+  buildResources: build
+
+# The renderer is bundled by Vite and the main process is bundled by esbuild
+# (a single self-contained file), so no runtime node_modules are needed.
+files:
+  - dist/**
+  - dist-electron/electron/main.js
+  - dist-electron/electron/preload.cjs
+  - package.json
+  # Source maps are uploaded to Sentry, not shipped inside the asar.
+  - "!dist/**/*.map"
+  - "!dist-electron/**/*.map"
+
+asar: true
+
+# The official extensions ship with the app, outside the asar
+# (Contents/Resources/extensions), as self-contained extension dirs built by
+# `nx run openp41ge:bundle-extensions` (scripts/bundle-extensions.ts).
+extraResources:
+  - from: dist-extensions
+    to: extensions
+
+# Update feed → GitHub Releases. With a `publish` config present (even with
+# `--publish never`), electron-builder embeds `app-update.yml` into the app and
+# writes the per-channel update-info .yml (latest-mac.yml / alpha-mac.yml / …)
+# into `release/`; the release job uploads it as a release asset. v26's GitHub
+# provider emits ONLY the configured channel's file, so CI overrides `channel`
+# per build with `-c.publish.channel=<alpha|beta|rc>` (stable stays "latest").
+publish:
+  provider: github
+  owner: openp41ge
+  repo: code
+  channel: latest
+
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - dmg
+    - zip
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.inherit.plist
+  notarize: true
+
+dmg:
+  title: ${productName} ${version}

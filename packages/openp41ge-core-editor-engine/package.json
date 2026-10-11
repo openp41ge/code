@@ -1,0 +1,155 @@
+{
+  "name": "openp41ge-core-editor-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./events": {
+      "types": "./dist/events.d.ts",
+      "import": "./dist/events.js"
+    },
+    "./interfaces": {
+      "types": "./dist/interfaces/index.d.ts",
+      "import": "./dist/interfaces/index.js"
+    },
+    "./model": {
+      "types": "./dist/model/index.d.ts",
+      "import": "./dist/model/index.js"
+    },
+    "./model/piece-tree-text-content-model": {
+      "types": "./dist/model/piece-tree-text-content-model.d.ts",
+      "import": "./dist/model/piece-tree-text-content-model.js"
+    },
+    "./model/view-model": {
+      "types": "./dist/model/view-model.d.ts",
+      "import": "./dist/model/view-model.js"
+    },
+    "./cursor": {
+      "types": "./dist/cursor/index.d.ts",
+      "import": "./dist/cursor/index.js"
+    },
+    "./cursor/cursor-controller": {
+      "types": "./dist/cursor/cursor-controller.d.ts",
+      "import": "./dist/cursor/cursor-controller.js"
+    },
+    "./input": {
+      "types": "./dist/input/index.d.ts",
+      "import": "./dist/input/index.js"
+    },
+    "./input/text-area-input": {
+      "types": "./dist/input/text-area-input.d.ts",
+      "import": "./dist/input/text-area-input.js"
+    },
+    "./input/keyboard-handler": {
+      "types": "./dist/input/keyboard-handler.d.ts",
+      "import": "./dist/input/keyboard-handler.js"
+    },
+    "./rendering": {
+      "types": "./dist/rendering/index.d.ts",
+      "import": "./dist/rendering/index.js"
+    },
+    "./view": {
+      "types": "./dist/view/index.d.ts",
+      "import": "./dist/view/index.js"
+    },
+    "./view/view-lines": {
+      "types": "./dist/view/view-lines.d.ts",
+      "import": "./dist/view-lines.js"
+    },
+    "./view/word-wrap-helper": {
+      "types": "./dist/view/word-wrap-helper.d.ts",
+      "import": "./dist/word-wrap-helper.js"
+    },
+    "./view/wrap-column-calculator": {
+      "types": "./dist/view/wrap-column-calculator.d.ts",
+      "import": "./dist/wrap-column-calculator.js"
+    },
+    "./view/scroll-manager": {
+      "types": "./dist/view/scroll-manager.d.ts",
+      "import": "./dist/scroll-manager.js"
+    },
+    "./rendering": {
+      "types": "./dist/rendering/index.d.ts",
+      "import": "./dist/rendering/index.js"
+    },
+    "./rendering/cursor-renderer": {
+      "types": "./dist/rendering/cursor-renderer.d.ts",
+      "import": "./dist/cursor-renderer.js"
+    },
+    "./rendering/selection-renderer": {
+      "types": "./dist/rendering/selection-renderer.d.ts",
+      "import": "./dist/selection-renderer.js"
+    },
+    "./rendering/line-numbers-overlay": {
+      "types": "./dist/rendering/line-numbers-overlay.d.ts",
+      "import": "./dist/line-numbers-overlay.js"
+    },
+    "./rendering/current-line-highlight": {
+      "types": "./dist/rendering/current-line-highlight.d.ts",
+      "import": "./dist/current-line-highlight.js"
+    },
+    "./rendering/indentation-guides": {
+      "types": "./dist/rendering/indentation-guides.d.ts",
+      "import": "./dist/indentation-guides.js"
+    },
+    "./rendering/bracket-matching": {
+      "types": "./dist/rendering/bracket-matching.d.ts",
+      "import": "./dist/bracket-matching.js"
+    },
+    "./rendering/bracket-pair-service": {
+      "types": "./dist/rendering/bracket-pair-service.d.ts",
+      "import": "./dist/bracket-pair-service.js"
+    },
+    "./themes": {
+      "types": "./dist/themes/index.d.ts",
+      "import": "./dist/themes/index.js"
+    },
+    "./input/clipboard-handler": {
+      "types": "./dist/input/clipboard-handler.d.ts",
+      "import": "./dist/clipboard-handler.js"
+    },
+    "./input/composition-handler": {
+      "types": "./dist/input/composition-handler.d.ts",
+      "import": "./dist/composition-handler.js"
+    },
+    "./input/mouse-handler": {
+      "types": "./dist/input/mouse-handler.d.ts",
+      "import": "./dist/mouse-handler.js"
+    },
+    "./input/auto-closing-pairs": {
+      "types": "./dist/input/auto-closing-pairs.d.ts",
+      "import": "./dist/auto-closing-pairs.js"
+    },
+    "./interfaces/formatter-registry": {
+      "types": "./dist/interfaces/formatter-registry.d.ts",
+      "import": "./dist/formatter-registry.js"
+    },
+    "./services": {
+      "types": "./dist/services/index.d.ts",
+      "import": "./dist/services/index.js"
+    }
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build && npx tsc --emitDeclarationOnly --outDir dist 2>/dev/null",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "openp41ge-core-syntax-highlighting": "workspace:*",
+    "openp41ge-core-piece-tree": "workspace:*",
+    "vscode-textmate": "^9.3.2"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^6.0.0"
+  }
+}

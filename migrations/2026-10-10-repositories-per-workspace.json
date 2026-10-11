@@ -1,0 +1,42 @@
+{
+  "id": "2026-10-10-repositories-per-workspace",
+  "description": "Each workspace keeps its clones in its own data folder: move each clone out of the shared repositories folder to the most recently opened workspace that lists it, relink its worktrees, and rewrite saved paths.",
+  "release": "0.1.0-alpha.11",
+  "steps": [
+    {
+      "op": "forEachClone",
+      "in": "repositories",
+      "owner": "mostRecentWorkspaceListing",
+      "do": [
+        {
+          "op": "if",
+          "missing": "${owner.dataDir}/repositories/${clone.name}/.git",
+          "do": [
+            {
+              "op": "move",
+              "from": "${clone}",
+              "to": "${owner.dataDir}/repositories/${clone.name}"
+            },
+            {
+              "op": "relinkWorktrees",
+              "repo": "${owner.dataDir}/repositories/${clone.name}",
+              "from": "${clone}"
+            }
+          ]
+        }
+      ]
+    },
+    { "op": "removeIfEmpty", "path": "repositories" },
+    {
+      "op": "forEachWorkspace",
+      "do": [
+        {
+          "op": "rewriteJsonPaths",
+          "files": "${workspace.file}",
+          "from": "repositories",
+          "to": "${workspace.dataDir}/repositories"
+        }
+      ]
+    }
+  ]
+}

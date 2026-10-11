@@ -1,0 +1,30 @@
+{
+  "name": "openp41ge-extension-agents",
+  "version": "0.1.0",
+  "description": "Openp41ge Agents — AI agent chats as an official extension.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "openp41ge": {
+    "extension": true,
+    "id": "openp41ge-extension-agents",
+    "publisher": "openp41ge",
+    "entry": "dist/index.js",
+    "renderer": "dist/renderer.js",
+    "api": "0.2"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "lit": "^3.3.3",
+    "openp41ge-sdk": "workspace:*",
+    "openp41ge-sdk-uikit": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^7.0.2"
+  }
+}

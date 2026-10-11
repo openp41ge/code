@@ -1,0 +1,44 @@
+{
+  "name": "openp41ge-sdk-uikit",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tailwindcss -i src/styles.css -o dist/styles.css && node scripts/inline-css.mjs && vite build && (tsc --emitDeclarationOnly --outDir dist 2>/dev/null || true)",
+        "cwd": "{projectRoot}"
+      },
+      "outputs": [
+        "{projectRoot}/dist/styles.css",
+        "{projectRoot}/src/generated/tailwind.ts",
+        "{projectRoot}/dist/index.js",
+        "{projectRoot}/dist/index.d.ts"
+      ],
+      "dependsOn": ["^build"],
+      "cache": true
+    },
+    "build:css": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tailwindcss -i src/styles.css -o dist/styles.css && node scripts/inline-css.mjs",
+        "cwd": "{projectRoot}"
+      },
+      "outputs": ["{projectRoot}/dist/styles.css", "{projectRoot}/src/generated/tailwind.ts"],
+      "cache": true
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "clean": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "rm -rf dist src/generated",
+        "cwd": "{projectRoot}"
+      }
+    }
+  }
+}

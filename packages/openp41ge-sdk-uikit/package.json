@@ -1,0 +1,60 @@
+{
+  "name": "openp41ge-sdk-uikit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./theme": {
+      "types": "./dist/theme/index.d.ts",
+      "import": "./dist/theme.js"
+    },
+    "./file-editor": {
+      "types": "./dist/file-editor/index.d.ts",
+      "import": "./dist/file-editor/index.js"
+    },
+    "./tooltip": {
+      "types": "./dist/components/tooltip/index.d.ts",
+      "import": "./dist/tooltip.js"
+    },
+    "./styles.css": "./dist/styles.css",
+    "./drop-indicator": {
+      "types": "./dist/components/drop-indicator/index.d.ts",
+      "import": "./dist/drop-indicator.js"
+    },
+    "./json-editor": {
+      "types": "./dist/json-editor/index.d.ts",
+      "import": "./dist/json-editor.js"
+    }
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "style": "dist/styles.css",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build:css": "tailwindcss -i src/styles.css -o dist/styles.css",
+    "build:inline": "node scripts/inline-css.mjs",
+    "build": "npm run build:css && npm run build:inline && vite build",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist src/generated"
+  },
+  "dependencies": {
+    "lit": "^3.2.0",
+    "openp41ge-core-syntax-highlighting": "workspace:*",
+    "openp41ge-core-tabs": "workspace:*",
+    "openp41ge-core-editor-engine": "workspace:*",
+    "openp41ge-core-scrollbar": "workspace:*",
+    "openp41ge-core-editor-gutter": "workspace:*"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0",
+    "typescript": "^7.0.2",
+    "vite": "^6.0.0",
+    "@storybook/web-components": "^8.6.0"
+  }
+}

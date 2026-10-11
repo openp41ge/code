@@ -1,0 +1,4 @@
+[defaults]
+url = https://sentry.io
+org = tw050x
+project = openp41ge

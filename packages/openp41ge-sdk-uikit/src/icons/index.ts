@@ -1,0 +1,1 @@
+export { iconRegistry } from "./registry";

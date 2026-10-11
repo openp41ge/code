@@ -1,0 +1,9 @@
+# Secret files — one variable per file, loaded by scripts/notarize.sh
+# Create them by running the script interactively, or manually.
+# Example:
+#   echo "you@example.com" > .secrets/NOTARY_APPLE_ID
+#   echo "TEAM123456" > .secrets/NOTARY_TEAM_ID
+#   echo "xxxx-xxxx-xxxx-xxxx" > .secrets/NOTARY_APP_PASSWORD
+*
+!.gitignore
+!.gitkeep

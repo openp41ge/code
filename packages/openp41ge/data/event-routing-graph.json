@@ -1,0 +1,230 @@
+{
+  "version": 1,
+  "nodes": [
+    {
+      "id": "focus/set-focused"
+    },
+    {
+      "id": "focus/set-blurred"
+    },
+    {
+      "id": "focus/set-sidebar-right"
+    },
+    {
+      "id": "focus/set-sidebar-left"
+    },
+    {
+      "id": "focus/clear-sidebar"
+    },
+    {
+      "id": "keyboard/suppress"
+    },
+    {
+      "id": "keyboard/clear-suppress"
+    },
+    {
+      "id": "tabs/open-system-tab"
+    },
+    {
+      "id": "tabs/activate-tab"
+    },
+    {
+      "id": "tabs/close-tab"
+    },
+    {
+      "id": "tabs/pin-tab"
+    },
+    {
+      "id": "tabs/open-in-cell"
+    },
+    {
+      "id": "tabs/remove-from-cell"
+    },
+    {
+      "id": "layout/toggle-sidebar"
+    },
+    {
+      "id": "layout/open-sidebar"
+    },
+    {
+      "id": "layout/set-sidebar-width"
+    },
+    {
+      "id": "tabs/remove-column-tab"
+    },
+    {
+      "id": "tabs/add-column-tab-at"
+    },
+    {
+      "id": "layout/resize-grid"
+    },
+    {
+      "id": "system-tabs/open-tab"
+    },
+    {
+      "id": "system-tabs/close-tab"
+    },
+    {
+      "id": "system-tabs/activate-tab"
+    },
+    {
+      "id": "system-tabs/reorder-tabs"
+    },
+    {
+      "id": "workspace/refresh-data"
+    }
+  ],
+  "edges": [
+    {
+      "id": "e001",
+      "from": "window-focus",
+      "when": {
+        "windowFocused": false
+      },
+      "to": ["focus/set-focused"]
+    },
+    {
+      "id": "e002",
+      "from": "window-blur",
+      "when": {
+        "windowFocused": true
+      },
+      "to": ["focus/set-blurred"]
+    },
+    {
+      "id": "e003",
+      "from": "sidebar-click-right",
+      "when": {
+        "windowFocused": false
+      },
+      "to": ["focus/set-focused", "focus/set-sidebar-right"]
+    },
+    {
+      "id": "e004",
+      "from": "sidebar-click-right",
+      "when": {
+        "windowFocused": true,
+        "focusedSide": "left"
+      },
+      "to": ["focus/set-sidebar-right"]
+    },
+    {
+      "id": "e005",
+      "from": "sidebar-click-left",
+      "when": {
+        "windowFocused": false
+      },
+      "to": ["focus/set-focused", "focus/set-sidebar-left"]
+    },
+    {
+      "id": "e006",
+      "from": "sidebar-click-left",
+      "when": {
+        "windowFocused": true,
+        "focusedSide": "right"
+      },
+      "to": ["focus/set-sidebar-left"]
+    },
+    {
+      "id": "e007",
+      "from": "grid-click",
+      "when": {
+        "focusedSide": "right"
+      },
+      "to": ["focus/clear-sidebar"]
+    },
+    {
+      "id": "e008",
+      "from": "grid-click",
+      "when": {
+        "focusedSide": "left"
+      },
+      "to": ["focus/clear-sidebar"]
+    },
+    {
+      "id": "e010",
+      "from": "tab-open-system",
+      "to": ["tabs/open-system-tab"]
+    },
+    {
+      "id": "e011",
+      "from": "tab-activate",
+      "to": ["tabs/activate-tab"]
+    },
+    {
+      "id": "e012",
+      "from": "tab-close",
+      "to": ["tabs/close-tab"]
+    },
+    {
+      "id": "e013",
+      "from": "tab-pin",
+      "to": ["tabs/pin-tab"]
+    },
+    {
+      "id": "e014",
+      "from": "tab-open-in-cell",
+      "to": ["tabs/open-in-cell"]
+    },
+    {
+      "id": "e015",
+      "from": "tab-remove-from-cell",
+      "to": ["tabs/remove-from-cell"]
+    },
+    {
+      "id": "e016",
+      "from": "sidebar-toggle",
+      "to": ["layout/toggle-sidebar"]
+    },
+    {
+      "id": "e017",
+      "from": "sidebar-open",
+      "to": ["layout/open-sidebar"]
+    },
+    {
+      "id": "e018",
+      "from": "sidebar-resized",
+      "to": ["layout/set-sidebar-width"]
+    },
+    {
+      "id": "e019",
+      "from": "tab-remove-column",
+      "to": ["tabs/remove-column-tab"]
+    },
+    {
+      "id": "e020",
+      "from": "tab-add-column-at",
+      "to": ["tabs/add-column-tab-at"]
+    },
+    {
+      "id": "e021",
+      "from": "layout-resize-grid",
+      "to": ["layout/resize-grid"]
+    },
+    {
+      "id": "e022",
+      "from": "system-tab-open",
+      "to": ["system-tabs/open-tab"]
+    },
+    {
+      "id": "e023",
+      "from": "system-tab-close",
+      "to": ["system-tabs/close-tab"]
+    },
+    {
+      "id": "e024",
+      "from": "system-tab-activate",
+      "to": ["system-tabs/activate-tab"]
+    },
+    {
+      "id": "e025",
+      "from": "system-tab-reorder",
+      "to": ["system-tabs/reorder-tabs"]
+    },
+    {
+      "id": "e026",
+      "from": "workspace-changed",
+      "to": ["workspace/refresh-data"]
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+name: Prerequisites
+
+on:
+  push:
+
+env:
+  NX_CLOUD_ACCESS_TOKEN: ""
+  NX_NO_CLOUD: "true"
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: nx-${{ runner.os }}-
+      - run: pnpm nx lint
+      - run: pnpm nx knip
+      - run: pnpm nx format:check
+
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: nx-${{ runner.os }}-
+      - run: pnpm nx run-many -t build
+
+  # The tests live in the private openp41ge/code-tests repo. It tests this
+  # commit and reports back as the `code-tests` commit status, which the
+  # release gate requires.
+  dispatch-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app
+        with:
+          client-id: ${{ vars.APP_CI_CLIENT_ID }}
+          private-key: ${{ secrets.APP_CI_PRIVATE_KEY }}
+          owner: openp41ge
+          repositories: code-tests
+          permission-contents: write # required for repository_dispatch
+
+      - name: Trigger code-tests
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          gh api repos/openp41ge/code-tests/dispatches \
+            -f event_type=test-app \
+            -f "client_payload[sha]=${{ github.sha }}"

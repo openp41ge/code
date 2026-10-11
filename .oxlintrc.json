@@ -1,0 +1,56 @@
+{
+  "$schema": "https://oxc-project.github.io/json-schema/oxlint.schema.json",
+  "ignorePatterns": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/coverage/**",
+    "**/*.js",
+    "**/*.cjs",
+    "**/*.mjs",
+    "**/__tests__/**",
+    "**/*.d.ts",
+    "**/test/"
+  ],
+  "categories": {
+    "correctness": "off",
+    "suspicious": "off",
+    "pedantic": "off",
+    "perf": "off",
+    "restriction": "off",
+    "style": "off",
+    "nursery": "off"
+  },
+  "rules": {
+    "no-explicit-any": "error",
+    "no-unused-vars": [
+      "error",
+      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_", "caughtErrors": "none" }
+    ],
+    "consistent-type-imports": ["error", { "prefer": "type-imports" }],
+    "no-var": "error",
+    "no-console": "error",
+    "max-classes-per-file": ["error", 1]
+  },
+  "overrides": [
+    {
+      "files": ["demos/*-demo/**/*.ts"],
+      "rules": {
+        "no-explicit-any": "off",
+        "no-console": "off"
+      }
+    },
+    {
+      "files": ["packages/openp41ge/electron/**/*.ts"],
+      "rules": {
+        "no-explicit-any": "off",
+        "no-console": "off"
+      }
+    },
+    {
+      "files": ["packages/openp41ge-core-logger/**/*.ts"],
+      "rules": {
+        "no-console": "off"
+      }
+    }
+  ]
+}

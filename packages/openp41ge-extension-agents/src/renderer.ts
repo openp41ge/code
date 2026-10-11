@@ -1,0 +1,78 @@
+/**
+ * openp41ge-extension-agents — renderer entry (view).
+ *
+ * Surfaces:
+ *   - `sidebar:chats` (Agents): the workspace's chats; new chat; settings.
+ *   - `sidebar:search` (Search chats): search the chats' messages.
+ *   - `grid:chat` (`{ chatId, cwd? }`): one chat in `<agents-chat>`.
+ * Chat rows (both sidebars) drag as `chat-thread` payloads, which open as
+ * the chat tab.
+ */
+
+import { registerDragDecls, registerRenderers } from "openp41ge-sdk";
+import type { ChatPaneHost } from "./views/chat-pane.js";
+import { renderChat } from "./views/chat-pane-element.js";
+import { renderChatSearch } from "./views/chat-search-sidebar.js";
+import type { ChatSearchHost } from "./views/chat-search-model.js";
+import { CHAT_DRAG_SOURCE_ID, renderChats, type ChatsSidebarHost } from "./views/chats-sidebar.js";
+
+registerRenderers([
+  {
+    kind: "sidebar",
+    id: "chats",
+    title: "Agents",
+    description: "AI agent conversations",
+    defaultSide: "right",
+    // The platform's SurfaceHost satisfies the views' hosts structurally.
+    render: (host) => renderChats(host as unknown as ChatsSidebarHost),
+  },
+  {
+    kind: "sidebar",
+    id: "search",
+    title: "Search chats",
+    description: "Search the agent conversations",
+    defaultSide: "right",
+    render: (host) => renderChatSearch(host as unknown as ChatSearchHost),
+  },
+  {
+    kind: "grid",
+    id: "chat",
+    title: "Agent",
+    render: (host) => renderChat(host as unknown as ChatPaneHost),
+  },
+]);
+
+/** This extension's chat payload kind (`openp41ge-extension-agents/chat-thread`). */
+const CHAT_KIND = "openp41ge-extension-agents/chat-thread";
+
+registerDragDecls({
+  kinds: [
+    {
+      id: "chat-thread",
+      label: "Chat",
+      schema: {
+        type: "object",
+        properties: { chatId: { type: "string" }, title: { type: "string" } },
+        required: ["chatId"],
+      },
+    },
+  ],
+  consumers: [
+    {
+      id: "chat",
+      accepts: [CHAT_KIND],
+      placement: ["grid"],
+      open: { kind: "renderer-surface", surface: "grid:chat" },
+    },
+  ],
+  sources: [
+    {
+      id: CHAT_DRAG_SOURCE_ID,
+      label: "Chat",
+      kind: CHAT_KIND,
+      attrs: { chatId: "data-chat-id", title: "data-chat-title" },
+      contexts: ["workspace"],
+      crossWindow: true,
+    },
+  ],
+});

@@ -1,0 +1,18 @@
+packages:
+  - "packages/*"
+  - "storybook"
+allowBuilds:
+  "@google/genai": true
+  "@scarf/scarf": true
+  "@sentry/cli": true
+  electron: true
+  electron-winstaller: false
+  esbuild: true
+  nx: true
+  protobufjs: true
+  unrs-resolver: true
+minimumReleaseAgeExclude:
+  - "@earendil-works/pi-agent-core@0.82.1 || 0.83.0"
+  - "@earendil-works/pi-ai@0.82.1 || 0.83.0"
+  - "@earendil-works/pi-coding-agent@0.82.1 || 0.83.0"
+  - "@earendil-works/pi-tui@0.82.1 || 0.83.0"

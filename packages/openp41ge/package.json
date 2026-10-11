@@ -1,0 +1,47 @@
+{
+  "name": "openp41ge",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/electron/main.js",
+  "scripts": {
+    "dev": "bash scripts/dev.sh",
+    "dev:tools": "OPENP41GE_DEVTOOLS=1 bash scripts/dev.sh",
+    "dev:renderer": "bash scripts/dev-renderer.sh",
+    "dev:electron": "bash scripts/dev-electron.sh",
+    "build": "vite build && bash scripts/build-electron.sh",
+    "build:electron": "bash scripts/build-electron.sh",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "clean": "bash scripts/clean.sh",
+    "dist": "node scripts/bundle-extensions.ts && electron-builder",
+    "dist:mac": "node scripts/bundle-extensions.ts && electron-builder --mac",
+    "start": "electron .",
+    "start:devtools": "OPENP41GE_DEVTOOLS=1 electron ."
+  },
+  "devDependencies": {
+    "@sentry/cli": "^3.8.0",
+    "@types/node": "^22.0.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "concurrently": "^9.0.0",
+    "electron": "^43.0.0",
+    "electron-builder": "^26.0.0",
+    "electron-updater": "^6.8.9",
+    "esbuild": "^0.25.12",
+    "lit": "^3.3.3",
+    "openp41ge-core-constants": "workspace:*",
+    "openp41ge-sdk": "workspace:*",
+    "openp41ge-core-extension-host": "workspace:*",
+    "openp41ge-core-filesystem": "workspace:*",
+    "openp41ge-core-logger": "workspace:*",
+    "openp41ge-core-scrollbar": "workspace:*",
+    "openp41ge-sdk-uikit": "workspace:*",
+    "ts-node": "^10.9.2",
+    "typescript": "^7.0.2",
+    "vite": "^6.0.0",
+    "zod": "^3.24.0"
+  },
+  "dependencies": {
+    "@sentry/electron": "^7.20.0"
+  }
+}

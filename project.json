@@ -1,0 +1,36 @@
+{
+  "name": "openp41ge-monorepo",
+  "$schema": "./node_modules/nx/schemas/project-schema.json",
+  "targets": {
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "oxlint packages/"
+      }
+    },
+    "knip": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "knip"
+      }
+    },
+    "knip:production": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "knip --production"
+      }
+    },
+    "format": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "prettier --write ."
+      }
+    },
+    "format:check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "prettier --check ."
+      }
+    }
+  }
+}

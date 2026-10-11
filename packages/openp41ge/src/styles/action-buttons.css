@@ -1,0 +1,73 @@
+/*
+ * Shared sidebar bottom-bar action buttons.
+ *
+ * These are the icon-only buttons in the sidebar tab bottom bars (settings
+ * gear, search, etc.). They are:
+ *   - FULL HEIGHT: they fill the whole bottom bar vertically.
+ *   - SQUARE: width equals their height (the bar height).
+ *   - Hover background so the click target is obvious.
+ *   - A 1px vertical separator between adjacent buttons.
+ *
+ * Add the `p41ge-icon-btn` class to a bottom-bar action button to get this
+ * look. The active state (is-active or aria-pressed="true") renders the same
+ * hover background + white icon so a toggled-on tool is clearly lit.
+ */
+.p41ge-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary, #999);
+  cursor: pointer;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+.p41ge-icon-btn:hover,
+.p41ge-icon-btn.is-active,
+.p41ge-icon-btn[aria-pressed="true"] {
+  background: var(--bg-hover, #2a2d2e);
+  color: var(--text-primary, #fff);
+}
+/* Separator between adjacent action buttons (e.g. settings | search). */
+.p41ge-icon-btn + .p41ge-icon-btn {
+  border-left: 1px solid var(--divider, #333);
+}
+/* Cap (outer) separator on the outermost action button, splitting the whole
+   button group off from the empty remainder of the bar. The cap side is
+   set via data-cap-side to match which edge the sidebar is docked to. */
+.p41ge-icon-btn[data-cap-side="left"] {
+  border-left: 1px solid var(--divider, #333);
+}
+.p41ge-icon-btn[data-cap-side="right"] {
+  border-right: 1px solid var(--divider, #333);
+}
+/* Standalone/outer button that is not adjacent to another action button on
+   either side — cap both edges so it reads as its own bounded unit. */
+.p41ge-icon-btn[data-cap-side="both"] {
+  border-left: 1px solid var(--divider, #333);
+  border-right: 1px solid var(--divider, #333);
+}
+
+/* Explorer tree-wide refresh button: on a LEFT-docked bar it sits flush
+   against the bar's outer edge and takes over the bar's removed 8px left
+   padding as its own left padding (set inline via style). Switching to
+   content-box keeps the square content area (so the icon stays where it was)
+   while the padding grows the button outward, making it non-square (the icon
+   sits off-centre relative to the button tile). */
+.wt-refresh-btn {
+  box-sizing: content-box;
+}
+
+/* Vertical separator line on the right of the explorer's collapse-all button,
+   splitting the refresh/collapse group off from the rest of the bar. */
+.sb-bottom-sep {
+  width: 1px;
+  height: 100%;
+  flex-shrink: 0;
+  background: var(--divider, #333);
+}

@@ -1,0 +1,63 @@
+{
+  "name": "openp41ge-core-tabs",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./interfaces": {
+      "types": "./dist/interfaces.d.ts",
+      "import": "./dist/interfaces.js"
+    },
+    "./boundary": {
+      "types": "./dist/boundary.d.ts",
+      "import": "./dist/boundary.js"
+    },
+    "./ghost-manager": {
+      "types": "./dist/ghost-manager.d.ts",
+      "import": "./dist/ghost-manager.js"
+    },
+    "./ghost-layout": {
+      "types": "./dist/ghost-layout.d.ts",
+      "import": "./dist/ghost-layout.js"
+    },
+    "./cursor-manager": {
+      "types": "./dist/cursor-manager.d.ts",
+      "import": "./dist/cursor-manager.js"
+    },
+    "./orchestrator": {
+      "types": "./dist/orchestrator.d.ts",
+      "import": "./dist/orchestrator.js"
+    },
+    "./sources/tab-drag-source": {
+      "types": "./dist/sources/tab-drag-source.d.ts",
+      "import": "./dist/sources/tab-drag-source.js"
+    },
+    "./targets/grid-drop-target": {
+      "types": "./dist/targets/grid-drop-target.d.ts",
+      "import": "./dist/targets/grid-drop-target.js"
+    },
+    "./targets/tab-bar-drop-target": {
+      "types": "./dist/targets/tab-bar-drop-target.d.ts",
+      "import": "./dist/targets/tab-bar-drop-target.js"
+    }
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "vite build && npx tsc --emitDeclarationOnly --outDir dist 2>/dev/null",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^6.0.0"
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "scopeName": "source.toml",
+  "name": "TOML",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#table" },
+    { "include": "#inline-table" },
+    { "include": "#array" },
+    { "include": "#string" },
+    { "include": "#number" },
+    { "include": "#boolean" },
+    { "include": "#datetime" },
+    { "include": "#bare-key" }
+  ],
+  "repository": {
+    "array": {
+      "begin": "\\[",
+      "beginCaptures": { "0": { "name": "punctuation.definition.array.begin.toml" } },
+      "end": "\\]",
+      "endCaptures": { "0": { "name": "punctuation.definition.array.end.toml" } },
+      "name": "meta.array.toml",
+      "patterns": [
+        { "include": "#value" },
+        { "match": ",", "name": "punctuation.separator.comma.toml" }
+      ]
+    },
+    "bare-key": {
+      "match": "^([a-zA-Z0-9_-]+)\\s*(=)",
+      "captures": {
+        "1": { "name": "entity.name.tag.toml" },
+        "2": { "name": "punctuation.separator.key-value.toml" }
+      }
+    },
+    "boolean": {
+      "match": "\\b(?:true|false)\\b",
+      "name": "constant.language.toml"
+    },
+    "comment": {
+      "begin": "#",
+      "captures": { "0": { "name": "punctuation.definition.comment.toml" } },
+      "end": "$",
+      "name": "comment.line.number-sign.toml"
+    },
+    "datetime": {
+      "match": "\\b\\d{4}-\\d{2}-\\d{2}([ T]\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})?)?\\b",
+      "name": "constant.other.date.toml"
+    },
+    "inline-table": {
+      "begin": "\\{",
+      "beginCaptures": { "0": { "name": "punctuation.definition.inline-table.begin.toml" } },
+      "end": "\\}",
+      "endCaptures": { "0": { "name": "punctuation.definition.inline-table.end.toml" } },
+      "name": "meta.inline-table.toml",
+      "patterns": [
+        { "include": "#value" },
+        { "match": ",", "name": "punctuation.separator.comma.toml" },
+        { "match": "=", "name": "punctuation.separator.key-value.toml" }
+      ]
+    },
+    "literal-string": {
+      "begin": "'",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.toml" } },
+      "end": "'",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.toml" } },
+      "name": "string.quoted.single.toml"
+    },
+    "multi-line-basic-string": {
+      "begin": "\"\"\"",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.toml" } },
+      "end": "\"\"\"",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.toml" } },
+      "name": "string.quoted.triple.toml",
+      "patterns": [{ "match": "\\\\.", "name": "constant.character.escape.toml" }]
+    },
+    "multi-line-literal-string": {
+      "begin": "'''",
+      "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.toml" } },
+      "end": "'''",
+      "endCaptures": { "0": { "name": "punctuation.definition.string.end.toml" } },
+      "name": "string.quoted.triple.toml"
+    },
+    "number": {
+      "match": "[-+]?(?:0x[0-9a-fA-F_]+|0o[0-7_]+|0b[01_]+|(?:[0-9][0-9_]*(?:\\.[0-9_]*)?(?:[eE][-+]?[0-9_]+)?))",
+      "name": "constant.numeric.toml"
+    },
+    "string": {
+      "patterns": [
+        { "include": "#multi-line-basic-string" },
+        { "include": "#multi-line-literal-string" },
+        {
+          "begin": "\"",
+          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.toml" } },
+          "end": "\"",
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.toml" } },
+          "name": "string.quoted.double.toml",
+          "patterns": [{ "match": "\\\\.", "name": "constant.character.escape.toml" }]
+        },
+        { "include": "#literal-string" }
+      ]
+    },
+    "table": {
+      "match": "^\\[\\[?([^\\]]+)\\]\\]?",
+      "captures": {
+        "0": { "name": "punctuation.definition.table.toml" },
+        "1": { "name": "entity.name.section.toml" }
+      }
+    },
+    "value": {
+      "patterns": [
+        { "include": "#string" },
+        { "include": "#number" },
+        { "include": "#boolean" },
+        { "include": "#datetime" },
+        { "include": "#array" },
+        { "include": "#inline-table" }
+      ]
+    }
+  },
+  "uuid": "e5f6a7b8-c9d0-1234-5678-9abcdef01234"
+}

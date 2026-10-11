@@ -1,0 +1,108 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "tags": ["+@public"],
+  "ignoreIssues": {
+    "package.json": ["unresolved"],
+    "packages/openp41ge/src/layout/types.ts": ["duplicates"],
+    "packages/openp41ge/src/renderer/global.d.ts": ["unresolved"],
+    "packages/openp41ge-core-editor-engine/src/global.d.ts": ["unresolved"],
+    "storybook/.storybook/main.ts": ["unresolved"]
+  },
+  "workspaces": {
+    ".": {
+      "project": ["!packages/**"],
+      "ignoreDependencies": [
+        "@earendil-works/pi-coding-agent",
+        "@xterm/addon-fit",
+        "concurrently",
+        "lit",
+        "zod"
+      ]
+    },
+    "packages/openp41ge": {
+      "entry": [
+        "src/main/index.ts",
+        "electron/main.ts",
+        "electron/preload.cjs",
+        // Standalone window pages, reached only from their HTML entries.
+        "src/renderer/fatal.ts",
+        "src/renderer/confirm.ts",
+        "src/renderer/prerequisites.ts",
+        "src/renderer/migrations.ts"
+      ],
+      "project": ["src/**/*.ts", "electron/**/*.{ts,cjs}"],
+      "ignoreDependencies": ["ts-node", "@xterm/xterm", "@xterm/addon-fit", "@sentry/cli"],
+      "ignore": [
+        // Welcome-page demo components — referenced by tag name from
+        // render-markdown.ts; kept for the animated intro demos.
+        "src/renderer/components/openp41ge-grid-demo.ts",
+        "src/renderer/components/openp41ge-sidebar-demo.ts",
+        "src/renderer/components/openp41ge-sidebar-move-demo.ts",
+        "src/renderer/components/openp41ge-stack-demo.ts",
+        "src/renderer/components/openp41ge-window-intro-demo.ts",
+        "src/renderer/components/openp41ge-workspace-tab-demo.ts",
+        "src/renderer/components/openp41ge-bottom-bar.ts",
+        "src/renderer/components/sidebar-views/index.ts",
+        "src/renderer/interfaces/index.ts",
+        "src/renderer/models/index.ts",
+        "src/renderer/models/text-content-model.ts",
+        "src/renderer/models/test-text-content-model.ts",
+        "src/renderer/models/text-decoration-provider.ts",
+        "src/renderer/models/text-edit.ts",
+        "src/renderer/models/text-model-events.ts",
+        "src/renderer/models/text-model.ts",
+
+        "src/renderer/services/index.ts",
+        "src/layout/index.ts",
+        "src/index.ts",
+
+        // Terminal tab app: unregistered for now but kept for easy re-enable.
+        "src/renderer/apps/terminal/index.ts",
+        "src/renderer/apps/terminal/terminal-controller.ts"
+      ],
+      "ignoreExportsUsedInFile": {
+        "interface": true,
+        "type": true
+      }
+    },
+    "packages/openp41ge-sdk-uikit": {
+      "project": ["src/**/*.ts"]
+    },
+    // Each extension's manifest renderer entry (`openp41ge.renderer`).
+    "packages/openp41ge-extension-agents": {
+      "entry": ["src/renderer.ts"]
+    },
+    "packages/openp41ge-extension-explorer": {
+      "entry": ["src/renderer.ts"]
+    },
+    "packages/openp41ge-extension-git": {
+      "entry": ["src/renderer.ts"]
+    },
+    "packages/openp41ge-extension-workspaces": {
+      "entry": ["src/renderer.ts"]
+    },
+    "packages/openp41ge-core-terminal": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/openp41ge-core-editor-engine": {
+      "project": ["src/**/*.ts"],
+      "ignore": ["src/global.d.ts"]
+    },
+    "packages/openp41ge-core-logger": {
+      "project": ["src/**/*.ts"],
+      "ignoreExportsUsedInFile": {
+        "interface": true,
+        "type": true
+      }
+    },
+    "storybook": {
+      "entry": [
+        ".storybook/main.ts",
+        ".storybook/extensions/event-log/preset.ts",
+        ".storybook/extensions/event-log/manager.tsx"
+      ],
+      "project": [".storybook/**/*"],
+      "ignoreDependencies": ["openp41ge-sdk-uikit"]
+    }
+  }
+}
