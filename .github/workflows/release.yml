@@ -7,6 +7,10 @@ name: Release
 #                          v0.1.0-beta.2    (prerelease)
 #   stable             -> push a tag:   v0.1.0
 #
+# A tag push for a release that already exists (e.g. publishing a manual
+# run's draft creates its tag) builds nothing. Pushes to branches never
+# release; they run prerequisites.yml only.
+#
 # Channel is derived from the semver: `-alpha` / `-beta` / `-rc` -> prerelease.
 # Pick the exact commit to release by choosing the branch/tag or commit sha in
 # the "Run workflow" dialog (or `gh workflow run release.yml --ref <sha>`).
@@ -43,6 +47,9 @@ jobs:
       tag: ${{ steps.meta.outputs.tag }}
       channel: ${{ steps.meta.outputs.channel }}
       prerelease: ${{ steps.meta.outputs.prerelease }}
+      skip: ${{ steps.meta.outputs.skip }}
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - id: meta
         name: Resolve version, tag, and channel
@@ -65,7 +72,17 @@ jobs:
             *-beta*)  CHANNEL="beta";   PRERELEASE="true" ;;
             *-rc*)    CHANNEL="rc";     PRERELEASE="true" ;;
           esac
+          # Publishing a release made by a manual run creates its tag, and that
+          # tag push lands here. The release already has its build, so a tag
+          # push only builds when no release exists for the tag yet.
+          SKIP="false"
+          if [ "${{ github.event_name }}" = "push" ] &&
+            gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release v$VERSION already exists; nothing to build."
+            SKIP="true"
+          fi
           {
+            echo "skip=$SKIP"
             echo "version=$VERSION"
             echo "tag=v$VERSION"
             echo "channel=$CHANNEL"
@@ -83,6 +100,7 @@ jobs:
     # then judge its conclusion. Pass immediately if a successful run already
     # exists; fail only when no run appears, or the latest one is not success.
     needs: meta
+    if: needs.meta.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
