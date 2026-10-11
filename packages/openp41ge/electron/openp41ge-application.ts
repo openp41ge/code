@@ -897,13 +897,14 @@ export class Openp41geApplication {
 
   /**
    * A dev build runs inside the stock Electron.app, so the Dock would show
-   * Electron's icon; show the app's instead. A packaged build carries the icon
-   * in its bundle (electron-builder `mac.icon`).
+   * Electron's icon; show the app's dev icon (the app icon under construction)
+   * instead, which also tells it apart from an installed release at a glance.
+   * A packaged build carries the app icon in its bundle (`mac.icon`).
    */
   private _setDevDockIcon(): void {
     if (app.isPackaged || process.platform !== "darwin") return;
     try {
-      app.dock?.setIcon(path.resolve(__dirname, "../../build/icon.png"));
+      app.dock?.setIcon(path.resolve(__dirname, "../../build/icon-dev.png"));
     } catch (err) {
       createLogger("openp41ge", "main-process").warn("could not set the dev Dock icon:", err);
     }
