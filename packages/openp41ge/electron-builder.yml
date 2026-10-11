@@ -56,6 +56,10 @@ mac:
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.inherit.plist
   notarize: true
+  # macOS asks before an app reaches devices on the local network (e.g. a
+  # self-hosted AI provider); this is the reason shown in that prompt.
+  extendInfo:
+    NSLocalNetworkUsageDescription: openp41ge connects to AI providers and other services you run on your local network.
 
 dmg:
   title: ${productName} ${version}

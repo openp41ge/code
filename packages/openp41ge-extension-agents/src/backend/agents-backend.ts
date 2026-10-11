@@ -29,6 +29,7 @@ import type { ChatProviderConfig } from "./chat-provider.js";
 import type { ChatProviderRegistry } from "./chat-provider-registry.js";
 import { ChatThreads } from "./chat-threads.js";
 import { DEFAULT_PROVIDER_ID } from "./config-schema.js";
+import { describeFetchError } from "./fetch-error.js";
 import { useLog } from "./log.js";
 import { ToolRegistry } from "./tool-registry.js";
 import { registerBuiltinTools } from "../tools/index.js";
@@ -272,7 +273,7 @@ async function listModels(
   try {
     res = await fetch(url, { headers });
   } catch (err) {
-    return { ok: false, error: (err as Error).message };
+    return { ok: false, error: describeFetchError(err) };
   }
   if (!res.ok) return { ok: false, error: `Model list request failed (${res.status})` };
   const body = (await res.json()) as { data?: Array<{ id: string }> };

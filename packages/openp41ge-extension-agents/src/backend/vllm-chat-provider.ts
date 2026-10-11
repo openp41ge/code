@@ -19,6 +19,7 @@ import type {
 } from "./chat-provider.js";
 import type { ToolDefinition } from "./tool.js";
 import type { ChatMessage } from "../chat/types.js";
+import { describeFetchError } from "./fetch-error.js";
 import { logFor } from "./log.js";
 
 const log = logFor("vllm-chat-provider");
@@ -101,7 +102,7 @@ export class VllmChatProvider implements ChatProvider {
       const data = (await res.json()) as { data?: unknown[] };
       return Array.isArray(data.data);
     } catch (err) {
-      log.warn("ping failed:", (err as Error).message);
+      log.warn("ping failed:", describeFetchError(err));
       return false;
     }
   }
@@ -160,7 +161,7 @@ export class VllmChatProvider implements ChatProvider {
         signal: req.signal,
       });
     } catch (err) {
-      const msg = (err as Error).message;
+      const msg = describeFetchError(err);
       if (req.signal?.aborted) return;
       log.error("stream request failed:", msg);
       yield { type: "text", text: `[provider error: ${msg}]` };
