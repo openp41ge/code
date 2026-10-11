@@ -352,7 +352,8 @@ jobs:
 
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG exists — updating."
-            gh release edit "$TAG" --title "$TAG" $PREREL_FLAG $DRAFT_FLAG
+            # --target too: a rerun on a draft must tag the commit it built.
+            gh release edit "$TAG" --target "${{ github.sha }}" --title "$TAG" $PREREL_FLAG $DRAFT_FLAG
           else
             echo "Creating release $TAG."
             gh release create "$TAG" \
