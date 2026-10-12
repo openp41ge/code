@@ -1,13 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
-  <title>openp41ge</title>
+  <title>openp41ge code</title>
   <g transform="translate(100 100) scale(8.24)">
     <rect x="1" y="1" width="98" height="98" rx="22" fill="#1F2329" stroke="#343A44" stroke-width="2"/>
-    <rect x="16" y="24" width="16" height="52" rx="4" fill="#3A414C"/>
-    <rect x="37" y="24" width="26" height="52" rx="4" fill="#3B7DF0"/>
-    <g fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M47.2,41.5 C46,41.5 45.2,42.3 45.2,44.2 V47.3 C45.2,48.9 44.4,49.7 42.8,50 C44.4,50.3 45.2,51.1 45.2,52.7 V55.8 C45.2,57.7 46,58.5 47.2,58.5"/>
-      <path d="M47.2,41.5 C46,41.5 45.2,42.3 45.2,44.2 V47.3 C45.2,48.9 44.4,49.7 42.8,50 C44.4,50.3 45.2,51.1 45.2,52.7 V55.8 C45.2,57.7 46,58.5 47.2,58.5" transform="matrix(-1 0 0 1 100 0)"/>
+    <rect x="16" y="24" width="26" height="52" rx="4" fill="#3B7DF0"/>
+    <g transform="translate(29 50) scale(0.021586) translate(-480 480)" fill="#FFFFFF">
+      <path d="M240-280 40-480l200-200 56 56-143 144 143 144-56 56Zm178 132-76-24 200-640 76 24-200 640Zm302-132-56-56 143-144-143-144 56-56 200 200-200 200Z"/>
     </g>
+    <rect x="47" y="24" width="16" height="52" rx="4" fill="#3A414C"/>
     <rect x="68" y="24" width="16" height="52" rx="4" fill="#3A414C"/>
   </g>
 </svg>
