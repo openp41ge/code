@@ -13,6 +13,9 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+const LSREGISTER =
+  "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister";
+
 /**
  * Put `icnsPath` into the app bundle at `appPath` as its icon. The bundle's
  * files may be hardlinks into the package store, which other projects share,
@@ -42,11 +45,7 @@ function main() {
   // app from launching.
   fs.utimesSync(appPath, new Date(), new Date());
   try {
-    execFileSync(
-      "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
-      ["-f", appPath],
-      { stdio: "ignore" },
-    );
+    execFileSync(LSREGISTER, ["-f", appPath], { stdio: "ignore" });
   } catch {
     // Launch Services picks the icon up on its own, later.
   }
