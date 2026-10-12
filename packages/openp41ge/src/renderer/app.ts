@@ -22,6 +22,7 @@ import "./components/openp41ge-windowview";
 import "./components/openp41ge-window-manager";
 import "./components/openp41ge-logs-window";
 import "./components/openp41ge-releases-pane";
+import { provideReleasesConfig } from "./services/releases-deps";
 import "./components/openp41ge-cleanup-pane";
 import "./components/openp41ge-migrations-pane";
 import "./components/openp41ge-titlebar";
@@ -73,6 +74,8 @@ import type { EventRouter } from "./services/event-router";
 // ═══════════════════════════════════════════════════════════════════════════
 
 const context = new StartupContext();
+// The Releases tab and release tabs read the update channel setting.
+provideReleasesConfig(context.configService);
 
 const steps = [
   new ExposeTestModelsStep(), // 1: Expose test models for test injection

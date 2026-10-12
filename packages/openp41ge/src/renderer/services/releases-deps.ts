@@ -2,10 +2,10 @@
  * What the Releases tab and a release's grid tab read and do: the release
  * list (checked in the background by the main process), the update channel
  * setting, and the updater. One place, so tests can replace it
- * (`setReleasesDeps`).
+ * (`setReleasesDeps`). The app gives it the config service at start
+ * (`provideReleasesConfig`), so it does not import the app.
  */
 
-import { appServices } from "../app";
 import { showConfirm } from "../confirm-service";
 
 export interface ReleasesDeps {
@@ -38,6 +38,19 @@ const NO_RELEASES: ReleasesSnapshot = {
 
 let override: Partial<ReleasesDeps> | null = null;
 
+/** The config service, as far as the update channel uses it. */
+interface ReleasesConfig {
+  get(key: string): unknown;
+  onKeyChange(key: string, callback: (value: unknown) => void): () => void;
+}
+
+let config: ReleasesConfig | null = null;
+
+/** Give the Releases views the app's config service (at start). */
+export function provideReleasesConfig(service: ReleasesConfig): void {
+  config = service;
+}
+
 /** Replace (some of) the dependencies; null restores the real ones. */
 export function setReleasesDeps(deps: Partial<ReleasesDeps> | null): void {
   override = deps;
@@ -57,9 +70,9 @@ function defaults(): ReleasesDeps {
     getReleases: async () => (await bridge?.releases?.get?.()) ?? NO_RELEASES,
     refreshReleases: async () => (await bridge?.releases?.refresh?.()) ?? NO_RELEASES,
     onReleasesChange: (cb) => bridge?.releases?.onChange?.(cb) ?? (() => {}),
-    getChannel: () => channelOf(appServices.configService.get("updateChannel")),
+    getChannel: () => channelOf(config?.get("updateChannel")),
     onChannelChange: (cb) =>
-      appServices.configService.onKeyChange("updateChannel", (v) => cb(channelOf(v))),
+      config?.onKeyChange("updateChannel", (v) => cb(channelOf(v))) ?? (() => {}),
     getInstalledVersion: async () => (await bridge?.updater?.getCurrentVersion?.()) ?? "",
     download: async () => (await bridge?.updater?.download?.()) ?? IDLE_STATUS,
     getStatus: async () => (await bridge?.updater?.getStatus?.()) ?? IDLE_STATUS,
