@@ -177,7 +177,7 @@ export function showConfirm(
       fullscreenable: false,
       alwaysOnTop: true,
       show: false,
-      title: "openp41ge",
+      title: "openp41ge code",
       backgroundColor: "#252526",
       // Do NOT set `parent` on the confirm window. On macOS, disabling the
       // parent (setEnabled(false)) makes Electron/macOS render a full-screen

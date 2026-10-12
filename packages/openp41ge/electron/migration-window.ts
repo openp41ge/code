@@ -65,7 +65,7 @@ export function openMigrationWindow(options: MigrationWindowOptions): void {
     maximizable: false,
     fullscreenable: false,
     show: false,
-    title: "Openp41ge — Updating your data",
+    title: "openp41ge code — Updating your data",
     ...(process.platform === "darwin" ? { titleBarStyle: "hiddenInset" as const } : {}),
     backgroundColor: "#1e1e1e",
     webPreferences: {

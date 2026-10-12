@@ -385,7 +385,10 @@ export class Openp41geApplication {
   }
 
   private _initChromeFlags(): void {
-    app.setName("openp41ge");
+    app.setName("openp41ge code");
+    // Chromium's data (localStorage, caches) stays in the folder it had
+    // before the app was renamed from "openp41ge".
+    app.setPath("userData", path.join(app.getPath("appData"), "openp41ge"));
     app.commandLine.appendSwitch("disable-features", "FontationsFontBackend");
     app.commandLine.appendSwitch("enable-gpu-rasterization");
     app.commandLine.appendSwitch("remote-debugging-port", "9222");

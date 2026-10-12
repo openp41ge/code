@@ -61,7 +61,7 @@ export function openPrerequisitesWindow(options: PrerequisitesWindowOptions): vo
     maximizable: false,
     fullscreenable: false,
     show: false,
-    title: "Openp41ge — Before you start",
+    title: "openp41ge code — Before you start",
     // The app's chrome: the page draws its own title bar (as the logs window).
     ...(process.platform === "darwin" ? { titleBarStyle: "hiddenInset" as const } : {}),
     backgroundColor: "#1e1e1e",

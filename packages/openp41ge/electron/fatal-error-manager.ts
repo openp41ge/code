@@ -103,7 +103,7 @@ export function showFatalErrorWindow(payload: FatalErrorPayload): boolean {
       fullscreenable: false,
       alwaysOnTop: true,
       show: false,
-      title: "openp41ge",
+      title: "openp41ge code",
       backgroundColor: "#252526",
       // Do NOT set `parent`. See confirm-dialog-manager.ts: on macOS,
       // disabling/covering the parent renders a full-screen dimmed layer that

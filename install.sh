@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# openp41ge installer — downloads a signed + notarized build from GitHub
+# openp41ge code installer — downloads a signed + notarized build from GitHub
 # Releases, verifies it, and installs the .app.
 #
 # Usage:
@@ -65,17 +65,18 @@ command -v curl    >/dev/null 2>&1 || die "missing required tool: curl"
 command -v python3 >/dev/null 2>&1 || die "missing required tool: python3"
 command -v ditto   >/dev/null 2>&1 || die "missing required tool: ditto"
 
-APP_NAME="openp41ge.app"
-DEST="/Applications/$APP_NAME"
-
+# The app was "openp41ge.app" up to 0.1.0-alpha.4; an in-app update keeps
+# the bundle's file name, so either name means it is installed.
 # macOS (App Management) refuses to change or delete another developer's app
 # from a terminal, even with sudo ("Operation not permitted"), so the
 # installer only installs where nothing is installed yet.
-if [[ -e "$DEST" && "$DRY_RUN" != "1" ]]; then
-  die "$APP_NAME is already installed at $DEST.
+for INSTALLED in "/Applications/openp41ge code.app" "/Applications/openp41ge.app"; do
+  if [[ -e "$INSTALLED" && "$DRY_RUN" != "1" ]]; then
+    die "openp41ge code is already installed at $INSTALLED.
   To update, use the update in the app itself.
-  To reinstall, quit $APP_NAME, drag it from Applications to the Trash, and run the installer again."
-fi
+  To reinstall, quit it, drag it from Applications to the Trash, and run the installer again."
+  fi
+done
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -179,7 +180,7 @@ ditto -x -k "$TMP/$ASSET_NAME" "$TMP/extracted"
 APP_DIR="$(find "$TMP/extracted" -maxdepth 1 -name "*.app" -type d | head -1)"
 [[ -n "$APP_DIR" ]] || die "No .app found in $ASSET_NAME"
 
-[[ "$(basename "$APP_DIR")" == "$APP_NAME" ]] || die "Expected $APP_NAME in $ASSET_NAME"
+DEST="/Applications/$(basename "$APP_DIR")"
 
 say "Installing to $DEST"
 sudo ditto "$APP_DIR" "$DEST"

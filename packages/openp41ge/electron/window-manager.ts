@@ -227,7 +227,7 @@ export function createOpenp41geWindow(
     // close/minimize controls (no fullscreen/green button) in the renderer.
     // It stays freely resizable (no maxWidth cap).
     ...(isWindowManager ? { frame: false, fullscreenable: false } : {}),
-    title: "openp41ge",
+    title: "openp41ge code",
     ...(!isWindowManager ? { titleBarStyle: "hiddenInset" } : {}),
     // Match the app's dark surface so the areas exposed while the window
     // grows (native maximize animation, resize) never flash white.
@@ -547,8 +547,8 @@ export async function promptQuit(parentWindow?: BrowserWindow): Promise<void> {
     return;
   }
   const { confirmed } = await showConfirm(parentWindow, {
-    title: "Quit openp41ge?",
-    message: "Are you sure you want to quit openp41ge? All panes will be closed.",
+    title: "Quit openp41ge code?",
+    message: "Are you sure you want to quit openp41ge code? All panes will be closed.",
     confirmLabel: "Quit",
   });
   if (confirmed) app.quit();

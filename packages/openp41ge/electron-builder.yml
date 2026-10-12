@@ -6,9 +6,10 @@
 # the environment: APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID.
 
 appId: com.openp41ge.app
-productName: openp41ge
+productName: openp41ge code
 copyright: Copyright © openp41ge
-artifactName: ${productName}-${version}-${arch}.${ext}
+# No spaces in release asset names (GitHub rewrites them).
+artifactName: openp41ge-code-${version}-${arch}.${ext}
 
 # Keep electron-builder output out of vite's `dist` (renderer) directory.
 directories:
