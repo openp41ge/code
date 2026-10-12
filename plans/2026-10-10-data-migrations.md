@@ -4,8 +4,9 @@
 
 ## Goal
 
-Move and rewrite files in the app data folder (`~/.openp41ge` or
-`~/.openp41ge-dev`) when a release changes its layout, without carrying every
+Move and rewrite files in the app data folder (`~/.openp41ge-code` or
+`~/.openp41ge-code-dev`; `~/.openp41ge` / `~/.openp41ge-dev` before the
+2026-10-12 rename) when a release changes its layout, without carrying every
 past upgrade in the app. Prompted by the per-workspace repositories move
 (the completed workspace-repositories plan, `45f7ef96`), which was code built
 into the app (`migrateRepositories`), as was the chat-threads move
@@ -101,7 +102,7 @@ symlink escapes); a step that would leave it is refused, and so is the set.
   run the sets not yet in the journal, oldest release first.
 - A fresh install (no data yet) starts at the current version: nothing to run.
 - Dev builds read the repo's own `migrations/` folder instead of releases, so
-  a migration is tried against `~/.openp41ge-dev` (or a copy, via
+  a migration is tried against `~/.openp41ge-code-dev` (or a copy, via
   `OPENP41GE_DIR`) before it is released.
 
 ### Running
@@ -157,8 +158,9 @@ symlink escapes); a step that would leave it is refused, and so is the set.
    checked against its `.sig`; a bad or missing signature fails the whole
    download). `migrationRange` / `writeDataVersion` keep the data version
    (`<data>/data-version`) (a fresh install starts at its version; data from before the
-   journal starts at `0.0.0`). Tested with throwaway keys. **Waiting on the
-   user's public key**; wired into release startup in phase 5.
+   journal starts at `0.0.0`). Tested with throwaway keys; the user's public
+   key is in `migrations/public-key.ts` (phase 4), and alpha.1 shipped the
+   first signed `migrations.json`.
 4. ~~Release workflow: merge, sign, attach~~ — done
    (`packages/openp41ge/scripts/release-migrations.mjs`, plain Node: merges
    the version's sets from `migrations/` into one `migrations.json`, signs it
@@ -186,10 +188,27 @@ symlink escapes); a step that would leave it is refused, and so is the set.
    sets. Unlike the built-in chat migration, the set runs once: an install
    with old chats but no workspace keeps its `chats.json` unconverted.
 
+A later set, `2026-10-10-agents-chat-threads` (chat threads move into the
+agents extension's folder), also shipped with 0.1.0-alpha.1.
+
+Moving the data folder itself is not a migration: steps only work inside
+the data folder. The 2026-10-12 rename (`~/.openp41ge` → `~/.openp41ge-code`)
+is app code (`storage-rename.ts`), run before the migrations.
+
 ## Completion Criteria
 
-- [ ] A release's migrations run once, in order, before data is read, on an
-      install that skipped versions.
+Evidence (2026-10-12): the release install's journal shows alpha.1's signed
+`migrations.json` downloaded, verified and its three sets applied in order
+on 2026-10-11 (chat threads, agents chat threads, repositories with
+worktree relinks). Only alpha.1 has shipped sets, so gathering sets from
+several releases across a version jump is covered by tests only. Refusals,
+failures and the offline window are covered by tests, not yet seen in the
+app; the release path (download, signature, offline) runs only in a
+packaged app.
+
+- [x] A release's migrations run once, in order, before data is read (seen
+      in a release install for one release; several releases: tests only).
 - [ ] Unsigned / tampered sets and paths outside the data folder are refused.
 - [ ] Failures stop, are recorded, and are shown; offline + required blocks.
-- [ ] Typecheck + lint + knip + tests + build green; dev app verified.
+- [x] Typecheck + lint + knip + tests + build green.
+- [ ] Seen in the app: a failing set, an unsigned set, required + offline.
