@@ -234,6 +234,15 @@ export class Openp41geLogsWindow extends LitElement {
   @state() private _sidebarTab: SidebarTabId = "streams";
   /** The window is focused: the focused tab shows its line only then. */
   @state() private _windowFocused = document.hasFocus();
+  /** The sidebar, not the grid, was clicked last: its active tab is the
+   *  focused tab. Kept while the window is blurred. */
+  @state() private _sidebarFocused = false;
+  /** A press in the sidebar focuses it; one in the grid focuses the grid. */
+  private readonly _onFocusZoneMouseDown = (e: Event): void => {
+    const target = e.target as Element | null;
+    if (target?.closest?.(".lw-sidebar")) this._sidebarFocused = true;
+    else if (target?.closest?.("tab-grid")) this._sidebarFocused = false;
+  };
   private readonly _onWindowFocus = (): void => {
     this._windowFocused = true;
   };
@@ -619,6 +628,7 @@ export class Openp41geLogsWindow extends LitElement {
     if (this._orchestrator) return;
     this._orchestrator = new DragOrchestrator(this._resolveTarget);
     this.shadowRoot?.addEventListener("mousedown", this._onMouseDown);
+    this.shadowRoot?.addEventListener("mousedown", this._onFocusZoneMouseDown, true);
     this.shadowRoot?.addEventListener("click", this._onTabCloseClick);
   }
 
@@ -627,6 +637,7 @@ export class Openp41geLogsWindow extends LitElement {
     this._orchestrator?.dispose();
     this._orchestrator = null;
     this.shadowRoot?.removeEventListener("mousedown", this._onMouseDown);
+    this.shadowRoot?.removeEventListener("mousedown", this._onFocusZoneMouseDown, true);
     this.shadowRoot?.removeEventListener("click", this._onTabCloseClick);
   }
 
@@ -1742,6 +1753,11 @@ export class Openp41geLogsWindow extends LitElement {
         .lw-sb-tab:hover {
           color: var(--text-primary, #ccc);
         }
+        /* The focused tab: a blue line across its top edge, as in the
+           grid's tab bars. Inset, so the tab keeps its size. */
+        .lw-sb-tab[data-focused] {
+          box-shadow: inset 0 2px 0 #4a9eff;
+        }
         .lw-sb-tab.active {
           background: var(--border-divider, #2d2d2d);
           color: var(--text-primary, #ccc);
@@ -2103,7 +2119,7 @@ export class Openp41geLogsWindow extends LitElement {
               .tabData=${this._tabData()}
               .activeTabIds=${this._activeTabIds}
               .barShowAdd=${false}
-              .focusVisible=${this._windowFocused}
+              .focusVisible=${this._windowFocused && !(this._sidebarOpen && this._sidebarFocused)}
               .edgeLeft=${!(this._sidebarSide === "left" && this._sidebarOpen)}
               .edgeRight=${!(this._sidebarSide === "right" && this._sidebarOpen)}
               @grid-activate=${this._onGridActivate}
@@ -2253,6 +2269,7 @@ export class Openp41geLogsWindow extends LitElement {
                   role="tab"
                   data-testid=${`lw-sbtab-${id}`}
                   aria-selected=${id === active}
+                  ?data-focused=${id === active && this._windowFocused && this._sidebarFocused}
                   style="border-right:${border}"
                   @click=${() => this._onLwSbTabClick(id)}
                 >
