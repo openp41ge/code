@@ -1,7 +1,7 @@
 <h1>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="brand/wordmark-dark.svg">
-    <img src="brand/wordmark-light.svg" alt="openp41ge" height="56">
+    <img src="brand/wordmark-light.svg" alt="openp41ge code" height="56">
   </picture>
 </h1>
 
