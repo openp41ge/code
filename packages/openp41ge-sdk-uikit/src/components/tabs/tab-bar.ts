@@ -285,6 +285,11 @@ export class TabBar extends LitElement {
         [data-preview] .tab-icon > * {
           transform: skewX(-12deg);
         }
+        /* The focused tab (the active tab of the focused cell): a blue line
+           across its top edge. Inset, so the tab keeps its size. */
+        .tab-btn[data-focused] {
+          box-shadow: inset 0 2px 0 #4a9eff;
+        }
         .tab-close {
           display: inline-flex;
           align-items: center;
@@ -453,6 +458,7 @@ export class TabBar extends LitElement {
                 class="tab-btn ${isActive ? "active" : ""}"
                 data-tab-id=${id}
                 ?data-preview=${isPreview}
+                ?data-focused=${isActive && this.focused}
                 style=${tabStyle}
                 @mouseenter=${(e: MouseEvent) => this._startTextScroll(e.currentTarget as HTMLElement)}
                 @mouseleave=${(e: MouseEvent) => this._stopTextScroll(e.currentTarget as HTMLElement)}
