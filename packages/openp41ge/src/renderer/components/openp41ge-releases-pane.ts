@@ -127,9 +127,8 @@ export class Openp41geReleasesPane extends LitElement {
   override render(): TemplateResult {
     const { checking, error, fetchedAt } = this._snapshot;
     const hasList = this._snapshot.releases.length > 0 || (fetchedAt !== null && !checking);
-    const status = checking
-      ? html`<span class="rp-checking">Checking…</span>`
-      : error && hasList
+    const status =
+      error && hasList && !checking
         ? html`<span class="rp-error" title=${error}>Couldn't check for releases</span>`
         : nothing;
     return html`
@@ -153,6 +152,7 @@ export class Openp41geReleasesPane extends LitElement {
             class="rp-footer-btn"
             aria-label="Check for releases"
             title="Check for releases"
+            aria-busy=${checking ? "true" : "false"}
             @click=${() => this._refresh()}
           >
             ${REFRESH_ICON}
@@ -336,9 +336,6 @@ export class Openp41geReleasesPane extends LitElement {
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    .rp-checking {
-      color: var(--muted-color, #8b93a1);
-    }
     .rp-error {
       color: #e57373;
     }
@@ -371,6 +368,27 @@ export class Openp41geReleasesPane extends LitElement {
       width: 16px;
       height: 16px;
       fill: currentColor;
+    }
+    /* A check is running: the refresh icon is blue and turns, pauses, turns… */
+    .rp-footer-btn[aria-busy="true"] {
+      color: var(--accent, #4a9eff);
+    }
+    .rp-footer-btn[aria-busy="true"] svg {
+      animation: rp-spin 1.4s ease-in-out infinite;
+    }
+    @keyframes rp-spin {
+      0% {
+        transform: rotate(0deg);
+      }
+      50%,
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .rp-footer-btn[aria-busy="true"] svg {
+        animation: none;
+      }
     }
   `;
 }
