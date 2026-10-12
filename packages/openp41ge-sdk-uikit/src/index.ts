@@ -9,6 +9,7 @@ export {
 } from "./components/sidebar-tab-content/sidebar-tab-content";
 export { iconRegistry } from "./icons";
 export { TabClose } from "./components/tabs/tab-close";
+export { tabFocusLineCss } from "./components/tabs/focus-line";
 
 // ─── Drop indicators (shared blue drag/drop lines + box) ────────────────
 export {

@@ -48,6 +48,7 @@ import {
   OverlayScrollbar,
   GhostManager,
   DRAG_EVENTS,
+  tabFocusLineCss,
   type TabGrid,
   type TargetResolver,
   type IDropTarget,
@@ -1756,12 +1757,8 @@ export class Openp41geLogsWindow extends LitElement {
         .lw-sb-tab:hover {
           color: var(--text-primary, #ccc);
         }
-        /* The focused tab: a blue line across its top edge, as in the
-           grid's tab bars. Inset, so the tab keeps its size. */
-        .lw-sb-tab[data-focused] {
-          box-shadow: inset 0 2px 0 #4a9eff;
-        }
-        .lw-sb-tab.active {
+        /* The focused tab's line: the toolkit's, as on every tab bar. */
+        ${tabFocusLineCss(".lw-sb-tab")} .lw-sb-tab.active {
           background: var(--border-divider, #2d2d2d);
           color: var(--text-primary, #ccc);
         }
@@ -1769,12 +1766,6 @@ export class Openp41geLogsWindow extends LitElement {
           flex: 1;
           overflow: hidden;
           text-overflow: ellipsis;
-        }
-        /* The close button is the toolkit's <tab-close> (as on every tab
-           handle). It is full height, so it draws the focus line over its own
-           hover background too. */
-        .lw-sb-tab[data-focused] .lw-sb-tab-close {
-          box-shadow: inset 0 2px 0 #4a9eff;
         }
         /* ＋ button pinned to the right edge of the tab bar. */
         .lw-sb-add {

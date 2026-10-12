@@ -13,7 +13,7 @@ import { getSystemTabRegistration, getAllSystemTabRegistrations } from "../apps/
 import { emitOpenSystemTab } from "./openp41ge-worktree-controller";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 import type { SystemTabController } from "../controllers/types";
-import { tooltipContent } from "openp41ge-sdk-uikit";
+import { tabFocusLineCss, tooltipContent } from "openp41ge-sdk-uikit";
 
 import { MIN_SIDEBAR_WIDTH } from "openp41ge-core-constants";
 import { createLogger } from "openp41ge-core-logger";
@@ -322,17 +322,8 @@ class Openp41geSidebar extends LitElement {
           .sidebar-tab-scroll::-webkit-scrollbar {
             display: none;
           }
-          /* The focused tab: a blue line across its top edge, as in the grid's
-             tab bars. Inset, so the tab keeps its size. */
-          .sidebar-tab[data-focused] {
-            box-shadow: inset 0 2px 0 #4a9eff;
-          }
-          /* The close button is full height, so its hover background would
-             cover the focus line: it draws the line over its own background. */
-          .sidebar-tab[data-focused] .sidebar-tab-close {
-            box-shadow: inset 0 2px 0 #4a9eff;
-          }
-          .sidebar-tab-add:hover {
+          /* The focused tab's line: the toolkit's, as on every tab bar. */
+          ${tabFocusLineCss(".sidebar-tab")} .sidebar-tab-add:hover {
             background: var(--bg-hover-strong, #444);
           }
           /* When the sidebar hosts no tabs, the ＋ button's own separators

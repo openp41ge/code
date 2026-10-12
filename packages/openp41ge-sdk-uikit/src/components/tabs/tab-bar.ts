@@ -12,6 +12,7 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { TabBarDropTarget } from "openp41ge-core-tabs/targets/tab-bar-drop-target";
 import { getDropIndexInBar, getTabButtonsInBar } from "openp41ge-core-tabs/boundary";
 import "./tab-close";
+import { tabFocusLineCss } from "./focus-line";
 
 /** Scroll speed for overflowing tab text (pixels per second). */
 const TAB_TEXT_SCROLL_SPEED = 40;
@@ -283,20 +284,13 @@ export class TabBar extends LitElement {
     if (this.tabIds.length === 0) return nothing;
     return html`
       <style>
+        ${tabFocusLineCss(".tab-btn")}
+      </style>
+      <style>
         /* A tab's icon stays upright when its title is italic (a preview
            tab): a text-glyph icon would otherwise slant with it. */
         .tab-icon {
           font-style: normal;
-        }
-        /* The focused tab (the active tab of the focused cell): a blue line
-           across its top edge. Inset, so the tab keeps its size. */
-        .tab-btn[data-focused] {
-          box-shadow: inset 0 2px 0 #4a9eff;
-        }
-        /* The close button is full height, so its hover background would cover
-           the line: it draws the line over its own background too. */
-        .tab-btn[data-focused] .tab-close {
-          box-shadow: inset 0 2px 0 #4a9eff;
         }
         /* The close button is the toolkit's <tab-close> (as on every tab
            handle); the bar only spaces it from the title. */
