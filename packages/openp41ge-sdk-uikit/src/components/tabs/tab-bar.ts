@@ -12,7 +12,7 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { TabBarDropTarget } from "openp41ge-core-tabs/targets/tab-bar-drop-target";
 import { getDropIndexInBar, getTabButtonsInBar } from "openp41ge-core-tabs/boundary";
 import "./tab-close";
-import { tabFocusLineCss } from "./focus-line";
+import { focusLineLayer, syncFocusLine } from "./focus-line";
 
 /** Scroll speed for overflowing tab text (pixels per second). */
 const TAB_TEXT_SCROLL_SPEED = 40;
@@ -71,6 +71,7 @@ export class TabBar extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    focusLineLayer().hide(this);
     const barEl = this.barElement;
     if (barEl) {
       barEl.removeEventListener("scroll", this);
@@ -96,6 +97,8 @@ export class TabBar extends LitElement {
   }
 
   updated(changedProperties: Map<string, unknown>) {
+    // The focused tab's line floats over it (see focus-line.ts).
+    syncFocusLine(this, this.renderRoot);
     if (changedProperties.has("winId") || changedProperties.has("col")) {
       const barEl = this.barElement;
       if (barEl) {
@@ -283,9 +286,6 @@ export class TabBar extends LitElement {
   render() {
     if (this.tabIds.length === 0) return nothing;
     return html`
-      <style>
-        ${tabFocusLineCss(".tab-btn")}
-      </style>
       <style>
         /* A tab's icon stays upright when its title is italic (a preview
            tab): a text-glyph icon would otherwise slant with it. */

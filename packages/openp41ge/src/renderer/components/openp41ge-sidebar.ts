@@ -13,7 +13,7 @@ import { getSystemTabRegistration, getAllSystemTabRegistrations } from "../apps/
 import { emitOpenSystemTab } from "./openp41ge-worktree-controller";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 import type { SystemTabController } from "../controllers/types";
-import { tabFocusLineCss, tooltipContent } from "openp41ge-sdk-uikit";
+import { focusLineLayer, syncFocusLine, tooltipContent } from "openp41ge-sdk-uikit";
 
 import { MIN_SIDEBAR_WIDTH } from "openp41ge-core-constants";
 import { createLogger } from "openp41ge-core-logger";
@@ -178,6 +178,7 @@ class Openp41geSidebar extends LitElement {
   disconnectedCallback(): void {
     this._resizeObserver?.disconnect();
     this._resizeObserver = null;
+    focusLineLayer().hide(this);
     super.disconnectedCallback();
   }
 
@@ -283,6 +284,8 @@ class Openp41geSidebar extends LitElement {
   }
 
   updated(changed: Map<string | number | symbol, unknown>): void {
+    // The focused tab's line floats over it (the toolkit's, as on every tab bar).
+    syncFocusLine(this, this.querySelector("[data-sidebar-tab-bar]"));
     // Keep alive: hosts + controllers persist across tab switches and sidebar
     // open/close. Only the active host is shown; hidden controllers get
     // setVisible(false) so they run no background work while inactive.
@@ -322,8 +325,7 @@ class Openp41geSidebar extends LitElement {
           .sidebar-tab-scroll::-webkit-scrollbar {
             display: none;
           }
-          /* The focused tab's line: the toolkit's, as on every tab bar. */
-          ${tabFocusLineCss(".sidebar-tab")} .sidebar-tab-add:hover {
+          .sidebar-tab-add:hover {
             background: var(--bg-hover-strong, #444);
           }
           /* When the sidebar hosts no tabs, the ＋ button's own separators

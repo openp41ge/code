@@ -48,7 +48,8 @@ import {
   OverlayScrollbar,
   GhostManager,
   DRAG_EVENTS,
-  tabFocusLineCss,
+  focusLineLayer,
+  syncFocusLine,
   type TabGrid,
   type TargetResolver,
   type IDropTarget,
@@ -314,6 +315,7 @@ export class Openp41geLogsWindow extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    focusLineLayer().hide(this);
     window.removeEventListener("focus", this._onWindowFocus);
     window.removeEventListener("blur", this._onWindowBlur);
     if (this._copiedTimer !== null) {
@@ -353,6 +355,9 @@ export class Openp41geLogsWindow extends LitElement {
   }
 
   protected updated(changed: Map<string, unknown>): void {
+    // The sidebar's focused tab's line floats over it (the toolkit's, as on
+    // every tab bar; the grid's tab bars show their own).
+    syncFocusLine(this, this.renderRoot.querySelector(".lw-sb-tabs"));
     if (changed.has("_placements") || changed.has("_tabs")) {
       void this._mountViewers();
     }
@@ -1757,8 +1762,7 @@ export class Openp41geLogsWindow extends LitElement {
         .lw-sb-tab:hover {
           color: var(--text-primary, #ccc);
         }
-        /* The focused tab's line: the toolkit's, as on every tab bar. */
-        ${tabFocusLineCss(".lw-sb-tab")} .lw-sb-tab.active {
+        .lw-sb-tab.active {
           background: var(--border-divider, #2d2d2d);
           color: var(--text-primary, #ccc);
         }
