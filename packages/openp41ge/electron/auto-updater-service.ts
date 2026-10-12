@@ -137,8 +137,7 @@ export class AutoUpdaterService {
     if (this._started) return;
     this._started = true;
 
-    const packaged = this.options.isPackaged ?? app.isPackaged;
-    if (!packaged) {
+    if (!this._packaged()) {
       log.info("auto-update disabled (dev build — no packaged updater feed)");
       return;
     }
@@ -167,9 +166,9 @@ export class AutoUpdaterService {
 
   /** Trigger an update check now (idempotent; safe pre-start). */
   async checkForUpdates(): Promise<UpdaterStatus> {
-    const updater = await this._loadUpdater();
+    const updater = this._packaged() ? await this._loadUpdater() : null;
     if (!updater) {
-      this._setStatus({ state: "error", message: "auto-update is not available" });
+      this._setStatus({ state: "error", message: this._unavailable() });
       return this._status;
     }
     this._setStatus({ state: "checking", channel: updater.channel ?? "latest" });
@@ -207,9 +206,9 @@ export class AutoUpdaterService {
    * returns immediately.
    */
   async downloadUpdate(): Promise<UpdaterStatus> {
-    const updater = await this._loadUpdater();
+    const updater = this._packaged() ? await this._loadUpdater() : null;
     if (!updater) {
-      this._setStatus({ state: "error", message: "auto-update is not available" });
+      this._setStatus({ state: "error", message: this._unavailable() });
       return this._status;
     }
     // If the last check never resolved an update, run one first so the updater
@@ -252,6 +251,17 @@ export class AutoUpdaterService {
   }
 
   // ── Private ─────────────────────────────────────────────────────────────
+
+  private _packaged(): boolean {
+    return this.options.isPackaged ?? app.isPackaged;
+  }
+
+  /** Why there is no updater: a dev build has none (no packaged feed). */
+  private _unavailable(): string {
+    return this._packaged()
+      ? "auto-update is not available"
+      : "auto-update is not available in development mode";
+  }
 
   private async _loadUpdater(): Promise<UpdaterLike | null> {
     if (this._updater !== undefined) return this._updater;
