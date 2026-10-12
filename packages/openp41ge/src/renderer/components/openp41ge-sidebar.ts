@@ -327,15 +327,10 @@ class Openp41geSidebar extends LitElement {
           .sidebar-tab[data-focused] {
             box-shadow: inset 0 2px 0 #4a9eff;
           }
-          /* Background (inactive) tabs: hover matches the activated tab's grey. */
-          .sidebar-tab .sidebar-tab-close:hover {
-            background: var(--border-divider, #2d2d2d);
-            color: #fff;
-          }
-          /* Activated tab: hover uses a brightened grey. */
-          .sidebar-tab.active .sidebar-tab-close:hover {
-            background: var(--bg-hover-strong, #444);
-            color: #fff;
+          /* The close button is full height, so its hover background would
+             cover the focus line: it draws the line over its own background. */
+          .sidebar-tab[data-focused] .sidebar-tab-close {
+            box-shadow: inset 0 2px 0 #4a9eff;
           }
           .sidebar-tab-add:hover {
             background: var(--bg-hover-strong, #444);
@@ -408,12 +403,11 @@ class Openp41geSidebar extends LitElement {
                         @mouseup=${(e: MouseEvent) => this._onTabMiddleClick(e, tab.id)}
                       >
                         <span class="truncate flex-1">${tab.title}</span>
-                        <span
-                          class="sidebar-tab-close flex items-center justify-center"
-                          style="width:34px;height:34px;border-radius:0;font-size:13px;line-height:1"
+                        <tab-close
+                          class="sidebar-tab-close"
+                          ?active=${isActive}
                           @click=${(e: Event) => this._onTabClose(e, tab.id)}
-                          >✕</span
-                        >
+                        ></tab-close>
                       </div>`;
                     })}
                   </div>

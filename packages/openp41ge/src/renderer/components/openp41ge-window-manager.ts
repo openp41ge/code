@@ -1609,31 +1609,10 @@ export class Openp41geWindowManager extends LitElement {
           text-align: center;
           box-sizing: border-box;
         }
+        /* The close button is the toolkit's <tab-close> (as on every tab
+           handle); the bar only spaces it from the title. */
         .wm-tab-close {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
           margin-left: 10px;
-          width: 34px;
-          height: 34px;
-          font-size: 13px;
-          font-style: normal;
-          line-height: 1;
-          color: #666;
-          cursor: pointer;
-          border-radius: 0;
-          transition:
-            background 0.15s,
-            color 0.15s;
-        }
-        .wm-tab-close:hover {
-          background: var(--border-divider, #2d2d2d);
-          color: #fff;
-        }
-        .wm-tab--active .wm-tab-close:hover {
-          background: var(--bg-hover-strong, #444);
-          color: #fff;
         }
         /* Trailing "+" new-tab button, full-height square pinned to the right
            side of the bar (margin-left:auto pushes it to the end). */
@@ -2575,16 +2554,15 @@ export class Openp41geWindowManager extends LitElement {
                         : nothing
                     }
                     <span class="wm-tab-title">${MANAGER_TAB_LABELS[id]}</span>
-                    <span
+                    <tab-close
                       class="wm-tab-close"
-                      aria-label="Close tab"
                       data-tip="Close tab"
+                      ?active=${this._activeTab === id}
                       @click=${(e: Event) => {
                         e.stopPropagation();
                         this._closeTab(id);
                       }}
-                      >✕</span
-                    >
+                    ></tab-close>
                   </div>
                 `,
               )}

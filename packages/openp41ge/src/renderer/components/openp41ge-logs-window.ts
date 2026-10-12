@@ -1767,25 +1767,11 @@ export class Openp41geLogsWindow extends LitElement {
           overflow: hidden;
           text-overflow: ellipsis;
         }
-        .lw-sb-tab-close {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          width: 28px;
-          height: 100%;
-          flex-shrink: 0;
-          border-radius: 0;
-          font-size: 13px;
-          line-height: 1;
-          color: var(--text-secondary, #999);
-        }
-        .lw-sb-tab-close:hover {
-          background: var(--border-divider, #2d2d2d);
-          color: #fff;
-        }
-        .lw-sb-tab.active .lw-sb-tab-close:hover {
-          background: var(--bg-hover-strong, #444);
-          color: #fff;
+        /* The close button is the toolkit's <tab-close> (as on every tab
+           handle). It is full height, so it draws the focus line over its own
+           hover background too. */
+        .lw-sb-tab[data-focused] .lw-sb-tab-close {
+          box-shadow: inset 0 2px 0 #4a9eff;
         }
         /* ＋ button pinned to the right edge of the tab bar. */
         .lw-sb-add {
@@ -2274,12 +2260,12 @@ export class Openp41geLogsWindow extends LitElement {
                   @click=${() => this._onLwSbTabClick(id)}
                 >
                   <span class="lw-sb-tab-label">${def.title}</span>
-                  <span
+                  <tab-close
                     class="lw-sb-tab-close"
                     data-testid=${`lw-sbtab-close-${id}`}
+                    ?active=${id === active}
                     @click=${(e: Event) => this._closeSidebarTab(e, id)}
-                    >✕</span
-                  >
+                  ></tab-close>
                 </div>
               `;
             })}

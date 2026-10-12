@@ -8,6 +8,7 @@ export {
   type SidebarTabBarButton,
 } from "./components/sidebar-tab-content/sidebar-tab-content";
 export { iconRegistry } from "./icons";
+export { TabClose } from "./components/tabs/tab-close";
 
 // ─── Drop indicators (shared blue drag/drop lines + box) ────────────────
 export {

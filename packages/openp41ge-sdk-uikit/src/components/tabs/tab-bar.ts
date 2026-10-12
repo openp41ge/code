@@ -11,6 +11,7 @@ import { property } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { TabBarDropTarget } from "openp41ge-core-tabs/targets/tab-bar-drop-target";
 import { getDropIndexInBar, getTabButtonsInBar } from "openp41ge-core-tabs/boundary";
+import "./tab-close";
 
 /** Scroll speed for overflowing tab text (pixels per second). */
 const TAB_TEXT_SCROLL_SPEED = 40;
@@ -297,51 +298,10 @@ export class TabBar extends LitElement {
         .tab-btn[data-focused] .tab-close {
           box-shadow: inset 0 2px 0 #4a9eff;
         }
+        /* The close button is the toolkit's <tab-close> (as on every tab
+           handle); the bar only spaces it from the title. */
         .tab-close {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
           margin-left: 6px;
-          font-size: 13px;
-          /* Always render the ✕ in the UI font so it is the same size in every
-             window, regardless of an inherited monospace font (e.g. the Logs
-             window sets monospace on its root, which would otherwise shrink
-             the ✕ glyph). */
-          font-family: var(--font-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
-          /* The ✕ glyph must never inherit the tab's italic (unpinned tabs
-             italicize their title). Always render it upright. */
-          font-style: normal;
-          /* Neutralize the inherited 34px line-height (from the tab) that
-             pushes the glyph low; a tight line box lets flex center the ✕. */
-          line-height: 1;
-          color: #666;
-          cursor: pointer;
-          /* Full-height, square close button: spans the tab's 34px height and
-             is as wide as it is tall. */
-          width: 34px;
-          height: 34px;
-          flex-shrink: 0;
-          border-radius: 0;
-          transition:
-            background 0.15s,
-            color 0.15s;
-        }
-        .tab-close-x {
-          display: block;
-          line-height: 1;
-          /* Font metrics leave the ✕ glyph low in its 20px button;
-             lift just the glyph (the button itself stays put). */
-          transform: translateY(-1px);
-        }
-        /* Background (inactive) tabs: hover matches the activated tab's grey. */
-        .tab-btn .tab-close:hover {
-          background: var(--border-divider, #2d2d2d);
-          color: #fff;
-        }
-        /* Activated tab: hover uses a brightened grey. */
-        .tab-btn.active .tab-close:hover {
-          background: var(--bg-hover-strong, #444);
-          color: #fff;
         }
         .tab-pin {
           display: inline-flex;
@@ -552,13 +512,17 @@ export class TabBar extends LitElement {
                                 </svg>`
                           }
                         </span>
-                        <span class="tab-close" data-close-tab-id=${id}
-                          ><span class="tab-close-x">✕</span></span
-                        >
+                        <tab-close
+                          class="tab-close"
+                          data-close-tab-id=${id}
+                          ?active=${isActive}
+                        ></tab-close>
                       </span>`
-                    : html`<span class="tab-close" data-close-tab-id=${id}
-                        ><span class="tab-close-x">✕</span></span
-                      >`
+                    : html`<tab-close
+                        class="tab-close"
+                        data-close-tab-id=${id}
+                        ?active=${isActive}
+                      ></tab-close>`
                 }
               </div>
             `;
