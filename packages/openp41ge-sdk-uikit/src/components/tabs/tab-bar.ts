@@ -293,6 +293,11 @@ export class TabBar extends LitElement {
         .tab-btn[data-focused] {
           box-shadow: inset 0 2px 0 #4a9eff;
         }
+        /* The close button is full height, so its hover background would cover
+           the line: it draws the line over its own background too. */
+        .tab-btn[data-focused] .tab-close {
+          box-shadow: inset 0 2px 0 #4a9eff;
+        }
         .tab-close {
           display: inline-flex;
           align-items: center;
