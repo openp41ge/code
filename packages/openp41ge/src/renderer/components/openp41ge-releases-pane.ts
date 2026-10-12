@@ -1,7 +1,8 @@
 /**
  * openp41ge-releases-pane — the manager window's Releases sidebar tab.
  *
- * The app's published releases, one row each (tag, channel, Installed, date):
+ * The app's published releases, one row each (tag, channel, a Current pill
+ * on the installed one, date):
  *   - **Releases** (default): every release in the range the `updateChannel`
  *     setting allows (e.g. `alpha` → alpha, beta, rc and stable), newest first.
  *   - **Channels** (the bottom bar's toggle): the latest release of each
@@ -135,14 +136,7 @@ export class Openp41geReleasesPane extends LitElement {
       <div class="rp">
         <div class="rp-scroll" role="list">${this._body(hasList)}</div>
         <footer class="rp-footer">
-          <span class="rp-footer-status">
-            ${
-              this._installedVersion
-                ? html`<b class="rp-installed-version">v${this._installedVersion}</b>`
-                : nothing
-            }
-            ${status}
-          </span>
+          <span class="rp-footer-status"> ${status} </span>
           <span class="rp-footer-spacer"></span>
           <button
             class="rp-footer-btn"
@@ -203,7 +197,7 @@ export class Openp41geReleasesPane extends LitElement {
       <div class="rp-row-head">
         <span class="rp-tag">${r.tag_name}</span>
         <span class="rp-badge rp-badge--${channel}">${CHANNEL_LABELS[channel] ?? channel}</span>
-        ${installed ? html`<span class="rp-chip rp-chip--installed">Installed</span>` : nothing}
+        ${installed ? html`<span class="rp-chip rp-chip--current">Current</span>` : nothing}
       </div>
       <div class="rp-date">${formatReleaseDate(r.published_at)}</div>
     </div>`;
@@ -285,7 +279,7 @@ export class Openp41geReleasesPane extends LitElement {
       letter-spacing: 0.04em;
     }
     .rp-badge--stable,
-    .rp-chip--installed {
+    .rp-chip--current {
       background: rgba(111, 200, 114, 0.16);
       color: #6fc872;
     }
@@ -341,11 +335,6 @@ export class Openp41geReleasesPane extends LitElement {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-    }
-    .rp-installed-version {
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-weight: 600;
-      color: var(--text-primary, #d4d4d4);
     }
     .rp-checking {
       color: var(--muted-color, #8b93a1);

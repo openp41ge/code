@@ -124,7 +124,7 @@ export class Openp41geReleaseView extends LitElement {
         <header class="rv-head">
           <h2 class="rv-tag">${r.tag_name}</h2>
           <span class="rv-badge rv-badge--${channel}">${CHANNEL_LABELS[channel] ?? channel}</span>
-          ${installed ? html`<span class="rv-chip">Installed</span>` : nothing}
+          ${installed ? html`<span class="rv-chip">Current</span>` : nothing}
           <span class="rv-date">${formatReleaseDate(r.published_at)}</span>
         </header>
         <div class="rv-actions">
