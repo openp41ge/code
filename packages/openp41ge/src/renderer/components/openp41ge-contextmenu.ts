@@ -123,7 +123,7 @@ class Openp41geContextMenu extends LitElement {
       >
         ${this._items.map((item) => {
           if (item.type === "separator") {
-            return html`<div class="h-px bg-[#333] my-1 mx-2"></div>`;
+            return html`<div class="menu-separator h-px bg-[#333] my-1"></div>`;
           }
           const hasChildren = item.children && item.children.length > 0;
           return html`
