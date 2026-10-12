@@ -9,6 +9,7 @@
  */
 
 import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { appTitle, keepWindowTitle } from "./app-title.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import { allMet, type PrerequisiteResult } from "../src/main/services/prerequisites.js";
@@ -61,7 +62,7 @@ export function openPrerequisitesWindow(options: PrerequisitesWindowOptions): vo
     maximizable: false,
     fullscreenable: false,
     show: false,
-    title: "openp41ge code — Before you start",
+    title: appTitle(app.isPackaged, "Before you start"),
     // The app's chrome: the page draws its own title bar (as the logs window).
     ...(process.platform === "darwin" ? { titleBarStyle: "hiddenInset" as const } : {}),
     backgroundColor: "#1e1e1e",
@@ -72,6 +73,7 @@ export function openPrerequisitesWindow(options: PrerequisitesWindowOptions): vo
       sandbox: false,
     },
   });
+  keepWindowTitle(win);
   _win = win;
 
   const fromThisWindow = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) =>

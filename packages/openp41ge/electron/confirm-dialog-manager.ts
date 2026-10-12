@@ -16,6 +16,7 @@
  */
 
 import { app, BrowserWindow, ipcMain, screen } from "electron";
+import { appTitle, keepWindowTitle } from "./app-title.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createLogger } from "openp41ge-core-logger";
@@ -177,7 +178,7 @@ export function showConfirm(
       fullscreenable: false,
       alwaysOnTop: true,
       show: false,
-      title: "openp41ge code",
+      title: appTitle(app.isPackaged),
       backgroundColor: "#252526",
       // Do NOT set `parent` on the confirm window. On macOS, disabling the
       // parent (setEnabled(false)) makes Electron/macOS render a full-screen
@@ -196,6 +197,7 @@ export function showConfirm(
         sandbox: false,
       },
     });
+    keepWindowTitle(win);
 
     const pending: PendingConfirm = {
       confirmId,

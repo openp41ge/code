@@ -13,6 +13,7 @@
  */
 
 import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { appTitle, keepWindowTitle } from "./app-title.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import {
@@ -65,7 +66,7 @@ export function openMigrationWindow(options: MigrationWindowOptions): void {
     maximizable: false,
     fullscreenable: false,
     show: false,
-    title: "openp41ge code — Updating your data",
+    title: appTitle(app.isPackaged, "Updating your data"),
     ...(process.platform === "darwin" ? { titleBarStyle: "hiddenInset" as const } : {}),
     backgroundColor: "#1e1e1e",
     webPreferences: {
@@ -75,6 +76,7 @@ export function openMigrationWindow(options: MigrationWindowOptions): void {
       sandbox: false,
     },
   });
+  keepWindowTitle(win);
 
   let session: MigrationSession | null = null;
   let state: WindowState = { phase: "checking", rows: [] };

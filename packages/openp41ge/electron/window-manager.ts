@@ -6,6 +6,7 @@
  */
 
 import { app, BrowserWindow, screen } from "electron";
+import { appTitle, keepWindowTitle } from "./app-title.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createLogger } from "openp41ge-core-logger";
@@ -227,7 +228,7 @@ export function createOpenp41geWindow(
     // close/minimize controls (no fullscreen/green button) in the renderer.
     // It stays freely resizable (no maxWidth cap).
     ...(isWindowManager ? { frame: false, fullscreenable: false } : {}),
-    title: "openp41ge code",
+    title: appTitle(app.isPackaged),
     ...(!isWindowManager ? { titleBarStyle: "hiddenInset" } : {}),
     // Match the app's dark surface so the areas exposed while the window
     // grows (native maximize animation, resize) never flash white.
@@ -241,6 +242,7 @@ export function createOpenp41geWindow(
       sandbox: false,
     },
   });
+  keepWindowTitle(win);
 
   openp41geWindows.set(openp41geWinId, win);
   openp41geWindowMeta.set(openp41geWinId, windowMeta);

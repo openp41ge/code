@@ -24,6 +24,7 @@
  */
 
 import { app, BrowserWindow, ipcMain } from "electron";
+import { appTitle, keepWindowTitle } from "./app-title.js";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -103,7 +104,7 @@ export function showFatalErrorWindow(payload: FatalErrorPayload): boolean {
       fullscreenable: false,
       alwaysOnTop: true,
       show: false,
-      title: "openp41ge code",
+      title: appTitle(app.isPackaged),
       backgroundColor: "#252526",
       // Do NOT set `parent`. See confirm-dialog-manager.ts: on macOS,
       // disabling/covering the parent renders a full-screen dimmed layer that
@@ -116,6 +117,7 @@ export function showFatalErrorWindow(payload: FatalErrorPayload): boolean {
         sandbox: false,
       },
     });
+    keepWindowTitle(win);
 
     _fatalWin = win;
 
