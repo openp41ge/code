@@ -37,6 +37,9 @@ export class TabBar extends LitElement {
   @property({ type: String }) winId: string = "";
   @property({ type: Number }) col: number = 0;
   @property({ type: Boolean }) focused: boolean = false;
+  /** With `focused`, the active tab shows the focus line. Cleared by the host
+   *  while the window is blurred or its focus is elsewhere. */
+  @property({ type: Boolean }) focusVisible: boolean = true;
   /** When true, render a trailing “＋” button (right end of the bar) that
    *  bubbles a `tab-bar-add` event so the host can open a new tab. Opt-in:
    *  the workspace grid does not set it, so it stays out of the way there. */
@@ -458,7 +461,7 @@ export class TabBar extends LitElement {
                 class="tab-btn ${isActive ? "active" : ""}"
                 data-tab-id=${id}
                 ?data-preview=${isPreview}
-                ?data-focused=${isActive && this.focused}
+                ?data-focused=${isActive && this.focused && this.focusVisible}
                 style=${tabStyle}
                 @mouseenter=${(e: MouseEvent) => this._startTextScroll(e.currentTarget as HTMLElement)}
                 @mouseleave=${(e: MouseEvent) => this._stopTextScroll(e.currentTarget as HTMLElement)}

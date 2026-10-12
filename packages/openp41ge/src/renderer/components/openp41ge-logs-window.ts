@@ -232,6 +232,14 @@ export class Openp41geLogsWindow extends LitElement {
   @state() private _sidebarOpenTabs: SidebarTabId[] = ["streams"];
   /** Active sidebar tab (must be in `_sidebarOpenTabs` unless all are closed). */
   @state() private _sidebarTab: SidebarTabId = "streams";
+  /** The window is focused: the focused tab shows its line only then. */
+  @state() private _windowFocused = document.hasFocus();
+  private readonly _onWindowFocus = (): void => {
+    this._windowFocused = true;
+  };
+  private readonly _onWindowBlur = (): void => {
+    this._windowFocused = false;
+  };
   @state() private _searchQuery = "";
 
   /** Sidebar tab-strip overflow state (drives the edge shadows + re-renders). */
@@ -270,6 +278,8 @@ export class Openp41geLogsWindow extends LitElement {
     // Cmd/Ctrl+B toggles the single sidebar panel (one shortcut, one sidebar).
     window.addEventListener("keydown", this._onKeyDown);
     window.addEventListener("resize", this._onDetailResize);
+    window.addEventListener("focus", this._onWindowFocus);
+    window.addEventListener("blur", this._onWindowBlur);
     // Build the default tab set from the systems that have logged so far. If
     // none have logged yet, subscribe and populate as soon as the first stream
     // registers (so a freshly booted app still gets its default tabs).
@@ -294,6 +304,8 @@ export class Openp41geLogsWindow extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    window.removeEventListener("focus", this._onWindowFocus);
+    window.removeEventListener("blur", this._onWindowBlur);
     if (this._copiedTimer !== null) {
       window.clearTimeout(this._copiedTimer);
       this._copiedTimer = null;
@@ -2091,6 +2103,7 @@ export class Openp41geLogsWindow extends LitElement {
               .tabData=${this._tabData()}
               .activeTabIds=${this._activeTabIds}
               .barShowAdd=${false}
+              .focusVisible=${this._windowFocused}
               .edgeLeft=${!(this._sidebarSide === "left" && this._sidebarOpen)}
               .edgeRight=${!(this._sidebarSide === "right" && this._sidebarOpen)}
               @grid-activate=${this._onGridActivate}

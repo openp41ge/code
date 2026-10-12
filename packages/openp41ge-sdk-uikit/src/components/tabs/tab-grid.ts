@@ -84,6 +84,10 @@ export class TabGrid extends LitElement {
   /** Forwarded to each <tab-bar> as its `showAdd` flag (renders a trailing
    *  “＋” button that bubbles `tab-bar-add`). */
   @property({ type: Boolean }) barShowAdd: boolean = false;
+  /** Whether the focused cell's active tab shows the focus line. The host
+   *  clears it while the window is blurred or its focus is outside the grid;
+   *  the focused cell is kept, so the line returns to the same tab. */
+  @property({ type: Boolean }) focusVisible: boolean = true;
 
   set gridState(state: GridState | null) {
     if (!state) return;
@@ -1124,6 +1128,7 @@ export class TabGrid extends LitElement {
           .winId=${this.winId}
           .col=${colIndex}
           .focused=${colIndex === this._focusedCol}
+          .focusVisible=${this.focusVisible}
           .showAdd=${this.barShowAdd}
         ></tab-bar>
         <tab-content

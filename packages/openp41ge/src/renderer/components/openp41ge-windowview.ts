@@ -25,6 +25,7 @@ import "./openp41ge-sidebar";
 // Registers <drag-line>, the shared translucent blue hover affordance used by
 // the resize notches (the "you can drag this" sibling of <drop-line>).
 import "openp41ge-sdk-uikit/drop-indicator";
+import { appState } from "../services/app-state";
 
 class Openp41geWindowView extends LitElement {
   protected createRenderRoot(): HTMLElement | DocumentFragment {
@@ -39,6 +40,22 @@ class Openp41geWindowView extends LitElement {
 
   @property({ attribute: false })
   layouts: Map<string, Map<string, Rect>> = new Map();
+
+  // ═══ Focus (from AppState): where the focused tab's line shows ════════
+
+  /** The window is focused, and the zone its focus is in (a sidebar, or the
+   *  grid when null). Blurring keeps the zone, so the line comes back. */
+  @state()
+  private _focus = { windowFocused: appState.windowFocused, side: appState.focusedSide };
+
+  private _unobserveFocus: (() => void) | null = null;
+
+  private readonly _onFocusState = (): void => {
+    const { windowFocused, focusedSide: side } = appState;
+    if (windowFocused !== this._focus.windowFocused || side !== this._focus.side) {
+      this._focus = { windowFocused, side };
+    }
+  };
 
   // ═══ Resize state (owned by windowview for unified corner handling) ──
 
@@ -100,11 +117,15 @@ class Openp41geWindowView extends LitElement {
     super.connectedCallback();
     this._ensureSkeleton();
     window.addEventListener("resize", this._onWindowResize);
+    this._unobserveFocus = appState.observe(this._onFocusState);
+    this._onFocusState();
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     window.removeEventListener("resize", this._onWindowResize);
+    this._unobserveFocus?.();
+    this._unobserveFocus = null;
     if (this._resizeRaf) {
       cancelAnimationFrame(this._resizeRaf);
       this._resizeRaf = 0;
@@ -485,6 +506,7 @@ class Openp41geWindowView extends LitElement {
             .systemTabs=${leftSysTabs}
             .activeTabId=${win.sidebar?.activeLeftTab ?? null}
             .isOpen=${ws?.sidebar?.leftSidebarOpen ?? false}
+            .focused=${this._focus.windowFocused && this._focus.side === "left"}
             class="sidebar-element ${ws?.sidebar?.leftSidebarOpen ? "" : "sidebar-element-hidden"}"
             style="flex: 0 1 ${this._leftWidth}px; max-width: min(${this._leftWidth}px, 35vw)"
           ></openp41ge-sidebar>
@@ -513,6 +535,7 @@ class Openp41geWindowView extends LitElement {
                 .activeTabIds=${activeTabIds}
                 .edgeLeft=${!(ws?.sidebar?.leftSidebarOpen ?? false)}
                 .edgeRight=${!(ws?.sidebar?.rightSidebarOpen ?? false)}
+                .focusVisible=${this._focus.windowFocused && this._focus.side === null}
               ></tab-grid>
             </div>
           </div>
@@ -535,6 +558,7 @@ class Openp41geWindowView extends LitElement {
             .systemTabs=${rightSysTabs}
             .activeTabId=${win.sidebar?.activeRightTab ?? null}
             .isOpen=${ws?.sidebar?.rightSidebarOpen ?? false}
+            .focused=${this._focus.windowFocused && this._focus.side === "right"}
             class="sidebar-element ${ws?.sidebar?.rightSidebarOpen ? "" : "sidebar-element-hidden"}"
             style="flex: 0 1 ${this._rightWidth}px; max-width: min(${this._rightWidth}px, 35vw)"
           ></openp41ge-sidebar>

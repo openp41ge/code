@@ -43,6 +43,10 @@ class Openp41geSidebar extends LitElement {
   @property({ attribute: false })
   isOpen: boolean = false;
 
+  /** The window's focus is in this sidebar: its active tab shows the focus line. */
+  @property({ attribute: false })
+  focused: boolean = false;
+
   // ═══ Tab scroll ──────────────────────────────────────────────────────
 
   @state()
@@ -318,6 +322,11 @@ class Openp41geSidebar extends LitElement {
           .sidebar-tab-scroll::-webkit-scrollbar {
             display: none;
           }
+          /* The focused tab: a blue line across its top edge, as in the grid's
+             tab bars. Inset, so the tab keeps its size. */
+          .sidebar-tab[data-focused] {
+            box-shadow: inset 0 2px 0 #4a9eff;
+          }
           /* Background (inactive) tabs: hover matches the activated tab's grey. */
           .sidebar-tab .sidebar-tab-close:hover {
             background: var(--border-divider, #2d2d2d);
@@ -392,6 +401,7 @@ class Openp41geSidebar extends LitElement {
                         class="sidebar-tab ${isActive ? "active" : ""} flex items-center gap-2.5 cursor-pointer whitespace-nowrap select-none transition-colors duration-75 shrink-0 ${sideBorder} border-divider"
                         data-sidebar-tab-id=${tab.id}
                         data-sidebar-side=${this.side}
+                        ?data-focused=${isActive && this.focused}
                         data-tab-title=${tab.title}
                         style="${tabStyle}"
                         @click=${() => this._onTabClick(tab.id)}

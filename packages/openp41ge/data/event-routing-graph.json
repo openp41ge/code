@@ -94,52 +94,20 @@
     {
       "id": "e003",
       "from": "sidebar-click-right",
-      "when": {
-        "windowFocused": false
-      },
+      "when": null,
       "to": ["focus/set-focused", "focus/set-sidebar-right"]
-    },
-    {
-      "id": "e004",
-      "from": "sidebar-click-right",
-      "when": {
-        "windowFocused": true,
-        "focusedSide": "left"
-      },
-      "to": ["focus/set-sidebar-right"]
     },
     {
       "id": "e005",
       "from": "sidebar-click-left",
-      "when": {
-        "windowFocused": false
-      },
+      "when": null,
       "to": ["focus/set-focused", "focus/set-sidebar-left"]
-    },
-    {
-      "id": "e006",
-      "from": "sidebar-click-left",
-      "when": {
-        "windowFocused": true,
-        "focusedSide": "right"
-      },
-      "to": ["focus/set-sidebar-left"]
     },
     {
       "id": "e007",
       "from": "grid-click",
-      "when": {
-        "focusedSide": "right"
-      },
-      "to": ["focus/clear-sidebar"]
-    },
-    {
-      "id": "e008",
-      "from": "grid-click",
-      "when": {
-        "focusedSide": "left"
-      },
-      "to": ["focus/clear-sidebar"]
+      "when": null,
+      "to": ["focus/set-focused", "focus/clear-sidebar"]
     },
     {
       "id": "e010",

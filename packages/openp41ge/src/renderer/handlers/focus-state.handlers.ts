@@ -25,9 +25,10 @@ export function createFocusHandlers(state: AppState): Record<string, HandlerFn> 
       state.windowFocused = true;
     }),
 
+    // Blurring keeps `focusedSide`: the window remembers which zone it was
+    // focused on and shows it again when it is focused.
     "focus/set-blurred": trace("focus/set-blurred", async () => {
       state.windowFocused = false;
-      state.focusedSide = null;
     }),
 
     "focus/set-sidebar-right": trace("focus/set-sidebar-right", async () => {
