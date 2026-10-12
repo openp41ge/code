@@ -226,7 +226,6 @@ export class Openp41geApplication {
     // Wait for Electron to be ready, then create the UI
     await app.whenReady();
     this.lifecycle.notifyElectronReady();
-    this._setDevDockIcon();
 
     // Serve installed-extension assets to the renderer over the `openp41ge-ext://`
     // custom protocol. Roots are read per-request so host reloads are picked up.
@@ -897,21 +896,6 @@ export class Openp41geApplication {
   }
 
   // ── Step 7-8: Window + Menu (after app.whenReady) ─────────────────────
-
-  /**
-   * A dev build runs inside the stock Electron.app, so the Dock would show
-   * Electron's icon; show the app's dev icon (the app icon under construction)
-   * instead, which also tells it apart from an installed release at a glance.
-   * A packaged build carries the app icon in its bundle (`mac.icon`).
-   */
-  private _setDevDockIcon(): void {
-    if (app.isPackaged || process.platform !== "darwin") return;
-    try {
-      app.dock?.setIcon(path.resolve(__dirname, "../../build/icon-dev.png"));
-    } catch (err) {
-      createLogger("openp41ge", "main-process").warn("could not set the dev Dock icon:", err);
-    }
-  }
 
   /**
    * Open a workspace: load its session (windows/grids/sidebars) into the

@@ -67,7 +67,11 @@
       "executor": "nx:run-commands",
       "dependsOn": ["build:electron"],
       "options": {
-        "commands": ["node scripts/wait-for-vite.mjs", "electron ."],
+        "commands": [
+          "node scripts/dev-app-icon.mjs",
+          "node scripts/wait-for-vite.mjs",
+          "electron ."
+        ],
         "parallel": false,
         "cwd": "{projectRoot}"
       }
@@ -83,7 +87,7 @@
         }
       ],
       "options": {
-        "command": "concurrently --kill-others \"vite\" \"node scripts/wait-for-vite.mjs && electron .\"",
+        "command": "node scripts/dev-app-icon.mjs && concurrently --kill-others \"vite\" \"node scripts/wait-for-vite.mjs && electron .\"",
         "cwd": "{projectRoot}"
       }
     }
