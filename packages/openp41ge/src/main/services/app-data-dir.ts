@@ -24,6 +24,17 @@ export function appDataDirName(isPackaged: boolean): string {
 }
 
 /**
+ * Chromium's profile folder (Electron's `userData`: localStorage, caches)
+ * under the OS app-data folder, by packaged state. A release keeps the folder
+ * it had before the app was renamed from "openp41ge"; a dev build has its
+ * own. Chromium locks its storage in this folder, so if both used one folder
+ * the second app to start would wait seconds on its first localStorage access.
+ */
+export function chromiumProfileDirName(isPackaged: boolean): string {
+  return isPackaged ? "openp41ge" : "openp41ge-dev";
+}
+
+/**
  * Absolute app-data root: the environment override first, otherwise the
  * packaged-based default under the user's home directory.
  */

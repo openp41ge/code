@@ -54,7 +54,7 @@ import { WorkspaceRegistry } from "../src/main/services/workspace-registry.js";
 import { ConfigService, updateChannelForVersion } from "../src/main/services/config-service.js";
 import { AutoUpdaterService } from "./auto-updater-service.js";
 import { ReleasesFeed, releasesFeedDeps } from "./releases-feed.js";
-import { resolveAppDataDir } from "../src/main/services/app-data-dir.js";
+import { chromiumProfileDirName, resolveAppDataDir } from "../src/main/services/app-data-dir.js";
 import { parseWorkspaceLaunchArg } from "../src/main/services/workspace-launch-arg.js";
 import { ReposWatcher } from "./repos-watcher.js";
 import { WorkspaceManifestChanges } from "../src/main/services/workspace-manifest-changes.js";
@@ -391,9 +391,10 @@ export class Openp41geApplication {
 
   private _initChromeFlags(): void {
     app.setName("openp41ge code");
-    // Chromium's data (localStorage, caches) stays in the folder it had
-    // before the app was renamed from "openp41ge".
-    app.setPath("userData", path.join(app.getPath("appData"), "openp41ge"));
+    app.setPath(
+      "userData",
+      path.join(app.getPath("appData"), chromiumProfileDirName(app.isPackaged)),
+    );
     app.commandLine.appendSwitch("disable-features", "FontationsFontBackend");
     app.commandLine.appendSwitch("enable-gpu-rasterization");
     app.commandLine.appendSwitch("remote-debugging-port", "9222");
