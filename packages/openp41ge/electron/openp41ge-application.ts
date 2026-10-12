@@ -53,6 +53,7 @@ import {
 import { WorkspaceRegistry } from "../src/main/services/workspace-registry.js";
 import { ConfigService, updateChannelForVersion } from "../src/main/services/config-service.js";
 import { AutoUpdaterService } from "./auto-updater-service.js";
+import { ReleasesFeed, releasesFeedDeps } from "./releases-feed.js";
 import { resolveAppDataDir } from "../src/main/services/app-data-dir.js";
 import { parseWorkspaceLaunchArg } from "../src/main/services/workspace-launch-arg.js";
 import { ReposWatcher } from "./repos-watcher.js";
@@ -103,6 +104,7 @@ import { registerWelcomeHandlers } from "./ipc-handlers/welcome-handlers.js";
 import { registerManagerGridHandlers } from "./ipc-handlers/manager-grid-handlers.js";
 import { registerLogHandlers } from "./ipc-handlers/log-handlers.js";
 import { registerUpdaterHandlers } from "./ipc-handlers/updater-handlers.js";
+import { registerReleasesHandlers } from "./ipc-handlers/releases-handlers.js";
 import { registerExtensionHandlers } from "./ipc-handlers/extension-handlers.js";
 import { registerCleanupHandlers } from "./ipc-handlers/cleanup-handlers.js";
 import { runExtensionGit, type ExtensionGitScope } from "../src/main/services/extension-git.js";
@@ -148,6 +150,8 @@ export class Openp41geApplication {
   private configService!: ConfigService;
   private extensionConfig!: ExtensionConfigService;
   private autoUpdater!: AutoUpdaterService;
+  /** Which releases exist (the Releases tab), checked in the background. */
+  private releasesFeed!: ReleasesFeed;
   /** Avoid re-notifying about the same version during a session. */
   private _notifiedUpdateVersion: string | null = null;
   private dispatcher!: OperationDispatcher;
@@ -235,6 +239,8 @@ export class Openp41geApplication {
 
     // Kick off the startup update check (no-op in dev; channel from config).
     void this.autoUpdater.start();
+    // The Releases tab's list: cached, checked now when stale, then every 6h.
+    this.releasesFeed.start();
 
     this._openFirstWindow();
     this._setupMenu();
@@ -428,6 +434,17 @@ export class Openp41geApplication {
       ) {
         this._notifiedUpdateVersion = status.version;
         this._notifyUpdateAvailable(status.version);
+      }
+    });
+    this.releasesFeed = new ReleasesFeed(releasesFeedDeps(this.openp41geDir));
+    this.releasesFeed.onChange((snapshot) => {
+      const payload = JSON.stringify(snapshot);
+      for (const [, bw] of openp41geWindows) {
+        try {
+          bw.webContents.send("releases:changed", payload);
+        } catch {
+          // window might be closing
+        }
       }
     });
   }
@@ -848,6 +865,7 @@ export class Openp41geApplication {
     registerManagerGridHandlers(this.openp41geDir);
     registerLogHandlers(this.logStore);
     registerUpdaterHandlers(this.autoUpdater);
+    registerReleasesHandlers(this.releasesFeed);
     // An extension backend's git (ctx.git) runs in the calling window's
     // workspace: its repositories folder, and only the repos it lists. Its
     // ctx.workspace is that workspace (worktrees, a data folder).
@@ -1157,6 +1175,7 @@ export class Openp41geApplication {
       void this.extensionManager.shutdown();
       for (const watcher of this.reposWatchers.values()) watcher.stop();
       this.cleanupScheduler.stop();
+      this.releasesFeed.stop();
       this.workspacesWatcher?.close();
       this.workspaceManifests?.stop();
     });

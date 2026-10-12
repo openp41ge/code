@@ -817,6 +817,20 @@ contextBridge.exposeInMainWorld("openp41ge", {
     },
   },
 
+  /** Which releases exist (checked in the background; never downloads). */
+  releases: {
+    /** The list, when it was fetched, and whether a check is running. */
+    get: () => ipcRenderer.invoke("releases:get"),
+    /** Check now. Resolves with the list after the check. */
+    refresh: () => ipcRenderer.invoke("releases:refresh"),
+    /** Subscribe to list changes. Returns unsubscribe. */
+    onChange: (callback) => {
+      const handler = (_event, data) => callback(JSON.parse(data));
+      ipcRenderer.on("releases:changed", handler);
+      return () => ipcRenderer.removeListener("releases:changed", handler);
+    },
+  },
+
   welcome: {
     isDismissed: () => ipcRenderer.invoke("welcome:is-dismissed"),
     setDismissed: (dismissed) => ipcRenderer.invoke("welcome:set-dismissed", dismissed),

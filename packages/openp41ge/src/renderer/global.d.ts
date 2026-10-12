@@ -341,6 +341,16 @@ declare global {
         onStatus: (callback: (status: UpdaterStatus) => void) => () => void;
       };
 
+      /** Which releases exist (backed by the main-process ReleasesFeed). */
+      releases: {
+        /** The list, when it was fetched, and whether a check is running. */
+        get: () => Promise<ReleasesSnapshot>;
+        /** Check now. Resolves with the list after the check. */
+        refresh: () => Promise<ReleasesSnapshot>;
+        /** Subscribe to list changes. Returns unsubscribe. */
+        onChange: (callback: (snapshot: ReleasesSnapshot) => void) => () => void;
+      };
+
       /** Welcome intro dismissal — backed by a marker file in the app-data dir. */
       welcome: {
         isDismissed: () => Promise<boolean>;
@@ -430,6 +440,24 @@ declare global {
     | { state: "downloading"; version: string; progress: number; bytesPerSecond: number; transferred: number; total: number }
     | { state: "update-downloaded"; version: string }
     | { state: "error"; message: string };
+
+  /** Which releases exist, as the main process's ReleasesFeed last checked. */
+  interface ReleasesSnapshot {
+    releases: Array<{
+      tag_name: string;
+      name: string;
+      prerelease: boolean;
+      published_at: string | null;
+      body: string | null;
+      html_url: string | null;
+    }>;
+    /** When the list was last fetched (ms), null: never. */
+    fetchedAt: number | null;
+    /** A check is running. */
+    checking: boolean;
+    /** Why the last check failed (null: it did not). */
+    error: string | null;
+  }
 
   /** Filters for window.openp41ge.logs.query(). */
   interface LogQueryFilter {

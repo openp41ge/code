@@ -17,6 +17,7 @@ import { blankAppRegistration } from "../../apps/blank/index";
 import { fileViewerAppRegistration } from "../../apps/file-viewer/index";
 import { logViewerAppRegistration } from "../../apps/log-viewer/index";
 import { configEditorAppRegistration } from "../../apps/config-editor/index";
+import { releaseAppRegistration } from "../../apps/release/index";
 import { registerExtensionsWithRefresh } from "../../apps/extension/index";
 import { workspaceData } from "../../services/workspace-data";
 
@@ -31,6 +32,7 @@ export class RegisterAppTypesStep implements IStartupStep {
     registerAppType(fileViewerAppRegistration);
     registerAppType(logViewerAppRegistration);
     registerAppType(configEditorAppRegistration);
+    registerAppType(releaseAppRegistration);
 
     // Register editor system tab types (override the grid)
     // The workspace manager is no longer an in-window surface: a workspace window

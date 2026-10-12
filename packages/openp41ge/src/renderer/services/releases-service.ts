@@ -1,13 +1,11 @@
 /**
- * Renderer-side GitHub releases service for the management window's Releases
- * tab.
+ * Renderer-side helpers for the manager window's Releases tab.
  *
- * Fetches the app's published releases from the GitHub REST API and exposes a
- * pure filter that hides prerelease builds unless the user's configured update
- * channel opts in ("alpha"/"beta"/"rc").
+ * The release list itself comes from the main process (`window.openp41ge.
+ * releases`, checked in the background). These pure helpers pick what each
+ * view shows: every release in the range the user's update channel allows
+ * (Releases), or the latest of each channel in it (Channels).
  *
- * `api.github.com` is a public endpoint for a public repo: no credentials are
- * sent and the response is CORS-enabled, so a plain renderer `fetch` works.
  * Release `body` text is untrusted — callers must render it as text (never
  * via `unsafeHTML`).
  */
@@ -19,29 +17,6 @@ export interface GithubRelease {
   published_at: string | null;
   body: string | null;
   html_url: string | null;
-}
-
-/** The repository whose releases the manager shows. */
-export const RELEASES_REPO = "openp41ge/code";
-
-export const RELEASES_API = `https://api.github.com/repos/${RELEASES_REPO}/releases?per_page=100`;
-
-/** Fetch published releases for the app repo, newest first (GitHub orders the
- *  list by creation date). Throws on network/HTTP failure — callers catch to
- *  surface an error state rather than crashing. */
-export async function fetchReleases(
-  url: string = RELEASES_API,
-  signal?: AbortSignal,
-): Promise<GithubRelease[]> {
-  const res = await fetch(url, {
-    signal,
-    headers: { Accept: "application/vnd.github+json" },
-  });
-  if (!res.ok) {
-    throw new Error(`GitHub releases request failed (${res.status})`);
-  }
-  const data: unknown = await res.json();
-  return Array.isArray(data) ? (data as GithubRelease[]) : [];
 }
 
 /** The channels a release can belong to, least → most stable. */
@@ -112,6 +87,20 @@ export function compareTags(a: string, b: string): number {
   return pa.preNum - pb.preNum;
 }
 
+/** Newest published first; the tag breaks ties. */
+function newestFirst(a: GithubRelease, b: GithubRelease): number {
+  const d = (b.published_at ?? "").localeCompare(a.published_at ?? "");
+  if (d !== 0) return d;
+  return compareTags(b.tag_name, a.tag_name);
+}
+
+/** Every release in the range `updateChannel` allows (the Releases view),
+ *  newest published first. */
+export function selectInRange(updateChannel: string, releases: GithubRelease[]): GithubRelease[] {
+  const included = new Set<ReleaseChannel>(channelsForUpdateChannel(updateChannel));
+  return releases.filter((r) => included.has(channelFromTag(r.tag_name))).sort(newestFirst);
+}
+
 /**
  * Take the LATEST release of each channel in the visibility window, dropping
  * every historical release older than the per-channel latest. Returns newest
@@ -129,31 +118,7 @@ export function selectLatestPerChannel(
     const cur = byChannel.get(c);
     if (!cur || compareTags(r.tag_name, cur.tag_name) > 0) byChannel.set(c, r);
   }
-  return [...byChannel.values()].sort((a, b) => {
-    const d = (b.published_at ?? "").localeCompare(a.published_at ?? "");
-    if (d !== 0) return d;
-    return compareTags(b.tag_name, a.tag_name);
-  });
-}
-
-/**
- * Fetch a single page of releases (for lazy history loading in the drawer).
- * GitHub's list endpoint returns up to `per_page` releases newest-first. An
- * empty array is returned when the page is beyond the available data.
- */
-export async function fetchReleasesPage(
-  page: number,
-  url: string = RELEASES_API,
-  signal?: AbortSignal,
-): Promise<GithubRelease[]> {
-  const separator = url.includes("?") ? "&" : "?";
-  const res = await fetch(`${url}${separator}page=${page}`, {
-    signal,
-    headers: { Accept: "application/vnd.github+json" },
-  });
-  if (!res.ok) throw new Error(`GitHub releases request failed (${res.status})`);
-  const data: unknown = await res.json();
-  return Array.isArray(data) ? (data as GithubRelease[]) : [];
+  return [...byChannel.values()].sort(newestFirst);
 }
 
 /** Format an ISO timestamp as a short localized date (e.g. "Sep 29, 2026"). */

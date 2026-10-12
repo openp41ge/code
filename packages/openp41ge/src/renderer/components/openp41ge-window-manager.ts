@@ -29,6 +29,7 @@ import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 import "./openp41ge-settings-list";
 import { settingsIcon } from "../icons";
 import { CONFIG_EDITOR_APP_TYPE, configEditorTitle } from "../apps/config-editor/title";
+import { openReleaseTab } from "../apps/release/index";
 import { workspaceFileService } from "../services/workspace-file-service";
 import { dataDirWorkspaces } from "../services/extension-renderer-loader";
 import { WorkspaceRowDragSource } from "../services/drag-sources/workspace-row-drag-source";
@@ -1041,6 +1042,15 @@ export class Openp41geWindowManager extends LitElement {
       undefined,
       pinned,
     );
+  }
+
+  /** Open a release (a Releases tab row) in the grid: one tab per release;
+   *  `pinned` from a double-click. */
+  private _openRelease(tag: string, pinned: boolean): void {
+    const grid = this.renderRoot?.querySelector(
+      "openp41ge-manager-grid",
+    ) as Openp41geManagerGrid | null;
+    if (grid) openReleaseTab(grid, tag, pinned);
   }
 
   /** Search bar row shown above the workspace-list footer while search is open.
@@ -2613,7 +2623,10 @@ export class Openp41geWindowManager extends LitElement {
                         `
                       : this._activeTab === "releases"
                         ? html`<div class="wm-tab-pane wm-releases-pane">
-                            <openp41ge-releases-pane></openp41ge-releases-pane>
+                            <openp41ge-releases-pane
+                              @open-release=${(e: CustomEvent<{ tag: string; pinned: boolean }>) =>
+                                this._openRelease(e.detail.tag, e.detail.pinned)}
+                            ></openp41ge-releases-pane>
                           </div>`
                         : this._activeTab === "migrations"
                           ? html`<div class="wm-tab-pane wm-migrations-pane">
