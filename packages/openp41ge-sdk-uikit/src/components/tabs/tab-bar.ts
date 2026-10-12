@@ -282,11 +282,10 @@ export class TabBar extends LitElement {
     if (this.tabIds.length === 0) return nothing;
     return html`
       <style>
-        /* A preview tab's icon slants with its italic title. On the icon's
-           content, not the icon box: the text scroll animates the box's
-           transform. */
-        [data-preview] .tab-icon > * {
-          transform: skewX(-12deg);
+        /* A tab's icon stays upright when its title is italic (a preview
+           tab): a text-glyph icon would otherwise slant with it. */
+        .tab-icon {
+          font-style: normal;
         }
         /* The focused tab (the active tab of the focused cell): a blue line
            across its top edge. Inset, so the tab keeps its size. */
