@@ -23,6 +23,8 @@ import {
   type IDragSource,
   type IDropTarget,
   type TargetResolver,
+  focusLineLayer,
+  syncFocusLine,
 } from "openp41ge-sdk-uikit";
 import type { WorkspaceFileData } from "../../layout/types";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
@@ -117,6 +119,23 @@ export class Openp41geWindowManager extends LitElement {
    *  window lands on Workspaces. */
   @state() private _openTabs: ManagerTabId[] = ["workspaces"];
   @state() private _activeTab: ManagerTabId | null = "workspaces";
+
+  // ═══ Focus line: the window's focus is in the sidebar or the grid (the
+  // last zone clicked); its focused tab has the line while the window is
+  // focused, as in a workspace window. ═══
+  @state() private _windowFocused = document.hasFocus();
+  @state() private _sidebarFocused = false;
+  private readonly _onFocusZoneMouseDown = (e: Event): void => {
+    const target = e.target as Element | null;
+    if (target?.closest?.(".wm-sidebar")) this._sidebarFocused = true;
+    else if (target?.closest?.("openp41ge-manager-grid")) this._sidebarFocused = false;
+  };
+  private readonly _onWindowFocusLine = (): void => {
+    this._windowFocused = true;
+  };
+  private readonly _onWindowBlurLine = (): void => {
+    this._windowFocused = false;
+  };
   /** Whether this window remembers its sidebar tabs across reloads (not a
    *  window opened for one tab). */
   private _keepsTabs = true;
@@ -213,6 +232,9 @@ export class Openp41geWindowManager extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     window.addEventListener("focus", this._onFocus);
+    window.addEventListener("focus", this._onWindowFocusLine);
+    window.addEventListener("blur", this._onWindowBlurLine);
+    this.shadowRoot?.addEventListener("mousedown", this._onFocusZoneMouseDown, true);
     window.addEventListener("resize", this._measureListOverflow);
     document.addEventListener("keydown", this._onKeydown);
     // Welcome intro action buttons live inside the shadow DOM, so clicks are
@@ -350,6 +372,10 @@ export class Openp41geWindowManager extends LitElement {
   disconnectedCallback(): void {
     super.disconnectedCallback();
     window.removeEventListener("focus", this._onFocus);
+    window.removeEventListener("focus", this._onWindowFocusLine);
+    window.removeEventListener("blur", this._onWindowBlurLine);
+    this.shadowRoot?.removeEventListener("mousedown", this._onFocusZoneMouseDown, true);
+    focusLineLayer().hide(this);
     window.removeEventListener("resize", this._measureListOverflow);
     document.removeEventListener("keydown", this._onKeydown);
     this.shadowRoot?.removeEventListener("click", this._onShadowClick);
@@ -379,6 +405,9 @@ export class Openp41geWindowManager extends LitElement {
   /** Attach custom tooltips to the footer tool buttons (replaces native `title`),
    *  and remember the sidebar's tabs when they change. */
   updated(changed: Map<string, unknown>): void {
+    // The sidebar's focused tab's line floats over it (the toolkit's, as on
+    // every tab bar; the grid's tab bars show their own).
+    syncFocusLine(this, this.shadowRoot?.querySelector(".wm-tabbar") ?? null);
     if (this._keepsTabs && (changed.has("_openTabs") || changed.has("_activeTab"))) {
       this._saveTabs();
     }
@@ -2544,6 +2573,9 @@ export class Openp41geWindowManager extends LitElement {
                   <div
                     class="wm-tab ${this._activeTab === id ? "wm-tab--active" : ""}"
                     data-manager-tab=${id}
+                    ?data-focused=${
+                      this._activeTab === id && this._windowFocused && this._sidebarFocused
+                    }
                     @click=${() => this._activateTab(id)}
                   >
                     ${
@@ -2820,7 +2852,10 @@ export class Openp41geWindowManager extends LitElement {
             <drag-line orientation="vertical" style="left:1px"></drag-line>
           </div>
           <div class="wm-main">
-            <openp41ge-manager-grid class="wm-grid"></openp41ge-manager-grid>
+            <openp41ge-manager-grid
+              class="wm-grid"
+              .focusVisible=${this._windowFocused && !this._sidebarFocused}
+            ></openp41ge-manager-grid>
           </div>
         </div>
       </div>

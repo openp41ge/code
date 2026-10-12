@@ -21,7 +21,7 @@
 
 import { html, type TemplateResult } from "lit";
 import { LitElement } from "lit";
-import { state } from "lit/decorators.js";
+import { property, state } from "lit/decorators.js";
 import { createLogger } from "openp41ge-core-logger";
 import { getAppTypeRegistration } from "../apps/app-registry";
 import { settingsTabIcon } from "./grid-tab-decorations";
@@ -105,6 +105,10 @@ export class Openp41geManagerGrid extends LitElement {
   static deps: ManagerGridDeps | null = null;
 
   /** Column-ordered placements: `_placements[i].position.col === i`. */
+  /** Whether the focused tab shows the focus line: the window is focused and
+   *  its focus is in the grid (the manager decides; see tab-grid). */
+  @property({ type: Boolean }) focusVisible = true;
+
   @state() private _placements: Placement[] = [];
   @state() private _tabs: GridTab[] = [];
   @state() private _activeTabIds: Record<string, string> = {};
@@ -623,6 +627,7 @@ export class Openp41geManagerGrid extends LitElement {
         .placements=${this._placements}
         .tabData=${this._tabData()}
         .activeTabIds=${this._activeTabIds}
+        .focusVisible=${this.focusVisible}
         .barShowAdd=${false}
         .edgeLeft=${true}
         .edgeRight=${true}

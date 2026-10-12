@@ -11,6 +11,9 @@
  * scrolls or resizes, and is clipped to the visible part of the tab's bar
  * (hidden when the tab is scrolled out of it).
  *
+ * The line is never shown while its window is not focused, so only the
+ * focused window shows one (each window has its own document and line).
+ *
  * Every tab bar calls `syncFocusLine(this, root)` after it renders and
  * `focusLineLayer().hide(this)` when it is removed. The bar that shows the
  * line owns it; another bar's hide leaves it alone.
@@ -24,6 +27,8 @@ export class FocusLineLayer {
   private _owner: object | null = null;
   private _watched: Element[] = [];
   private _resize: ResizeObserver | null = null;
+  /** Whether the window is focused (the line shows only then). */
+  private _windowFocused: boolean;
   private readonly _update = (): void => this.update();
 
   constructor(private readonly _doc: Document) {
@@ -39,6 +44,16 @@ export class FocusLineLayer {
       display: "none",
     });
     this.element = el;
+    this._windowFocused = _doc.hasFocus();
+    const view = _doc.defaultView;
+    view?.addEventListener("focus", () => {
+      this._windowFocused = true;
+      this.update();
+    });
+    view?.addEventListener("blur", () => {
+      this._windowFocused = false;
+      this.update();
+    });
   }
 
   /** The tab the line is over (null: none). */
@@ -70,7 +85,7 @@ export class FocusLineLayer {
   /** Place the line over its tab again. */
   update(): void {
     const tab = this._target;
-    if (!tab || !tab.isConnected) {
+    if (!tab || !tab.isConnected || !this._windowFocused) {
       this.element.style.display = "none";
       return;
     }
