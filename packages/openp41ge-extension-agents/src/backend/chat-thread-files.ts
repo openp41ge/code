@@ -108,7 +108,7 @@ export class ChatThreadFiles {
 
   /** The messages in one of a thread's files ([] when the file is missing). */
   readMessages(threadId: string, fileName: string): ChatMessage[] {
-    const file = path.join(this._threadDir(threadId), path.basename(fileName));
+    const file = path.join(this.threadDir(threadId), path.basename(fileName));
     let raw: string;
     try {
       raw = fs.readFileSync(file, "utf-8");
@@ -135,15 +135,16 @@ export class ChatThreadFiles {
 
   /** Delete one of a thread's message files (no-op when missing). */
   removeMessages(threadId: string, fileName: string): void {
-    fs.rmSync(path.join(this._threadDir(threadId), path.basename(fileName)), { force: true });
+    fs.rmSync(path.join(this.threadDir(threadId), path.basename(fileName)), { force: true });
   }
 
   /** Delete a thread's folder. */
   deleteThread(threadId: string): void {
-    fs.rmSync(this._threadDir(threadId), { recursive: true, force: true });
+    fs.rmSync(this.threadDir(threadId), { recursive: true, force: true });
   }
 
-  private _threadDir(threadId: string): string {
+  /** A thread's folder (its header and message files). */
+  threadDir(threadId: string): string {
     if (!threadId || threadId !== path.basename(threadId) || threadId.startsWith(".")) {
       throw new Error(`invalid thread id: ${threadId}`);
     }
@@ -151,7 +152,7 @@ export class ChatThreadFiles {
   }
 
   private _writeAtomic(threadId: string, fileName: string, body: string): void {
-    const dir = this._threadDir(threadId);
+    const dir = this.threadDir(threadId);
     fs.mkdirSync(dir, { recursive: true });
     const target = path.join(dir, fileName);
     const tmp = `${target}.tmp`;

@@ -98,6 +98,8 @@ export interface ChatSummary {
   lastMessagePreview?: string;
   /** AI-written one-line summary; shown as "No description" when absent. */
   description?: string;
+  /** Set when the chat is archived (listed only when archived chats are asked for). */
+  archivedAt?: number;
 }
 
 /** Search hit for a chat: which messages and tool calls matched. */

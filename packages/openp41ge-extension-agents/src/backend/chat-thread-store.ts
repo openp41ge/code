@@ -201,9 +201,10 @@ export class ChatThreadStore {
     return this._visible().map((t) => this._chat(t));
   }
 
-  /** Summaries of the threads `list` returns, from the headers alone. */
-  listSummaries(): ChatSummary[] {
-    return this._visible().map(({ header: h }) => ({
+  /** Summaries of the threads `list` returns, from the headers alone;
+   *  with `archived`, the archived threads too (they carry `archivedAt`). */
+  listSummaries(opts: { archived?: boolean } = {}): ChatSummary[] {
+    return this._visible(opts.archived).map(({ header: h }) => ({
       id: h.id,
       title: h.title,
       updatedAt: h.updatedAt,
@@ -211,7 +212,13 @@ export class ChatThreadStore {
       toolCallCount: h.toolCallCount,
       lastMessagePreview: h.lastMessagePreview,
       description: h.description,
+      ...(h.archivedAt ? { archivedAt: h.archivedAt } : {}),
     }));
+  }
+
+  /** A thread's folder: its header and message files (null: unknown). */
+  threadDir(id: string): string | null {
+    return this._threads.has(id) ? this._files.threadDir(id) : null;
   }
 
   /** The whole thread (loads every message file). */
@@ -302,6 +309,15 @@ export class ChatThreadStore {
     const t = this._threads.get(id);
     if (!t || t.header.archivedAt) return false;
     t.header.archivedAt = Date.now();
+    this._touchHeader(t);
+    return true;
+  }
+
+  /** Bring an archived thread back into the default list. */
+  unarchive(id: string): boolean {
+    const t = this._threads.get(id);
+    if (!t?.header.archivedAt) return false;
+    delete t.header.archivedAt;
     this._touchHeader(t);
     return true;
   }
@@ -528,9 +544,9 @@ export class ChatThreadStore {
 
   // ── Internals ────────────────────────────────────────────────────────
 
-  private _visible(): ThreadState[] {
+  private _visible(archived = false): ThreadState[] {
     return Array.from(this._threads.values())
-      .filter((t) => !t.header.archivedAt)
+      .filter((t) => archived || !t.header.archivedAt)
       .sort((a, b) => b.header.updatedAt - a.header.updatedAt);
   }
 

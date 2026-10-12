@@ -6,17 +6,20 @@
  *   - A row opens its chat as a preview; a double click pins it. A chat open
  *     in another window says so and does not open here.
  *   - Rows drag as `chat-thread` payloads (drop one on the grid to open it).
- *   - The bottom bar's settings button (at the edge facing the grid) opens
- *     the extension's config.
+ *   - A row's context menu copies the chat's folder (its conversation
+ *     history, to share) and archives or unarchives the chat.
+ *   - The bottom bar (buttons at the edge facing the grid): settings opens
+ *     the extension's config; the archive toggle lists archived chats too.
  * `<agents-chats>` keeps a `ChatsModel` while connected.
  */
 
 import { html, LitElement, nothing, type TemplateResult } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { defaultChatTitle as formatTime } from "../chat/title.js";
+import type { ContextMenuEntry } from "openp41ge-sdk";
 import type { ChatSummary } from "../chat/types.js";
 import { ChatsModel, type ChatsHost } from "./chats-model.js";
-import { PLUS_ICON, SETTINGS_ICON } from "./icons.js";
+import { ARCHIVE_ICON, PLUS_ICON, SETTINGS_ICON } from "./icons.js";
 import { innerSide } from "./inner-side.js";
 
 /** `data-drag-source-id` of chat rows. */
@@ -25,6 +28,7 @@ export const CHAT_DRAG_SOURCE_ID = "chat";
 /** The surface host, as far as the sidebar uses it. */
 export interface ChatsSidebarHost extends ChatsHost {
   readonly config: { openEditor(): void };
+  showContextMenu(event: MouseEvent, items: readonly ContextMenuEntry[]): void;
 }
 
 const STYLES = html`<style>
@@ -59,6 +63,9 @@ const STYLES = html`<style>
   }
   .ac-row.elsewhere {
     cursor: default;
+  }
+  .ac-row.archived .ac-title {
+    color: var(--text-muted, #777);
   }
   .ac-text {
     flex: 1;
@@ -141,6 +148,9 @@ const STYLES = html`<style>
     background: var(--bg-hover, #2a2d2e);
     color: var(--text-primary, #ddd);
   }
+  .ac-button[aria-pressed="true"] {
+    color: var(--accent, #4a9eff);
+  }
 </style>`;
 
 export class AgentsChats extends LitElement {
@@ -217,6 +227,16 @@ export class AgentsChats extends LitElement {
           >
             ${unsafeHTML(SETTINGS_ICON)}
           </button>
+          <button
+            type="button"
+            class="ac-button"
+            title="Show archived chats"
+            aria-label="Show archived chats"
+            aria-pressed=${m?.state.showArchived ? "true" : "false"}
+            @click=${() => void m?.toggleArchived()}
+          >
+            ${unsafeHTML(ARCHIVE_ICON)}
+          </button>
         </div>
       </div>`;
   }
@@ -236,22 +256,36 @@ export class AgentsChats extends LitElement {
   ): TemplateResult {
     const description = (chat.description ?? "").trim() || "No description";
     return html`<div
-      class="ac-row ${where ?? ""}"
+      class="ac-row ${where ?? ""} ${chat.archivedAt ? "archived" : ""}"
       data-chat-id=${chat.id}
       data-chat-title=${chat.title}
       data-drag-source-id=${CHAT_DRAG_SOURCE_ID}
       title=${where === "elsewhere" ? `“${chat.title}” is open in another window` : chat.title}
       @click=${() => m.openChat(chat.id)}
       @dblclick=${() => m.openChat(chat.id, true)}
+      @contextmenu=${(e: MouseEvent) => this._menu(m, chat, e)}
     >
       <div class="ac-text">
         <div class="ac-title">${chat.title}</div>
         <div class="ac-desc">${description}</div>
         <div class="ac-date">
-          ${where === "elsewhere" ? "Open in another window · " : ""}${formatTime(chat.updatedAt)}
+          ${chat.archivedAt ? "Archived · " : ""}${
+            where === "elsewhere" ? "Open in another window · " : ""
+          }${formatTime(chat.updatedAt)}
         </div>
       </div>
     </div>`;
+  }
+
+  private _menu(m: ChatsModel, chat: ChatSummary, e: MouseEvent): void {
+    e.preventDefault();
+    this.host?.showContextMenu(e, [
+      { label: "Copy conversation path", onSelect: () => void m.copyPath(chat.id) },
+      { separator: true },
+      chat.archivedAt
+        ? { label: "Unarchive", onSelect: () => void m.unarchive(chat.id) }
+        : { label: "Archive", onSelect: () => void m.archive(chat.id) },
+    ]);
   }
 }
 

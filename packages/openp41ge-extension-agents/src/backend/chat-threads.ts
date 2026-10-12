@@ -58,9 +58,10 @@ export class ChatThreads {
 
   // ── Per workspace ────────────────────────────────────────────────────
 
-  /** The workspace's unarchived threads (none without a workspace). */
-  listSummaries(workspaceId: string | undefined): ChatSummary[] {
-    return this._store(workspaceId)?.listSummaries() ?? [];
+  /** The workspace's unarchived threads, with `archived` the archived ones
+   *  too (none without a workspace). */
+  listSummaries(workspaceId: string | undefined, opts?: { archived?: boolean }): ChatSummary[] {
+    return this._store(workspaceId)?.listSummaries(opts) ?? [];
   }
 
   search(
@@ -112,6 +113,15 @@ export class ChatThreads {
 
   archive(id: string): boolean {
     return this._owner.get(id)?.archive(id) ?? false;
+  }
+
+  unarchive(id: string): boolean {
+    return this._owner.get(id)?.unarchive(id) ?? false;
+  }
+
+  /** Thread `id`'s folder on disk (null: unknown thread). */
+  threadDir(id: string): string | null {
+    return this._owner.get(id)?.threadDir(id) ?? null;
   }
 
   delete(id: string): boolean {

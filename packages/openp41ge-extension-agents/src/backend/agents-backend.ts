@@ -94,7 +94,10 @@ export class AgentsBackend {
 
     return {
       // ── Threads ────────────────────────────────────────────────────────
-      list: command((_p, _c, ws) => this._threads.listSummaries(ws)),
+      // `archived: true` includes the archived chats.
+      list: command((p, _c, ws) =>
+        this._threads.listSummaries(ws, { archived: p.archived === true }),
+      ),
       get: command((p) => this._threads.get(chatId(p))),
       header: command((p) => this._threads.getHeader(chatId(p))),
       messages: command((p) =>
@@ -117,6 +120,9 @@ export class AgentsBackend {
         this._announce(ctx, this._threads.rename(chatId(p), str(p, "title") ?? "")),
       ),
       archive: command((p, ctx) => this._announce(ctx, this._threads.archive(chatId(p)))),
+      unarchive: command((p, ctx) => this._announce(ctx, this._threads.unarchive(chatId(p)))),
+      // The chat's folder (its header and message files: the conversation).
+      path: command((p) => this._threads.threadDir(chatId(p))),
       search: command((p, _c, ws) =>
         this._threads.search(str(p, "query") ?? "", p.options as ChatSearchOptions, ws),
       ),
