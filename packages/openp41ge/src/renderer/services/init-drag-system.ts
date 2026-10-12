@@ -34,6 +34,7 @@ import { extensionDrag } from "./extension-drag";
 import { resolveCrossWindowPayloadDrop } from "./payload-cross-window";
 import { LogStreamDragSource } from "./drag-sources/log-stream-drag-source";
 import { ManagerTabDragSource } from "./drag-sources/manager-tab-drag-source";
+import { MANAGER_GRID_WIN_ID } from "./manager-grid-layout";
 import { ClosedSidebarDropTarget } from "./drop-targets/closed-sidebar-drop-target";
 import {
   SidebarDropTarget,
@@ -487,6 +488,19 @@ function _deepElementFromPoint(clientX: number, clientY: number): Element | null
   return el;
 }
 
+/** `closest` that continues past shadow roots into their hosts: the element
+ *  under the cursor may be inside one (e.g. a <tab-close>'s ✕). */
+function _closestComposed(el: Element, selector: string): Element | null {
+  let node: Element | null = el;
+  while (node) {
+    const hit = node.closest(selector);
+    if (hit) return hit;
+    const root = node.getRootNode();
+    node = root instanceof ShadowRoot ? root.host : null;
+  }
+  return null;
+}
+
 /** Stable IDropTarget adapters per extension drop-target element. */
 const _extensionDropTargets = new WeakMap<HTMLElement, IDropTarget>();
 
@@ -702,11 +716,17 @@ export function initDragSystem(): () => void {
   });
 
   // ── Mousedown: initiate tab drags ────────────────────────────────────
+  //
+  // Found through the event's composed path: a grid may be inside shadow roots
+  // (the manager window's is), where `e.target` is the outermost host. A
+  // window that drags its own tabs (the Logs window) marks its host
+  // `data-own-tab-drags` and is left alone.
   const onMouseDown = (e: MouseEvent) => {
-    const tabBtn = (e.target as HTMLElement).closest?.("[data-tab-id]");
-    if (!tabBtn || !(tabBtn instanceof HTMLElement)) return;
-
-    if ((e.target as HTMLElement).closest?.(".tab-close")) return;
+    const path = e.composedPath().filter((el): el is HTMLElement => el instanceof HTMLElement);
+    const tabBtn = path.find((el) => el.hasAttribute("data-tab-id"));
+    if (!tabBtn) return;
+    if (path.some((el) => el.classList.contains("tab-close"))) return;
+    if (path.some((el) => el.hasAttribute("data-own-tab-drags"))) return;
 
     e.preventDefault();
 
@@ -1268,6 +1288,10 @@ export function initDragSystem(): () => void {
 
     const screenX = detail.screenX ?? detail.bounds.x + 50;
     const screenY = detail.screenY ?? detail.bounds.y + 55;
+
+    // A manager grid tab is not a workspace tab: dropped outside its window it
+    // is not detached or moved to another window (cancelled).
+    if (detail.winId === MANAGER_GRID_WIN_ID) return;
 
     // ── Manager-tab detach: only manager windows are valid destinations. ──
     if (_managerTabDragActive) {
@@ -2112,7 +2136,13 @@ export function openp41geTargetResolver(clientX: number, clientY: number): IDrop
   // otherwise fail the instanceof guard and break target resolution — hiding
   // every drop indicator when the cursor crosses a tab icon. Element.closest
   // works on SVG too, and every selector below resolves to an HTMLElement.
-  const el = document.elementFromPoint(clientX, clientY);
+  //
+  // Descend into shadow roots: the manager window's grid is inside two
+  // (<openp41ge-window-manager> → <openp41ge-manager-grid> → <tab-grid>), where
+  // document.elementFromPoint only sees the outermost host. Then look up with
+  // _closestComposed, which climbs back out of any shadow root the cursor's
+  // element is in.
+  const el = _deepElementFromPoint(clientX, clientY);
   if (!el) return null;
 
   // The sidebar side of the current drag, if it is a sidebar-tab drag. Read from
@@ -2131,7 +2161,7 @@ export function openp41geTargetResolver(clientX: number, clientY: number): IDrop
   // When dragging a sidebar tab, only sidebar surfaces are valid targets.
   // Skip grid tab bars and grid cells entirely.
   if (sidebarDragSide) {
-    const sidebarBarEl = el.closest?.("[data-sidebar-tab-bar]");
+    const sidebarBarEl = _closestComposed(el, "[data-sidebar-tab-bar]");
     if (sidebarBarEl instanceof HTMLElement) {
       const side = sidebarBarEl.getAttribute("data-sidebar-tab-bar") as "left" | "right";
       if (side === "left" || side === "right") {
@@ -2139,7 +2169,7 @@ export function openp41geTargetResolver(clientX: number, clientY: number): IDrop
       }
     }
     // Also allow drop on sidebar content area (appends to end of tab bar)
-    const sidebarContentEl = el.closest?.("[data-sidebar-content]");
+    const sidebarContentEl = _closestComposed(el, "[data-sidebar-content]");
     if (sidebarContentEl instanceof HTMLElement) {
       const side = sidebarContentEl.getAttribute("data-sidebar-content") as "left" | "right";
       if (side === "left" || side === "right") {
@@ -2167,7 +2197,7 @@ export function openp41geTargetResolver(clientX: number, clientY: number): IDrop
 
   // Normal (non-sidebar) drag: check grid tab bars and grid cells
   const isFileDrag = !!payloadDrag || _currentSource?.type === "open-tab";
-  const tabBarEl = el.closest?.("tab-bar");
+  const tabBarEl = _closestComposed(el, "tab-bar");
   if (tabBarEl instanceof HTMLElement) {
     // Payload drags use the tab bar's own target: it shows the insert line and
     // opens the payload AT that position (TabBarDropTarget → insertAt).
@@ -2176,7 +2206,7 @@ export function openp41geTargetResolver(clientX: number, clientY: number): IDrop
       // tab bar must resolve to the enclosing grid — GridDropTarget then computes
       // the column under the cursor (cell-center/boundary), matching the native
       // path and cross-window file drops.
-      const gridEl = tabBarEl.closest?.("tab-grid");
+      const gridEl = _closestComposed(tabBarEl, "tab-grid");
       if (gridEl instanceof HTMLElement) {
         const gridTarget = (gridEl as HTMLElement & { dropTarget?: IDropTarget }).dropTarget;
         if (gridTarget) return gridTarget;
@@ -2187,7 +2217,7 @@ export function openp41geTargetResolver(clientX: number, clientY: number): IDrop
     }
   }
 
-  const tabGridEl = el.closest?.("tab-grid");
+  const tabGridEl = _closestComposed(el, "tab-grid");
   if (tabGridEl instanceof HTMLElement) {
     const dropTarget = (tabGridEl as HTMLElement & { dropTarget?: IDropTarget }).dropTarget;
     if (dropTarget) return dropTarget;

@@ -27,12 +27,16 @@ import { getAppTypeRegistration } from "../apps/app-registry";
 import { settingsTabIcon } from "./grid-tab-decorations";
 import type { TabController } from "../controllers/types";
 import type { TabGrid } from "../openp41ge-tabs-adapter";
-import { parseManagerGrid, serializeManagerGrid } from "../services/manager-grid-layout";
+import {
+  MANAGER_GRID_WIN_ID,
+  parseManagerGrid,
+  serializeManagerGrid,
+} from "../services/manager-grid-layout";
 import { PlaceholderController } from "./manager-grid-placeholder";
 
 const log = createLogger("openp41ge", "manager-grid");
 
-const WIN_ID = "manager-grid";
+const WIN_ID = MANAGER_GRID_WIN_ID;
 
 /** After a change, how long the grid waits before saving its tabs. */
 const SAVE_DELAY_MS = 250;

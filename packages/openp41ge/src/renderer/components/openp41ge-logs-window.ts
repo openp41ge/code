@@ -626,6 +626,9 @@ export class Openp41geLogsWindow extends LitElement {
 
   private _setupDrag(): void {
     if (this._orchestrator) return;
+    // This window drags its own grid tabs: the app-wide drag system must not
+    // start a second drag for them.
+    this.setAttribute("data-own-tab-drags", "");
     this._orchestrator = new DragOrchestrator(this._resolveTarget);
     this.shadowRoot?.addEventListener("mousedown", this._onMouseDown);
     this.shadowRoot?.addEventListener("mousedown", this._onFocusZoneMouseDown, true);

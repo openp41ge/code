@@ -7,6 +7,9 @@
  */
 
 /** A saved tab: what reopens it. */
+/** The manager grid's id, as its tab bars and drags carry it (`winId`). */
+export const MANAGER_GRID_WIN_ID = "manager-grid";
+
 export interface SavedManagerTab {
   readonly appType: string;
   readonly title: string;
