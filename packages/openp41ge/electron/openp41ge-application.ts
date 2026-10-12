@@ -784,12 +784,9 @@ export class Openp41geApplication {
         }
       }
     });
-    // Wire workspace state persistence: save after every mutation. Saves go to
-    // the bound workspace's `.openp41ge-workspace` file (no global workspace.json).
-    this.dispatcher.setSaveHandler((ws) => {
-      const p = this.workspaceSessionStore.getCurrentWorkspacePath();
-      if (p) this.workspaceSessionStore.save(p, ws);
-    });
+    // The default dispatcher is never saved: it serves windows bound to no
+    // workspace (window manager, logs), so it has no file. Each workspace's
+    // dispatcher (the registry's) saves its layout to that workspace's file.
 
     setDispatcher(this.dispatcher);
     setRegistry(this.registry);
@@ -1166,12 +1163,9 @@ export class Openp41geApplication {
     // state for the skeleton to render on relaunch.
     app.on("before-quit", () => {
       setAppQuitting(true);
-      // Persist every open workspace (each dispatcher saves to its own file)
-      // plus the unbound default, preserving the full multi-window state.
-      for (const p of this.registry.paths()) {
-        this.registry.get(p)?.persist();
-      }
-      this.dispatcher.persist();
+      // Persist every open workspace (each dispatcher saves to its own file),
+      // preserving the full multi-window state.
+      this.registry.persistAll();
       // Extensions' cleanups (their synchronous part finishes before exit).
       void this.extensionManager.shutdown();
       for (const watcher of this.reposWatchers.values()) watcher.stop();

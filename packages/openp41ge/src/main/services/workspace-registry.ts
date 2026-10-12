@@ -55,6 +55,11 @@ export class WorkspaceRegistry {
     return this._dispatchers.has(workspacePath);
   }
 
+  /** Save every open workspace's layout to its own file (on app quit). */
+  persistAll(): void {
+    for (const d of this._dispatchers.values()) d.persist();
+  }
+
   /** Every workspace path currently open in the registry. */
   paths(): string[] {
     return Array.from(this._dispatchers.keys());
