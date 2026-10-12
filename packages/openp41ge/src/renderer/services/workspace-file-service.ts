@@ -68,11 +68,11 @@ export class WorkspaceFileService {
 
   /**
    * Absolute app-data root, from the main process. Falls back to the release
-   * folder (`~/.openp41ge` resolved by the main-process handlers) for test and
+   * folder (`~/.openp41ge-code` resolved by the main-process handlers) for test and
    * browser-only contexts where the bridge field is absent.
    */
   private _dataDir(): string {
-    return window.openp41ge?.dataDir?.() ?? "~/.openp41ge";
+    return window.openp41ge?.dataDir?.() ?? "~/.openp41ge-code";
   }
 
   // ── Open (via dialog) ───────────────────────────────

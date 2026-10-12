@@ -3,7 +3,7 @@
  * (newest first), plus a default in-memory implementation.
  *
  * The `<openp41ge-log-viewer>` consumes a `LogPageReader` so the platform can
- * hand it a file-backed reader (over `~/.openp41ge/logs` daily files) while
+ * hand it a file-backed reader (over `~/.openp41ge-code/logs` daily files) while
  * the package stays self-contained by defaulting to `MemLogPageReader` (the
  * in-memory log bus).
  */

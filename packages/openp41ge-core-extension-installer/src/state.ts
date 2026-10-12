@@ -1,6 +1,6 @@
 /**
  * state.ts — the installer's persisted state, stored next to the install root
- * (default `~/.openp41ge/extensions/state.json`).
+ * (default `~/.openp41ge-code/extensions/state.json`).
  *
  * Owns the `installed` map (per-id version/source/sha256).
  */

@@ -3,7 +3,7 @@
  *
  * Implements the pluggable `ExtensionSource` for official extensions, given a
  * catalog manifest that maps extension ids to prebuilt release assets. All
- * sources install into the same `~/.openp41ge/extensions/` root; this package
+ * sources install into the same `~/.openp41ge-code/extensions/` root; this package
  * owns that root's `state.json` (the installed map).
  */
 

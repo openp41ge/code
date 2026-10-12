@@ -9,7 +9,7 @@
  * Every call writes a structured entry to the global log bus (log-buffer.ts),
  * which fans out to the in-memory ring buffer, the log viewer / debug overlay,
  * the console (console-transport.ts), and — via the platform transports — the
- * on-disk files under ~/.openp41ge/logs/.
+ * on-disk files under ~/.openp41ge-code/logs/.
  *
  * Structured data: if the LAST argument is a plain object (not an array,
  * Error, Date, etc.), it is detached as the entry's structured `data` payload

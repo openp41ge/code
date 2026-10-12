@@ -4,7 +4,7 @@
  * The single main-process surface for the extension system:
  *
  *   - Boots the host at startup (`init`), scanning the global
- *     `~/.openp41ge/extensions` root, the open workspace's
+ *     `~/.openp41ge-code/extensions` root, the open workspace's
  *     `<workspace>/extensions` dir and any extra roots (dev packages).
  *   - Rebuilds/reloads the host when the workspace changes. No load order
  *     between extensions is guaranteed.
@@ -28,7 +28,7 @@ import type { HandlerCaller, HandlerPayload } from "openp41ge-sdk";
 export const EXTENSIONS_DIR_NAME = "extensions";
 
 export interface ExtensionHostManagerOptions {
-  /** Global install root (`~/.openp41ge/extensions`). */
+  /** Global install root (`~/.openp41ge-code/extensions`). */
   readonly installDir: string;
   /** Extra discovery roots (e.g. the repo's `packages/` dir in dev). */
   readonly extraDiscoveryDirs?: readonly string[];

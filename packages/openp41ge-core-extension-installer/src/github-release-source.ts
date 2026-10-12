@@ -3,7 +3,7 @@
  *
  * Implements the pluggable `ExtensionSource`: installs extensions distributed
  * as prebuilt GitHub release assets, fetched from a catalog manifest published
- * by the platform org. All sources install to the same `~/.openp41ge/extensions/`
+ * by the platform org. All sources install to the same `~/.openp41ge-code/extensions/`
  * root.
  *
  * Flow (`install`): fetch catalog → find entry → download asset → verify
@@ -36,7 +36,7 @@ export interface GithubReleaseSourceOptions {
   readonly org: string;
   /** URL of the catalog manifest listing installable extensions. */
   readonly catalogUrl: string;
-  /** Install root — all sources land here (`~/.openp41ge/extensions`). */
+  /** Install root — all sources land here (`~/.openp41ge-code/extensions`). */
   readonly installDir: string;
   /** State file path (defaults to `<installDir>/state.json`). */
   readonly stateFile?: string;

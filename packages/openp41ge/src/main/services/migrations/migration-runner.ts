@@ -28,7 +28,7 @@ import {
 } from "./operations.js";
 
 export interface RunOptions {
-  /** The app data folder (`~/.openp41ge` or `~/.openp41ge-dev`). */
+  /** The app data folder (`~/.openp41ge-code` or `~/.openp41ge-code-dev`). */
   readonly root: string;
 }
 

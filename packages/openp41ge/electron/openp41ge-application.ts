@@ -8,6 +8,7 @@
 
 import { app, BrowserWindow, ipcMain, Menu, Notification, shell } from "electron";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createLogger } from "openp41ge-core-logger";
@@ -55,6 +56,11 @@ import { ConfigService, updateChannelForVersion } from "../src/main/services/con
 import { AutoUpdaterService } from "./auto-updater-service.js";
 import { ReleasesFeed, releasesFeedDeps } from "./releases-feed.js";
 import { chromiumProfileDirName, resolveAppDataDir } from "../src/main/services/app-data-dir.js";
+import {
+  StorageMove,
+  legacyAppDataDirName,
+  legacyChromiumProfileDirName,
+} from "../src/main/services/storage-rename.js";
 import { parseWorkspaceLaunchArg } from "../src/main/services/workspace-launch-arg.js";
 import { ReposWatcher } from "./repos-watcher.js";
 import { WorkspaceManifestChanges } from "../src/main/services/workspace-manifest-changes.js";
@@ -81,6 +87,7 @@ import {
   openLogsWindow,
   setOpenWorkspaceWindowHandler,
   setAppQuitting,
+  setAppDataDir,
   focusWorkspaceWindow,
   broadcastToWorkspace,
   dispatcherForEvent,
@@ -386,14 +393,28 @@ export class Openp41geApplication {
 
   private _initPaths(): void {
     // Single source of truth for the app-data root (dev vs release folder).
-    this.openp41geDir = resolveAppDataDir(app.isPackaged);
+    // Data from before the rename to "openp41ge code" moves there first (not
+    // with an `OPENP41GE_DIR` override).
+    const dir = resolveAppDataDir(app.isPackaged);
+    this.openp41geDir = process.env.OPENP41GE_DIR
+      ? dir
+      : new StorageMove().moveDataDir(
+          path.join(os.homedir(), legacyAppDataDirName(app.isPackaged)),
+          dir,
+        );
+    setAppDataDir(this.openp41geDir);
   }
 
   private _initChromeFlags(): void {
     app.setName("openp41ge code");
+    // Chromium's profile from before the rename moves to the new name first.
+    const appData = app.getPath("appData");
     app.setPath(
       "userData",
-      path.join(app.getPath("appData"), chromiumProfileDirName(app.isPackaged)),
+      new StorageMove().moveFolder(
+        path.join(appData, legacyChromiumProfileDirName(app.isPackaged)),
+        path.join(appData, chromiumProfileDirName(app.isPackaged)),
+      ),
     );
     app.commandLine.appendSwitch("disable-features", "FontationsFontBackend");
     app.commandLine.appendSwitch("enable-gpu-rasterization");

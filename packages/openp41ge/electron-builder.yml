@@ -5,8 +5,12 @@
 # apple-actions/import-codesign-certs). Notarization credentials come from
 # the environment: APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID.
 
-appId: com.openp41ge.app
+appId: com.openp41ge.code
 productName: openp41ge code
+# The packaged package.json's name. electron-updater names its download cache
+# after it (~/Library/Caches/openp41ge-code-updater).
+extraMetadata:
+  name: openp41ge-code
 copyright: Copyright © openp41ge
 # No spaces in release asset names (GitHub rewrites them).
 artifactName: openp41ge-code-${version}-${arch}.${ext}

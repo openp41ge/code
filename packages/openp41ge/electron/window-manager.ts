@@ -14,7 +14,6 @@ import { showConfirm } from "./confirm-dialog-manager.js";
 import type { TabNameGenerator } from "../src/main/index.js";
 import type { OperationDispatcher } from "../src/main/index.js";
 import type { WorkspaceRegistry } from "../src/main/services/workspace-registry.js";
-import { resolveAppDataDir } from "../src/main/services/app-data-dir.js";
 
 const log = createLogger("openp41ge", "window-manager");
 
@@ -131,6 +130,13 @@ export function broadcastToWorkspace(workspacePath: string, serialized: string):
 
 export function setTabNames(t: TabNameGenerator): void {
   _tabNames = t;
+}
+
+/** The app-data root windows are told about (set at start, see `_initPaths`). */
+let _appDataDir = "";
+
+export function setAppDataDir(dir: string): void {
+  _appDataDir = dir;
 }
 
 // ─── Window creation ─────────────────────────────────────────────────────
@@ -269,7 +275,7 @@ export function createOpenp41geWindow(
         workspacePath: windowMeta.workspacePath,
         initialTab: windowMeta.initialTab,
         revealErrorId: windowMeta.revealErrorId,
-        dataDir: resolveAppDataDir(app.isPackaged),
+        dataDir: _appDataDir,
       });
     }
   });

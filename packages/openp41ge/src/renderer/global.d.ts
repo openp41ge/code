@@ -20,7 +20,7 @@ declare global {
     openp41ge: {
       platform: string;
       isDev: () => boolean;
-      /** Absolute app-data root (~/.openp41ge or ~/.openp41ge-dev). */
+      /** Absolute app-data root (~/.openp41ge-code or ~/.openp41ge-code-dev). */
       dataDir: () => string;
       /** Show a native context menu. Returns the id of the clicked item, or null if dismissed. */
       showContextMenu: (items: Array<{ label: string; id: string }>) => Promise<string | null>;

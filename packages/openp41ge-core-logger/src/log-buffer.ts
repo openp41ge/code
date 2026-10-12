@@ -8,7 +8,7 @@
  *   - the in-memory ring buffer (`getLogBuffer()` / `queryLog()`) that the
  *     `<openp41ge-log-viewer>` and the overlay's `<debug-log-panel>` render,
  *   - the console (`console-transport.ts`),
- *   - the main-process `LogFileStore` (persisted to `~/.openp41ge/logs/`),
+ *   - the main-process `LogFileStore` (persisted to `~/.openp41ge-code/logs/`),
  *   - the renderer IPC transport (`renderer-log-transport.ts`).
  *
  * Capture levels: INFO/WARN/ERROR are always captured. DEBUG is captured only

@@ -45,7 +45,7 @@ ipcRenderer.on("native:contextMenuAction", (_event, id) => {
 contextBridge.exposeInMainWorld("openp41ge", {
   platform: process.platform,
   isDev: () => _isDev,
-  /** Absolute app-data root (~/.openp41ge or ~/.openp41ge-dev). */
+  /** Absolute app-data root (~/.openp41ge-code or ~/.openp41ge-code-dev). */
   dataDir: () => _dataDir,
 
   /** Show a native context menu. Returns the id of the clicked item, or null if dismissed. */

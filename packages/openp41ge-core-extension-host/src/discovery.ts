@@ -1,7 +1,7 @@
 /**
  * discovery.ts — find installed extensions on disk.
  *
- * Each discovery directory (global `~/.openp41ge/extensions`, per-workspace
+ * Each discovery directory (global `~/.openp41ge-code/extensions`, per-workspace
  * `.openp41ge/extensions`) is scanned for immediate subdirectories; a subdir
  * that contains a valid `package.json` manifest is treated as an installed
  * extension. Hidden dirs and unreadable/non-extension dirs are skipped.

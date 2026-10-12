@@ -8,7 +8,7 @@
  * file-backed `LogPageReader`).
  *
  * By default it reads the in-memory log bus via `MemLogPageReader`; the
- * platform injects a file-backed reader (over `~/.openp41ge/logs`) by setting
+ * platform injects a file-backed reader (over `~/.openp41ge-code/logs`) by setting
  * the `pageReader` property.
  */
 

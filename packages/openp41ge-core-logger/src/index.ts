@@ -5,7 +5,7 @@
  *   - ILogger interface + createLogger() factory
  *   - Global log / event bus (in-memory buffer, query, subscribe, capture levels)
  *   - Persistent on-disk logging is wired by the platform: the renderer forwards
- *     entries over IPC and the main process writes them to ~/.openp41ge/logs/
+ *     entries over IPC and the main process writes them to ~/.openp41ge-code/logs/
  *
  * The <openp41ge-log-viewer> Web Component is exported from "openp41ge-core-logger/viewer".
  */

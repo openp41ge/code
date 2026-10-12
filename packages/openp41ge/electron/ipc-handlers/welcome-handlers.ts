@@ -1,7 +1,7 @@
 /**
  * Welcome-dismissal IPC — a marker file in the app-data directory.
  *
- * When `~/.openp41ge` (release) or `~/.openp41ge-dev` (dev) contains the
+ * When `~/.openp41ge-code` (release) or `~/.openp41ge-code-dev` (dev) contains the
  * marker file, the manager window does not show (or open) the Welcome tab.
  * The user creates/removes the marker by toggling the "never show the
  * welcome message again" control on the first welcome page.

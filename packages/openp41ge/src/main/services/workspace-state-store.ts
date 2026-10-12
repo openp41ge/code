@@ -5,7 +5,7 @@
  * On each mutation, the entire workspace is serialized and written atomically.
  * On startup, the last saved state is restored.
  *
- * Stored under the resolved app-data root (~/.openp41ge release, ~/.openp41ge-dev dev).
+ * Stored under the resolved app-data root (~/.openp41ge-code release, ~/.openp41ge-code-dev dev).
  */
 
 import fs from "fs";

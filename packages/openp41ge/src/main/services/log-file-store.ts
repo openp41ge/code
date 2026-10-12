@@ -1,8 +1,8 @@
 /**
  * LogFileStore — persists the structured log bus to disk as JSONL.
  *
- * Files live under `<baseDir>/logs/` (default `~/.openp41ge/logs`; dev build
- * `~/.openp41ge-dev/logs`):
+ * Files live under `<baseDir>/logs/` (default `~/.openp41ge-code/logs`; dev build
+ * `~/.openp41ge-code-dev/logs`):
  *   - `openp41ge.log`            — the live day's file (stable name for `tail -f`)
  *   - `openp41ge-YYYY-MM-DD.log` — archived previous days, pruned after
  *                                   retentionDays (default 14)

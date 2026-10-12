@@ -1,6 +1,6 @@
 /**
  * Manager-grid IPC — the manager window's open grid tabs, kept between
- * launches in the app-data root (`~/.openp41ge` release, `~/.openp41ge-dev`
+ * launches in the app-data root (`~/.openp41ge-code` release, `~/.openp41ge-code-dev`
  * dev): the manager is not bound to a workspace, so this is not under
  * `workspaces/`. The renderer owns the shape (and checks it on reading); this
  * stores it whole.

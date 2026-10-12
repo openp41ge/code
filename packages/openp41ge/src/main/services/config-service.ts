@@ -3,7 +3,7 @@
  *
  * The .config directory is dot-prefixed so it doesn't appear as a project
  * in the app-data root (projects are direct subdirectories like
- * ~/.openp41ge/myproject/; the dev build uses ~/.openp41ge-dev/).
+ * ~/.openp41ge-code/myproject/; the dev build uses ~/.openp41ge-code-dev/).
  *
  * On startup:
  * - If the file exists, it is read and parsed.
@@ -252,7 +252,7 @@ export class ConfigService {
    *  `updateChannelForVersion(app.getVersion())` so a prerelease build (e.g.
    *  v0.1.0-alpha.10) checks its own track; tests/dev default to "latest". */
   constructor(openp41geDir?: string, updateChannel: UserConfig["updateChannel"] = "latest") {
-    // Callers pass the resolved app-data root. `~/.openp41ge` is only a safety
+    // Callers pass the resolved app-data root. `~/.openp41ge-code` is only a safety
     // default for direct construction without the resolved root.
     const baseDir = openp41geDir ?? path.join(os.homedir(), APP_DATA_DIR_PRODUCTION);
     this._configDir = path.join(baseDir, ".config");

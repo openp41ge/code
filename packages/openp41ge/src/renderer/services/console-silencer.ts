@@ -4,7 +4,7 @@
  * Openp41ge routes all its logging through the structured log bus
  * (`openp41ge-core-logger`), which fans entries out to the in-memory buffer, the
  * log viewer, and (via the renderer→main IPC transport) the on-disk files
- * under `~/.openp41ge/logs/`. Replaying every entry to the browser console is
+ * under `~/.openp41ge-code/logs/`. Replaying every entry to the browser console is
  * pure duplication, so this silencer replaces `console.debug/log/info/warn/
  * error` (and `trace`) with crash-proof no-ops.
  *
