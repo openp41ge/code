@@ -55,12 +55,8 @@ import { WorkspaceRegistry } from "../src/main/services/workspace-registry.js";
 import { ConfigService, updateChannelForVersion } from "../src/main/services/config-service.js";
 import { AutoUpdaterService } from "./auto-updater-service.js";
 import { ReleasesFeed, releasesFeedDeps } from "./releases-feed.js";
-import { resolveAppDataDir, resolveChromiumProfileDir } from "../src/main/services/app-data-dir.js";
-import {
-  StorageMove,
-  legacyAppDataDirName,
-  legacyChromiumProfileDirName,
-} from "../src/main/services/storage-rename.js";
+import { resolveAppDataDir } from "../src/main/services/app-data-dir.js";
+import { StorageMove, legacyAppDataDirName } from "../src/main/services/storage-rename.js";
 import { parseWorkspaceLaunchArg } from "../src/main/services/workspace-launch-arg.js";
 import { ReposWatcher } from "./repos-watcher.js";
 import { WorkspaceManifestChanges } from "../src/main/services/workspace-manifest-changes.js";
@@ -406,20 +402,8 @@ export class Openp41geApplication {
   }
 
   private _initChromeFlags(): void {
-    app.setName("openp41ge code");
-    // Chromium's profile from before the rename moves to the new name first
-    // (not with an `OPENP41GE_DIR` override: the profile is inside it then).
-    const appData = app.getPath("appData");
-    const profile = resolveChromiumProfileDir(app.isPackaged, appData);
-    app.setPath(
-      "userData",
-      process.env.OPENP41GE_DIR
-        ? profile
-        : new StorageMove().moveFolder(
-            path.join(appData, legacyChromiumProfileDirName(app.isPackaged)),
-            profile,
-          ),
-    );
+    // The app's name and Chromium's folders are set earlier, in
+    // `initChromiumStorage` (main.ts), before Sentry starts.
     app.commandLine.appendSwitch("disable-features", "FontationsFontBackend");
     app.commandLine.appendSwitch("enable-gpu-rasterization");
     app.commandLine.appendSwitch("remote-debugging-port", "9222");

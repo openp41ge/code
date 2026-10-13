@@ -58,3 +58,8 @@ export function resolveChromiumProfileDir(isPackaged: boolean, appData: string):
   if (override) return path.join(override, "chromium-profile");
   return path.join(appData, chromiumProfileDirName(isPackaged));
 }
+
+/** Chromium's crash reports folder: inside its profile folder (`profileDir`). */
+export function crashReportsDir(profileDir: string): string {
+  return path.join(profileDir, "Crashpad");
+}

@@ -7,6 +7,7 @@
 
 import { setConsoleTransportEnabled } from "openp41ge-core-logger";
 import { Openp41geApplication } from "./openp41ge-application.js";
+import { initChromiumStorage } from "./chromium-storage.js";
 import { initSentry } from "./sentry.js";
 
 // Non-fatal logs must only reach the log system (log bus → viewer → disk),
@@ -16,6 +17,10 @@ import { initSentry } from "./sentry.js";
 // entirely (they are handled in openp41ge-application and go to console via
 // console.error + the fatal error window).
 setConsoleTransportEnabled(false);
+
+// Chromium's folders before Sentry: its crash reporting fixes the crash
+// reports folder when it starts.
+initChromiumStorage();
 
 // Initialize Sentry before the app starts (and thus before Electron is
 // ready): the SDK must register its `sentry-ipc` scheme & IPC handlers early.
