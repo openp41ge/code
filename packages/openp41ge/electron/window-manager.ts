@@ -229,11 +229,10 @@ export function createOpenp41geWindow(
     height,
     minWidth: 600,
     minHeight: 200,
-    // The Window Manager is a thin utility picker — it is not meant to be
-    // fullscreenable, so remove the native window chrome and render custom
-    // close/minimize controls (no fullscreen/green button) in the renderer.
-    // It stays freely resizable (no maxWidth cap).
-    ...(isWindowManager ? { frame: false, fullscreenable: false } : {}),
+    // The Window Manager has no native window chrome: it renders its own
+    // close / minimize / fullscreen traffic lights. It is freely resizable
+    // (no maxWidth cap) and can go fullscreen.
+    ...(isWindowManager ? { frame: false } : {}),
     title: appTitle(app.isPackaged),
     ...(!isWindowManager ? { titleBarStyle: "hiddenInset" } : {}),
     // Match the app's dark surface so the areas exposed while the window

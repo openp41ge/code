@@ -1541,9 +1541,9 @@ export class Openp41geWindowManager extends LitElement {
           height: 100%;
           position: relative;
         }
-        /* Frameless window title bar (native drag region). The Window Manager is
-           not fullscreenable, so it renders its own close/minimize traffic-light
-           buttons (no fullscreen/green) here. */
+        /* Frameless window title bar (native drag region). The Window Manager
+           has no native chrome, so it renders its own close / minimize /
+           fullscreen traffic-light buttons here. */
         .wm-titlebar {
           display: flex;
           align-items: center;
@@ -1592,6 +1592,9 @@ export class Openp41geWindowManager extends LitElement {
         }
         .wm-winbtn--min {
           background: #febc2e;
+        }
+        .wm-winbtn--full {
+          background: #28c840;
         }
         /* Tab bar: persistent navigation row below the window title bar, styled
            like the workspace window's <tab-bar>. Hosts the "Workspaces" tab
@@ -2595,6 +2598,13 @@ export class Openp41geWindowManager extends LitElement {
               @click=${() => window.openp41ge?.window.minimize()}
             >
               <span>─</span>
+            </button>
+            <button
+              class="wm-winbtn wm-winbtn--full"
+              aria-label="Toggle full screen"
+              @click=${() => window.openp41ge?.window.toggleFullScreen()}
+            >
+              <span>⤢</span>
             </button>
           </div>
         </div>

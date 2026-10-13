@@ -62,6 +62,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
   window: {
     minimize: () => ipcRenderer.send("window:minimize"),
     maximize: () => ipcRenderer.send("window:maximize"),
+    toggleFullScreen: () => ipcRenderer.send("window:toggleFullScreen"),
     /** Animated grow-to-fit used by the custom title-bar double-click. */
     maximizeAnimated: () => ipcRenderer.send("window:maximize-animated"),
     /** Custom titlebar drag: animate a real window move over IPC. */

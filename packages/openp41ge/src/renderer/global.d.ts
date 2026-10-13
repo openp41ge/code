@@ -27,6 +27,8 @@ declare global {
       window: {
         minimize: () => void;
         maximize: () => void;
+        /** Enter / leave fullscreen (the management window's green light). */
+        toggleFullScreen: () => void;
         maximizeAnimated: () => void;
         startDrag: () => void;
         dragMove: (x: number, y: number) => void;

@@ -1,6 +1,6 @@
 /**
  * Window control IPC handlers — new-tab, close-tab, add-column, new-window,
- * minimize, maximize, close, isMaximized.
+ * minimize, maximize, toggleFullScreen, close, isMaximized.
  */
 
 import { ipcMain, BrowserWindow, screen, type IpcMainEvent } from "electron";
@@ -60,6 +60,12 @@ export function registerWindowHandlers(
 
   ipcMain.on("window:minimize", (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize();
+  });
+
+  // The frameless management window's green traffic light.
+  ipcMain.on("window:toggleFullScreen", (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) win.setFullScreen(!win.isFullScreen());
   });
 
   ipcMain.on("window:maximize", (event) => {
