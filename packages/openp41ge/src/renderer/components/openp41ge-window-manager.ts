@@ -4,8 +4,8 @@
  * The top level is a simple list of workspaces. Clicking a workspace row opens
  * that workspace's config as a grid cell in the workspace-editor grid (the
  * `openp41ge-extension-workspaces` extension), alongside the live workspace windows. The
- * top-level cards carry only an "Open workspace window" button — all workspace
- * editing (name, repositories, worktrees) lives in the workspace editor grid.
+ * workspace editor opens the workspace's window (its Open button) and edits
+ * it (name, repositories, worktrees).
  */
 
 import { html, nothing, type TemplateResult } from "lit";
@@ -1931,7 +1931,8 @@ export class Openp41geWindowManager extends LitElement {
           display: flex;
           align-items: center;
           gap: 12px;
-          padding: 16px;
+          /* As the Releases tab's rows. */
+          padding: 7px 10px;
           cursor: pointer;
           border-bottom: 1px solid var(--divider, #2f3031);
           transition: background 0.1s ease;
@@ -1966,37 +1967,6 @@ export class Openp41geWindowManager extends LitElement {
         .ws-meta {
           color: var(--text-secondary, #999);
           font-size: 12px;
-        }
-        /* Right-edge icon button that opens the workspace window. */
-        .ws-open-btn {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-          width: 28px;
-          height: 28px;
-          padding: 0;
-          border: none;
-          border-radius: 6px;
-          background: transparent;
-          color: var(--text-secondary, #999);
-          cursor: pointer;
-          transition:
-            background 0.1s ease,
-            color 0.1s ease;
-        }
-        .ws-open-btn:hover {
-          background: var(--bg-hover, #2a2d2e);
-          color: var(--text-primary, #e3e3e3);
-        }
-        .ws-open-btn svg {
-          width: 16px;
-          height: 16px;
-          display: block;
-        }
-        .ws-open-btn:focus-visible {
-          outline: 1px solid var(--accent, #569cd6);
-          outline-offset: 1px;
         }
 
         /* Inline row of mini workspace-window skeletons (up to 3) sitting at the
@@ -2877,30 +2847,7 @@ export class Openp41geWindowManager extends LitElement {
                                                           ? html`<span
                                                               class="dw-checkbox ${this._selectedWorkspaces.has(w.filePath) ? "dw-checkbox--checked" : ""}"
                                                             ></span>`
-                                                          : html`<button
-                                                              class="ws-open-btn"
-                                                              type="button"
-                                                              title="Open workspace window"
-                                                              aria-label="Open workspace window"
-                                                              @click=${(e: Event) => {
-                                                                e.stopPropagation();
-                                                                this._openWorkspaceWindow(
-                                                                  w.filePath,
-                                                                );
-                                                              }}
-                                                            >
-                                                              <svg
-                                                                xmlns="http://www.w3.org/2000/svg"
-                                                                height="16px"
-                                                                viewBox="0 -960 960 960"
-                                                                width="16px"
-                                                                fill="currentColor"
-                                                              >
-                                                                <path
-                                                                  d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h560v-280h80v280q0 33-23.5 56.5T760-120H200Zm188-212-56-56 372-372H560v-80h280v280h-80v-144L388-332Z"
-                                                                />
-                                                              </svg>
-                                                            </button>`
+                                                          : nothing
                                                       }
                                                     </li>
                                                   `;

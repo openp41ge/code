@@ -110,12 +110,14 @@ function failedAddition(error: string): RepositoryAddition {
 
 /**
  * Build the workspace actions. `git` is read per call (the preload API may
- * be absent, e.g. in a window without a workspace).
+ * be absent, e.g. in a window without a workspace). `openWindow` opens (or
+ * focuses) a workspace file's window.
  */
 export function createWorkspaceActions(
   git: () => WorkspaceActionsGit | undefined,
   store: WorkspaceActionsStore,
   confirm: WorkspaceActionsConfirm,
+  openWindow: (workspaceFile: string) => void,
 ): SurfaceWorkspaceHost {
   /**
    * Clone `url` for `workspaceFile` (omitted: this window's workspace);
@@ -272,6 +274,10 @@ export function createWorkspaceActions(
 
     onWorkspaceFileChanged(fn) {
       return git()?.onWorkspaceFileChanged?.(fn) ?? (() => undefined);
+    },
+
+    openWindow(workspaceFile) {
+      openWindow(workspaceFile);
     },
   };
 }

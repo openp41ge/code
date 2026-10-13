@@ -331,6 +331,8 @@ export interface SurfaceWorkspaceHost {
    * when the surface is disposed.
    */
   onWorkspaceFileChanged(fn: (change: WorkspaceFileChange) => void): () => void;
+  /** Open the window of the workspace file `workspaceFile` (or focus it, when open). */
+  openWindow(workspaceFile: string): void;
 }
 
 /** A workspace file whose manifest changed (`onWorkspaceFileChanged`). */

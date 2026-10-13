@@ -125,6 +125,7 @@ const UNWIRED_WORKSPACE: SurfaceWorkspaceHost = {
     error: "workspace actions are not available",
   }),
   onWorkspaceFileChanged: () => () => undefined,
+  openWindow: () => undefined,
 };
 
 /** `host.config` when the platform wires no config. */

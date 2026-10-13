@@ -202,6 +202,7 @@ const workspaceActions = createWorkspaceActions(
     save: () => workspaceFileService.save(),
   },
   (options) => showConfirm({ ...options, confirmStyle: "danger" }),
+  (workspaceFile) => window.openp41ge?.windowManager?.openWorkspaceWindow(workspaceFile),
 );
 
 /** `host.showContextMenu`: the app's own context menu at the event's position. */
