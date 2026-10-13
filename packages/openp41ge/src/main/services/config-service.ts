@@ -40,6 +40,10 @@ export interface UserConfig {
     maxFileSize: number;
     /** Whether the file editor wraps long lines by default (a file's own toggle wins). */
     wordWrap: boolean;
+    /** Saving a file removes spaces and tabs at the end of its lines. */
+    trimTrailingWhitespace: boolean;
+    /** Saving a non-empty file ends it with a newline. */
+    insertFinalNewline: boolean;
   };
   /**
    * Which consumer opens a dropped payload kind, when more than one can:
@@ -81,6 +85,8 @@ const DEFAULT_CONFIG: UserConfig = {
   editor: {
     maxFileSize: DEFAULT_MAX_FILE_SIZE,
     wordWrap: false,
+    trimTrailingWhitespace: true,
+    insertFinalNewline: true,
   },
   dragConsumers: {},
 };

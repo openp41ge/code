@@ -26,6 +26,10 @@ export interface UserConfig {
     maxFileSize: number;
     /** Whether the file editor wraps long lines by default. */
     wordWrap: boolean;
+    /** Saving a file removes spaces and tabs at the end of its lines. */
+    trimTrailingWhitespace: boolean;
+    /** Saving a non-empty file ends it with a newline. */
+    insertFinalNewline: boolean;
   };
 }
 

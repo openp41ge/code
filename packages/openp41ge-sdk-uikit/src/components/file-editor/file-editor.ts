@@ -24,6 +24,7 @@ import type {
 import type { PieceTreeTextContentModel } from "openp41ge-core-editor-engine/model/piece-tree-text-content-model";
 import type { TextContentChangeEvent, TextSelection } from "openp41ge-core-editor-engine/model";
 import { ViewModel } from "openp41ge-core-editor-engine/model/view-model";
+import { saveCleanupEdits, type SaveCleanupOptions } from "./save-cleanup";
 import type { ViewModelEvent } from "openp41ge-core-editor-engine/model/view-model";
 import { ViewLines } from "openp41ge-core-editor-engine/view/view-lines";
 import { computeWrapSegments } from "openp41ge-core-editor-engine/view/word-wrap-helper";
@@ -276,6 +277,11 @@ export class FileEditorElement extends LitElement {
 
   /** Whether this editor is in read-only mode (no edits, no caret). */
   private _readOnly: boolean = false;
+  /** What a save tidies first (`setSaveCleanup`). */
+  private _saveCleanup: SaveCleanupOptions = {
+    trimTrailingWhitespace: false,
+    insertFinalNewline: false,
+  };
 
   /** Whether this editor is in read-only mode. */
   get isReadOnly(): boolean {
@@ -1368,9 +1374,21 @@ export class FileEditorElement extends LitElement {
     this._dispatchTitleChanged();
   }
 
+  /**
+   * What a save tidies first (`./save-cleanup.ts`): trailing whitespace and
+   * a final newline. Both off until the host turns them on.
+   */
+  setSaveCleanup(opts: SaveCleanupOptions): void {
+    this._saveCleanup = { ...opts };
+  }
+
   async save(): Promise<boolean> {
     if (this._readOnly) return false;
     if (!this.textContentModel || !this.filePath) return false;
+
+    // Tidy the buffer itself (one undoable edit), so what is shown is what is saved.
+    const cleanup = saveCleanupEdits(this.textContentModel, this._saveCleanup);
+    if (cleanup.length > 0) this.textContentModel.pushEditOperations(cleanup);
 
     const content = this.textContentModel.getValue();
 

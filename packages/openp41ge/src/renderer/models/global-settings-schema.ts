@@ -54,6 +54,16 @@ export const GLOBAL_SETTINGS_SCHEMA = {
           description:
             "Wrap long lines by default. A file's own word-wrap toggle, once used, wins for that file.",
         },
+        trimTrailingWhitespace: {
+          type: "boolean",
+          description:
+            "When a file is saved, remove the spaces and tabs at the end of its lines (default true).",
+        },
+        insertFinalNewline: {
+          type: "boolean",
+          description:
+            "When a file is saved, end it with a newline if it does not already (default true; an empty file stays empty).",
+        },
       },
     },
     dragConsumers: {

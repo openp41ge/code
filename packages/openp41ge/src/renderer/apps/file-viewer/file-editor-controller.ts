@@ -330,7 +330,7 @@ export class FileEditorController extends BaseController implements FileViewerCo
     this._editor.setTheme(themeId);
   }
 
-  /** Apply editor settings (line height, font size) from config. */
+  /** Apply editor settings (line height, font size, word wrap, save cleanup) from config. */
   private _applyEditorSettings(): void {
     if (!this._editor) return;
     const lineHeight = appServices.configService.get("lineHeight") as number | undefined;
@@ -345,6 +345,12 @@ export class FileEditorController extends BaseController implements FileViewerCo
     // without a per-file override; per-file choices are remembered per path.
     const wordWrap = appServices.configService.get("editor.wordWrap") as boolean | undefined;
     this._editor.setWordWrapDefault(Boolean(wordWrap));
+    // What a save tidies first: both on unless set to false.
+    this._editor.setSaveCleanup({
+      trimTrailingWhitespace:
+        appServices.configService.get("editor.trimTrailingWhitespace") !== false,
+      insertFinalNewline: appServices.configService.get("editor.insertFinalNewline") !== false,
+    });
   }
 
   private _attachEventBridge(): void {
