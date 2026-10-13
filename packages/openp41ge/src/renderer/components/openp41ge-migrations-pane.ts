@@ -1,7 +1,7 @@
 /**
  * openp41ge-migrations-pane — the manager window's Migrations tab.
  *
- * The data updates (the data-migrations plan) of this data folder: its data
+ * The data updates (migrations/README.md) of this data folder: its data
  * version next to the app's, whether it is up to date (or the last update
  * couldn't be finished, and where to get the app again), and how many
  * updates ran and when the last did — never what they were (that stays in

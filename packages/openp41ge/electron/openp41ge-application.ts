@@ -528,7 +528,7 @@ export class Openp41geApplication {
 
   /**
    * Bring the data folder up to this version's layout — before any saved
-   * layout loads (the data-migrations plan). Release builds download the
+   * layout loads (migrations/README.md). Release builds download the
    * signed sets of every release since the data was last migrated; dev
    * builds read the repo's `migrations/` folder. The migration window shows
    * only when sets are pending, or a required one could not be downloaded.
