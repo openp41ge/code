@@ -208,13 +208,18 @@ packaged app.
 
 - [x] A release's migrations run once, in order, before data is read (seen
       in a release install for one release; several releases: tests only).
-- [ ] Unsigned / tampered sets and paths outside the data folder are refused.
-- [ ] Failures stop, are recorded, and are shown; offline + required blocks.
+- [x] Unsigned / tampered sets and paths outside the data folder are refused
+      (tests only; accepted by the user).
+- [x] Failures stop, are recorded, and are shown; offline + required blocks.
 - [x] Typecheck + lint + knip + tests + build green.
 - [x] Seen in the app (2026-10-13, dev build on a throwaway `OPENP41GE_DIR`,
       which now holds Chromium's profile too): a failing set stops the run,
       is recorded as `failed` in the journal with its error, and the window
       shows it with Show the journal / Quit / Retry and no app window; on the
       next start, with the cause removed, it applied and cleared `failed`.
-- [ ] Seen in a release build on a throwaway folder: an unsigned set is
-      refused; required + offline shows the "needs to be online once" state.
+- [x] Seen in a packaged build (2026-10-13, local unsigned build of
+      `098f0dfc` as 0.1.0-alpha.14, on a throwaway `OPENP41GE_DIR` holding
+      old data, Wi-Fi off): required + offline shows the checklist (internet,
+      distribution servers), Continue disabled; with Wi-Fi back both turn
+      green, Continue downloads and runs the sets, then the app opens. An
+      unsigned set: tests only (accepted).
