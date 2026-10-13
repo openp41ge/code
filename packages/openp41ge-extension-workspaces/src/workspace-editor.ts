@@ -542,10 +542,11 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
         display: flex;
         flex-direction: column;
       }
-      /* The first content row: the editor's buttons (Open first). */
+      /* The first content row: the editor's buttons (Open first), at the right. */
       .we-toolbar {
         display: flex;
         align-items: center;
+        justify-content: flex-end;
         gap: 6px;
         padding: 12px 12px 0;
         flex-shrink: 0;
