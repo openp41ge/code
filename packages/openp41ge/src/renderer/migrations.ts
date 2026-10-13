@@ -39,5 +39,16 @@ function show(state: MigrationsViewState): void {
   if (page) bridge!.resize(page.getBoundingClientRect().height);
 }
 
-bridge.onState(show);
-void bridge.get().then(show);
+let current: MigrationsViewState | null = null;
+const update = (state: MigrationsViewState): void => {
+  current = state;
+  show(state);
+};
+bridge.onState(update);
+void bridge.get().then(update);
+// The status follows the connection while offline (Offline / Online).
+const reshow = (): void => {
+  if (current) show(current);
+};
+window.addEventListener("online", reshow);
+window.addEventListener("offline", reshow);
