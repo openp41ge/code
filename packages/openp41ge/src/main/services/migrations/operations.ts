@@ -137,6 +137,23 @@ export function rewritePaths(value: unknown, prefixes: ReadonlyArray<[string, st
   return value;
 }
 
+/** `value` with every object whose `appType` is `from` given `to` (and
+ *  `title`, when set). */
+export function renameAppType(value: unknown, from: string, to: string, title?: string): unknown {
+  if (Array.isArray(value)) return value.map((v) => renameAppType(v, from, to, title));
+  if (value && typeof value === "object") {
+    const next = Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [k, renameAppType(v, from, to, title)]),
+    ) as Record<string, unknown>;
+    if (next.appType === from) {
+      next.appType = to;
+      if (title !== undefined) next.title = title;
+    }
+    return next;
+  }
+  return value;
+}
+
 export function writeAtomic(file: string, contents: string): void {
   const tmp = `${file}.migrating`;
   fs.writeFileSync(tmp, contents, "utf-8");

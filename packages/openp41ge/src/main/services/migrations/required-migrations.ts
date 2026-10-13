@@ -8,4 +8,5 @@ export const REQUIRED_MIGRATIONS: readonly string[] = [
   "2026-10-09-chat-threads-per-workspace",
   "2026-10-10-repositories-per-workspace",
   "2026-10-10-agents-chat-threads",
+  "2026-10-13-git-history-search",
 ];

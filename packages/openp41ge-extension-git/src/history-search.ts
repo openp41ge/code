@@ -1,5 +1,5 @@
 /**
- * history.ts — the History sidebar tab: search the workspace's commits; the
+ * history-search.ts — the Git History Search sidebar tab: search the workspace's commits; the
  * results list here and open in the grid.
  *
  *   - Search row (as tall as the app's bottom bars): the query (Enter
@@ -7,7 +7,7 @@
  *     results), regex and match case.
  *   - Results bar (under the search row, smaller): the results, across how
  *     many repositories, commits searched and time taken; and while the
- *     search streams in (window by window, see HistoryModel) how many
+ *     search streams in (window by window, see HistorySearchModel) how many
  *     commits it has searched of the most it will.
  *   - Bottom bar: the options button (a square at the edge facing the grid,
  *     bright while any drawer option is set).
@@ -29,7 +29,7 @@
  *     dragging it onto the grid opens it there. A file opens the File diff at
  *     the commit (a click previews, a double-click pins).
  *
- * `<git-history>` keeps a `HistoryModel` (searched through the extension's
+ * `<git-history-search>` keeps a `HistorySearchModel` (searched through the extension's
  * backend) and renders it.
  */
 
@@ -42,13 +42,13 @@ import type { OpenTabRequest } from "openp41ge-sdk";
 import type { SearchResultCommit } from "./git-types.js";
 import {
   DEPTH_LIMITS,
-  HistoryModel,
+  HistorySearchModel,
   hits,
   entryParts,
   resultsSummary,
-  type HistoryState,
-  type HistoryToggle,
-} from "./history-model.js";
+  type HistorySearchState,
+  type HistorySearchToggle,
+} from "./history-search-model.js";
 import {
   CASE_ICON,
   CONTENT_ICON,
@@ -58,8 +58,8 @@ import {
   REGEX_ICON,
   SIMPLE_SEARCH_ICON,
   ADVANCED_SEARCH_ICON,
-} from "./history-icons.js";
-import { drawerPlacement, type DrawerPlacement } from "./history-drawer.js";
+} from "./history-search-icons.js";
+import { drawerPlacement, type DrawerPlacement } from "./history-search-drawer.js";
 import { COMMIT_DRAG_SOURCE_ID } from "./repository-cell-view.js";
 import { WORKTREE_ICON } from "./icons.js";
 import { FILE_DIFF_APP_TYPE } from "./repository-cell.js";
@@ -67,14 +67,14 @@ import { FILE_DIFF_APP_TYPE } from "./repository-cell.js";
 export const COMMIT_APP_TYPE = "ext:openp41ge-extension-git:commit";
 
 /** The surface host, as far as this tab uses it. */
-export interface HistoryHost {
+export interface HistorySearchHost {
   readonly context: Readonly<Record<string, unknown>>;
   dispatch(command: string, payload?: Readonly<Record<string, unknown>>): Promise<unknown>;
   openTab(request: OpenTabRequest): void;
 }
 
 /** The workspace's cloned repos, by name. */
-function workspaceRepos(host: HistoryHost): string[] {
+function workspaceRepos(host: HistorySearchHost): string[] {
   const repos = host.context.workspaceRepos;
   if (!Array.isArray(repos)) return [];
   return (repos as Array<{ name?: string; gitDir?: string }>)
@@ -83,7 +83,7 @@ function workspaceRepos(host: HistoryHost): string[] {
 }
 
 /** Each cloned repo's worktree branches. */
-function workspaceWorktrees(host: HistoryHost): Record<string, string[]> {
+function workspaceWorktrees(host: HistorySearchHost): Record<string, string[]> {
   const repos = host.context.workspaceRepos;
   if (!Array.isArray(repos)) return {};
   const out: Record<string, string[]> = {};
@@ -96,7 +96,7 @@ function workspaceWorktrees(host: HistoryHost): Record<string, string[]> {
 
 /** A backend command's result, or its error thrown. */
 async function call<T>(
-  host: HistoryHost,
+  host: HistorySearchHost,
   command: string,
   payload: Record<string, unknown>,
 ): Promise<T> {
@@ -106,14 +106,14 @@ async function call<T>(
   return answer.result;
 }
 
-/** The History render function. */
-export function renderHistory(host: HistoryHost): TemplateResult {
-  return html`<git-history
+/** The Git History Search render function. */
+export function renderHistorySearch(host: HistorySearchHost): TemplateResult {
+  return html`<git-history-search
     style="display:block;width:100%;height:100%"
     .host=${host}
     .repos=${workspaceRepos(host)}
     .worktrees=${workspaceWorktrees(host)}
-  ></git-history>`;
+  ></git-history-search>`;
 }
 
 const STYLES = html`<style>
@@ -526,7 +526,7 @@ const commitKey = (c: SearchResultCommit): string => `${c.repoName}:${c.hash}`;
 const DRAWER_MIN = 160;
 
 /** Whether any drawer option differs from its default (the trigger then shows it). */
-const filtered = (s: HistoryState): boolean =>
+const filtered = (s: HistorySearchState): boolean =>
   s.files || s.content || s.maxCount !== DEPTH_LIMITS[0];
 
 /** Spaces at either end as no-break spaces: the parts of the first line are
@@ -534,8 +534,8 @@ const filtered = (s: HistoryState): boolean =>
 const edgeSpaces = (text: string): string =>
   text.replace(/^ +| +$/g, (m) => "\u00a0".repeat(m.length));
 
-/** The History tab: its model, rendered. */
-export class GitHistory extends LitElement {
+/** The Git History Search tab: its model, rendered. */
+export class GitHistorySearch extends LitElement {
   static override properties = {
     host: { attribute: false },
     repos: { attribute: false },
@@ -546,14 +546,14 @@ export class GitHistory extends LitElement {
     _resizing: { state: true },
   };
 
-  declare host: HistoryHost | null;
+  declare host: HistorySearchHost | null;
   declare repos: readonly string[];
   declare worktrees: Readonly<Record<string, readonly string[]>>;
 
-  /** The options drawer's width (px), shared by every History tab. */
+  /** The options drawer's width (px), shared by every Git History Search tab. */
   static drawerWidth = 220;
 
-  private _model: HistoryModel | null = null;
+  private _model: HistorySearchModel | null = null;
   /** The open options drawer's placement (null: closed). */
   declare _drawer: DrawerPlacement | null;
   /** The drawer's resize bar is hovered / being dragged (shows its line). */
@@ -582,7 +582,7 @@ export class GitHistory extends LitElement {
     const host = this.host;
     if (!host) return;
     if (!this._model) {
-      this._model = new HistoryModel(
+      this._model = new HistorySearchModel(
         {
           searchWindow: (repo, options, start, size) =>
             call<{ commits: SearchResultCommit[]; walked: number }>(host, "search-commits-window", {
@@ -719,7 +719,7 @@ export class GitHistory extends LitElement {
    * The options drawer: groups of square buttons beside the sidebar, over a
    * mask on the grid and sidebars (a click on it closes the drawer).
    */
-  private _renderDrawer(m: HistoryModel, p: DrawerPlacement): TemplateResult {
+  private _renderDrawer(m: HistorySearchModel, p: DrawerPlacement): TemplateResult {
     const s = m.state;
     const at = p.side === "left" ? `right:${window.innerWidth - p.edge}px` : `left:${p.edge}px`;
     return html`<div
@@ -729,7 +729,7 @@ export class GitHistory extends LitElement {
       ></div>
       <div
         class="gh-drawer ${p.side}"
-        style="top:${p.mask.top}px;bottom:${p.mask.bottom}px;${at};width:${GitHistory.drawerWidth}px"
+        style="top:${p.mask.top}px;bottom:${p.mask.bottom}px;${at};width:${GitHistorySearch.drawerWidth}px"
         role="toolbar"
         aria-label="Search options"
       >
@@ -839,8 +839,10 @@ export class GitHistory extends LitElement {
     const move = (ev: PointerEvent) => {
       const delta = p.side === "left" ? startX - ev.clientX : ev.clientX - startX;
       const max = Math.max(DRAWER_MIN, window.innerWidth * 0.6);
-      GitHistory.drawerWidth = Math.round(Math.min(max, Math.max(DRAWER_MIN, startWidth + delta)));
-      drawer.style.width = `${GitHistory.drawerWidth}px`;
+      GitHistorySearch.drawerWidth = Math.round(
+        Math.min(max, Math.max(DRAWER_MIN, startWidth + delta)),
+      );
+      drawer.style.width = `${GitHistorySearch.drawerWidth}px`;
     };
     const up = () => {
       this._resizing = false;
@@ -854,8 +856,8 @@ export class GitHistory extends LitElement {
   }
 
   private _toggle(
-    m: HistoryModel,
-    option: HistoryToggle,
+    m: HistorySearchModel,
+    option: HistorySearchToggle,
     icon: string,
     label: string,
   ): TemplateResult {
@@ -873,7 +875,7 @@ export class GitHistory extends LitElement {
     </button>`;
   }
 
-  private _queryKeydown(m: HistoryModel, e: KeyboardEvent): void {
+  private _queryKeydown(m: HistorySearchModel, e: KeyboardEvent): void {
     const input = e.target as HTMLInputElement;
     if (e.key === "Enter") {
       e.preventDefault();
@@ -898,7 +900,7 @@ export class GitHistory extends LitElement {
     rows[Math.min(rows.length - 1, Math.max(0, (at < 0 ? 0 : at) + (at < 0 ? 0 : delta)))].focus();
   }
 
-  private _highlighted(text: string, s: HistoryState): Array<TemplateResult | string> {
+  private _highlighted(text: string, s: HistorySearchState): Array<TemplateResult | string> {
     const found = hits(text, s.resultsQuery, s);
     const out: Array<TemplateResult | string> = [];
     let i = 0;
@@ -912,7 +914,7 @@ export class GitHistory extends LitElement {
   }
 
   /** Where else the commit matched: more hits in its message, matching files. */
-  private _matchMeta(c: SearchResultCommit, s: HistoryState): string {
+  private _matchMeta(c: SearchResultCommit, s: HistorySearchState): string {
     const bits: string[] = [];
     const n = hits(c.message, s.resultsQuery, s).length;
     if (n > 1) bits.push(`+ ${n - 1} more instance${n - 1 === 1 ? "" : "s"}`);
@@ -943,7 +945,7 @@ export class GitHistory extends LitElement {
     });
   }
 
-  private _commitRow(m: HistoryModel, c: SearchResultCommit): TemplateResult {
+  private _commitRow(m: HistorySearchModel, c: SearchResultCommit): TemplateResult {
     const s = m.state;
     const key = commitKey(c);
     const expanded = s.expanded.includes(key);
@@ -1053,7 +1055,7 @@ export class GitHistory extends LitElement {
     </div>`;
   }
 
-  private _results(m: HistoryModel): TemplateResult | TemplateResult[] {
+  private _results(m: HistorySearchModel): TemplateResult | TemplateResult[] {
     const s = m.state;
     const message = (text: string, error = false) =>
       html`<div class="gh-message ${error ? "error" : ""}">${text}</div>`;
@@ -1115,4 +1117,5 @@ export class GitHistory extends LitElement {
   }
 }
 
-if (!customElements.get("git-history")) customElements.define("git-history", GitHistory);
+if (!customElements.get("git-history-search"))
+  customElements.define("git-history-search", GitHistorySearch);

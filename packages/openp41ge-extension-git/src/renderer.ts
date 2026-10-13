@@ -3,8 +3,8 @@
  *
  * Self-registers the Repositories sidebar (the workspace's repos and their
  * worktrees), the Git output, Repository, File diff and Commit grid tabs,
- * the History sidebar (commit search), and the drag sources for the
- * Repositories rows and the commit rows (Repository tab, History results). Dropped repos and worktrees (`git-repository`) open as the
+ * the Git History Search sidebar (commit search), and the drag sources for the
+ * Repositories rows and the commit rows (Repository tab, Git History Search results). Dropped repos and worktrees (`git-repository`) open as the
  * Repository tab, dropped commits (`git-commit`) as the Commit tab.
  */
 
@@ -19,7 +19,7 @@ import { fileDiffTabLabel, renderFileDiff } from "./file-diff-view.js";
 import { renderRepository, repositoryTabLabel, type RepositoryHost } from "./repository-cell.js";
 import { commitTabLabel, renderCommit, type CommitHost } from "./commit-cell.js";
 import { COMMIT_DRAG_SOURCE_ID } from "./repository-cell-view.js";
-import { renderHistory, type HistoryHost } from "./history.js";
+import { renderHistorySearch, type HistorySearchHost } from "./history-search.js";
 
 registerRenderers([
   {
@@ -68,10 +68,10 @@ registerRenderers([
   {
     // Search the workspace's commits; results open in the grid.
     kind: "sidebar",
-    id: "history",
-    title: "History",
+    id: "history-search",
+    title: "Git History Search",
     defaultSide: "right",
-    render: (host) => renderHistory(host as unknown as HistoryHost),
+    render: (host) => renderHistorySearch(host as unknown as HistorySearchHost),
   },
 ]);
 

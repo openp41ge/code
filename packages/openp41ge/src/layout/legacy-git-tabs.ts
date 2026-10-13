@@ -8,7 +8,8 @@
  *       → Commit `{ repoName, hash }`
  *   - `commit-file-diff` `{ filePath: JSON { repoName, hash, path } }`
  *       → File diff `{ repoName, path, hash }`
- *   - the `git` (History) sidebar tab → the extension's History sidebar.
+ *   - the `git` (History) sidebar tab → the extension's Git History Search
+ *     sidebar (`history-search`).
  * A tab whose saved data cannot be read is left as it is. Idempotent; a
  * record with nothing to rewrite is returned unchanged.
  */
@@ -63,7 +64,7 @@ function migrateTab(tab: Obj): Obj | null {
       return { ...tab, appType: `${EXT}:file-diff`, config: { repoName, path, hash } };
     }
     case "git":
-      return { ...tab, appType: `${EXT}:history` };
+      return { ...tab, appType: `${EXT}:history-search`, title: "Git History Search" };
     default:
       return null;
   }

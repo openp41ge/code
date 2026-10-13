@@ -1,5 +1,5 @@
 /**
- * history-icons.ts — the History sidebar's toggle icons (18px, `currentColor`:
+ * history-search-icons.ts — the Git History Search sidebar's toggle icons (18px, `currentColor`:
  * muted when off, bright when on). The platform's commit search glyphs.
  */
 

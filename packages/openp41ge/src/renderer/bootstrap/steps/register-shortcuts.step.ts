@@ -150,7 +150,7 @@ export class RegisterShortcutsStep implements IStartupStep {
       });
     }
 
-    // Cmd+Shift+H opens History in the right sidebar
+    // Cmd+Shift+H opens Git History Search in the right sidebar
     if (isWorkspaceWindow) {
       km.register({
         modifiers: 12,
@@ -164,14 +164,14 @@ export class RegisterShortcutsStep implements IStartupStep {
             emitEvent("tab-open-system", {
               windowId: myWindowId,
               side: "right",
-              appType: "git",
-              title: "History",
+              appType: "ext:openp41ge-extension-git:history-search",
+              title: "Git History Search",
             });
           } catch (_err) {
             // ignore
           }
         },
-        description: "Open History",
+        description: "Open Git History Search",
         category: "View",
       });
     }

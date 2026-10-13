@@ -1,6 +1,6 @@
 /**
  * chat-search-sidebar.ts — the Search chats sidebar (`sidebar:search`):
- * search the workspace's chats, laid out as the History sidebar.
+ * search the workspace's chats, laid out as the Git History Search sidebar.
  *
  *   - Search row (as tall as the app's bottom bars): the query, searched as
  *     you type, with regex and match-case toggles.

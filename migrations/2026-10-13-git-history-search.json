@@ -1,0 +1,14 @@
+{
+  "id": "2026-10-13-git-history-search",
+  "description": "The git extension's History sidebar is now Git History Search: saved History tabs open it under its new id and title.",
+  "release": "0.1.0-alpha.15",
+  "steps": [
+    {
+      "op": "renameAppType",
+      "files": "workspaces/*.openp41ge-workspace",
+      "from": "ext:openp41ge-extension-git:history",
+      "to": "ext:openp41ge-extension-git:history-search",
+      "title": "Git History Search"
+    }
+  ]
+}

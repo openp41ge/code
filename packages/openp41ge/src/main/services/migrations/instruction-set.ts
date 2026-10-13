@@ -26,6 +26,16 @@ export type Step =
       readonly to: string;
     }
   | {
+      /** Saved tabs (any object with an `appType`) of app type `from` get
+       *  `to`, and `title` when given — a renamed surface. */
+      readonly op: "renameAppType";
+      /** A file, or files matching `*` in the last segment. */
+      readonly files: string;
+      readonly from: string;
+      readonly to: string;
+      readonly title?: string;
+    }
+  | {
       readonly op: "relinkWorktrees";
       /** The clone's folder now. */
       readonly repo: string;
@@ -122,6 +132,14 @@ function checkPath(value: unknown, where: string, vars: ReadonlySet<string>): st
   return value;
 }
 
+/** An app type: `ext:<extensionId>:<surfaceId>` or a platform one, no spaces. */
+function checkAppType(value: unknown, where: string): string {
+  if (typeof value !== "string" || !/^[A-Za-z0-9._:-]+$/.test(value)) {
+    fail(where, "an app type is required");
+  }
+  return value;
+}
+
 function checkSteps(value: unknown, where: string, vars: ReadonlySet<string>): Step[] {
   if (!Array.isArray(value)) fail(where, "steps must be a list");
   return value.map((raw, i) => checkStep(raw, `${where}[${i}]`, vars));
@@ -149,6 +167,21 @@ function checkStep(raw: unknown, where: string, vars: ReadonlySet<string>): Step
         from: checkPath(s.from, `${at}.from`, vars),
         to: checkPath(s.to, `${at}.to`, vars),
       };
+    case "renameAppType": {
+      const from = checkAppType(s.from, `${at}.from`);
+      const to = checkAppType(s.to, `${at}.to`);
+      if (from === to) fail(at, "from and to are the same");
+      if (s.title !== undefined && (typeof s.title !== "string" || !s.title.trim())) {
+        fail(`${at}.title`, "must be a non-empty string");
+      }
+      return {
+        op: s.op,
+        files: checkPath(s.files, `${at}.files`, vars),
+        from,
+        to,
+        ...(s.title !== undefined ? { title: s.title as string } : {}),
+      };
+    }
     case "relinkWorktrees":
       return {
         op: s.op,

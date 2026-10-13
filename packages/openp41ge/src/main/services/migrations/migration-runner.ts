@@ -23,6 +23,7 @@ import {
   move,
   relinkWorktrees,
   removeIfEmpty,
+  renameAppType,
   rewritePaths,
   writeAtomic,
 } from "./operations.js";
@@ -159,6 +160,19 @@ class Run {
           if (next === JSON.stringify(data)) continue;
           writeAtomic(file, next);
           this.done.push(`rewrote paths in ${this._show(file)}`);
+        }
+        return;
+      }
+      case "renameAppType": {
+        for (const file of this._files(step.files, vars)) {
+          const before = fs.readFileSync(file, "utf-8");
+          const data: unknown = JSON.parse(before);
+          const next = renameAppType(data, step.from, step.to, step.title);
+          if (JSON.stringify(next) === JSON.stringify(data)) continue;
+          // Keep the file's layout: indented or not.
+          const indent = /^\s*[{[]\r?\n/.test(before) ? 2 : undefined;
+          writeAtomic(file, JSON.stringify(next, null, indent));
+          this.done.push(`renamed ${step.from} tabs in ${this._show(file)}`);
         }
         return;
       }

@@ -1,5 +1,5 @@
 /**
- * history-drawer.ts — where the History search options drawer goes: beside
+ * history-search-drawer.ts — where the Git History Search options drawer goes: beside
  * the sidebar's inner edge (into the grid), as tall as the sidebar; its mask
  * covers the grid and the other sidebar (as tall as
  * this sidebar — not the app bar — and not this sidebar, whose results

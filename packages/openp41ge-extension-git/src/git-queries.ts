@@ -551,7 +551,7 @@ export class GitQueries {
     await this._execGit(["branch", flag, branchName], repoName);
   }
 
-  // ─── Commit search (the History search) ────────────────────────────────
+  // ─── Commit search (Git History Search) ────────────────────────────────
 
   /** ASCII record-separator prefix on every commit-format line (0x1E can't
    * appear in real git data, so it is an unambiguous record boundary). */

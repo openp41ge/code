@@ -1,5 +1,5 @@
 /**
- * history-model.ts — the History sidebar's state: the search query and its
+ * history-search-model.ts — the Git History Search sidebar's state: the search query and its
  * options, the repos it covers, and the results.
  *
  * Commit messages are always searched; "files" adds changed file paths and
@@ -8,7 +8,7 @@
  * depth limit (no cap on results); where a result matched beyond its subject
  * and paths is fetched on demand (`loadMatch`). The search covers the workspace's repos — or, in an advanced search with
  * text in the repo filter, the ones whose name matches it — each searched through the injected
- * `HistoryApi` (the extension's backend), merged newest first. Typing
+ * `HistorySearchApi` (the extension's backend), merged newest first. Typing
  * searches after a 250ms pause; Enter at once. A newer search drops an older
  * one's results. No DOM.
  */
@@ -16,7 +16,7 @@
 import type { CommitSearchOptions, SearchResultCommit } from "./git-types.js";
 
 /** Git, for the search. May reject with git's error. */
-export interface HistoryApi {
+export interface HistorySearchApi {
   /** Search one window of a repo's newest-first history (`start`, `size`
    *  commits): its matches, and how many commits it held. */
   searchWindow(
@@ -34,7 +34,7 @@ export interface HistoryApi {
   ): Promise<SearchResultCommit["matched"] | null>;
 }
 
-export type HistoryToggle =
+export type HistorySearchToggle =
   "files" | "content" | "regex" | "caseSensitive" | "repoFilterRegex" | "repoFilterCase";
 
 /** How many of each repo's newest commits a search walks. */
@@ -44,7 +44,7 @@ const DEBOUNCE_MS = 250;
 /** Commits searched per call: each repo's history streams in windows this size. */
 export const SEARCH_WINDOW = 500;
 
-export interface HistoryState {
+export interface HistorySearchState {
   readonly query: string;
   readonly files: boolean;
   readonly content: boolean;
@@ -151,7 +151,7 @@ const plural = (n: number, one: string, many: string): string =>
  */
 export function resultsSummary(
   s: Pick<
-    HistoryState,
+    HistorySearchState,
     "results" | "resultsQuery" | "searching" | "walked" | "total" | "repoCount" | "elapsedMs"
   >,
   scope = 0,
@@ -175,8 +175,8 @@ export function resultsSummary(
   return `${results} ${where} · ${plural(s.walked, "commit", "commits")} searched${took}`;
 }
 
-export class HistoryModel {
-  private _state: HistoryState = {
+export class HistorySearchModel {
+  private _state: HistorySearchState = {
     query: "",
     files: false,
     content: false,
@@ -206,15 +206,15 @@ export class HistoryModel {
   private _token = 0;
 
   constructor(
-    private readonly _api: HistoryApi,
+    private readonly _api: HistorySearchApi,
     private readonly _changed: () => void,
   ) {}
 
-  get state(): HistoryState {
+  get state(): HistorySearchState {
     return this._state;
   }
 
-  private _set(update: Partial<HistoryState>): void {
+  private _set(update: Partial<HistorySearchState>): void {
     this._state = { ...this._state, ...update };
     this._changed();
   }
@@ -273,8 +273,8 @@ export class HistoryModel {
     this._rerun();
   }
 
-  toggle(option: HistoryToggle): void {
-    this._set({ [option]: !this._state[option] } as Partial<HistoryState>);
+  toggle(option: HistorySearchToggle): void {
+    this._set({ [option]: !this._state[option] } as Partial<HistorySearchState>);
     this._rerun();
   }
 
