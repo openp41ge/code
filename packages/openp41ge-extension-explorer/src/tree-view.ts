@@ -202,6 +202,60 @@ function followConfig(host: ExplorerHost): void {
 }
 
 /**
+ * Each mount's open rows, kept per workspace by the backend (`load-expanded`
+ * / `save-expanded`): `restored` once the saved rows are open again, and the
+ * set last saved, so only a change is saved. Kept beside the state, which
+ * some updates replace whole (Collapse all).
+ */
+const openRows = new WeakMap<ExplorerHost, { restored: boolean; saved: string }>();
+
+/**
+ * On a mount's first render, open the saved rows again; after that, save the
+ * open rows whenever they change. Nothing is saved while restoring, so a
+ * mount never overwrites the saved rows with none.
+ */
+function followOpenRows(host: ExplorerHost, roots: readonly TreeNode[]): void {
+  const rows = openRows.get(host);
+  if (!rows) {
+    openRows.set(host, { restored: false, saved: "" });
+    void restoreOpenRows(host);
+    return;
+  }
+  if (!rows.restored) return;
+  const paths = expandedPaths(roots);
+  const key = JSON.stringify(paths);
+  if (key === rows.saved) return;
+  rows.saved = key;
+  host.dispatch("save-expanded", { paths }).catch((err: unknown) => {
+    host.log?.error("Explorer: saving the open rows failed", err);
+  });
+}
+
+/** Open the saved rows again, parents first, reading folders as needed;
+ *  rows that are gone are skipped. */
+async function restoreOpenRows(host: ExplorerHost): Promise<void> {
+  let paths: string[] = [];
+  try {
+    const result = (await host.dispatch("load-expanded", {})) as { paths?: unknown } | undefined;
+    if (Array.isArray(result?.paths)) {
+      paths = result.paths.filter((p): p is string => typeof p === "string");
+    }
+  } catch (err) {
+    host.log?.error("Explorer: loading the open rows failed", err);
+  }
+  for (const path of paths) {
+    const node = findNode(followContext(host, host.state as Partial<ExplorerState>).roots, path);
+    if (node?.kind === "dir" && !node.expanded) await expandNode(host, path);
+  }
+  const rows = openRows.get(host);
+  if (!rows) return;
+  rows.restored = true;
+  rows.saved = JSON.stringify(
+    expandedPaths(followContext(host, host.state as Partial<ExplorerState>).roots),
+  );
+}
+
+/**
  * Inline repo / worktree SVGs — copied verbatim from the built-in explorer's
  * icon set (packages/openp41ge/src/renderer/icons) so the two explorers render
  * identical glyphs. Rendered via unsafeHTML (currentColor, so they inherit the
@@ -545,6 +599,21 @@ function mapNodes(nodes: TreeNode[], fn: (n: TreeNode) => TreeNode): TreeNode[] 
   });
 }
 
+/** The open rows (repos, worktrees and folders) a reader sees: each expanded
+ *  node whose parents are all expanded, parents first. */
+export function expandedPaths(nodes: readonly TreeNode[]): string[] {
+  const out: string[] = [];
+  const walk = (list: readonly TreeNode[]): void => {
+    for (const n of list) {
+      if (n.kind !== "dir" || !n.expanded) continue;
+      out.push(n.path);
+      walk(n.children);
+    }
+  };
+  walk(nodes);
+  return out;
+}
+
 /** Collapse every expanded node (repo, worktree and directory) in a tree. */
 export function collapseAll(nodes: TreeNode[]): TreeNode[] {
   return nodes.map((n) => ({
@@ -602,6 +671,7 @@ export function renderExplorer(host: ExplorerHost): TemplateResult {
   followConfig(host);
   const state = (host.state ?? {}) as Partial<ExplorerState>;
   const roots: TreeNode[] = followContext(host, state).roots;
+  followOpenRows(host, roots);
   return html`
     <style>
       .explorer-tree {
@@ -1093,25 +1163,26 @@ export function toggleNode(host: ExplorerHost, path: string, expand: boolean): v
     host.setState((prev) => setNodeExpanded(withRoots(host, prev), path, false));
     return;
   }
-  const node = findNode((host.state?.roots as TreeNode[] | undefined) ?? [], path);
-  if (node && node.loaded) {
-    host.setState((prev) => setNodeExpanded(withRoots(host, prev), path, true));
-    return;
-  }
+  void expandNode(host, path);
+}
+
+/** Expand a dir node by path; an unloaded dir's children are read first
+ *  (settles once they are in). */
+async function expandNode(host: ExplorerHost, path: string): Promise<void> {
+  const node = findNode(followContext(host, host.state as Partial<ExplorerState>).roots, path);
   host.setState((prev) => setNodeExpanded(withRoots(host, prev), path, true));
-  void host
-    .dispatch("read-dir", { path, depth: prefetchDepthOf(host) })
-    .then((result) => {
-      const r = result as { ok?: boolean; entries?: ReadDirEntry[]; error?: string } | undefined;
-      host.setState((prev) =>
-        r && r.ok
-          ? applyReadDir(withRoots(host, prev), path, r.entries)
-          : setNodeError(withRoots(host, prev), path, r?.error ?? "read failed"),
-      );
-    })
-    .catch((err) => {
-      host.setState((prev) => setNodeError(withRoots(host, prev), path, String(err)));
-    });
+  if (node && node.loaded) return;
+  try {
+    const result = await host.dispatch("read-dir", { path, depth: prefetchDepthOf(host) });
+    const r = result as { ok?: boolean; entries?: ReadDirEntry[]; error?: string } | undefined;
+    host.setState((prev) =>
+      r && r.ok
+        ? applyReadDir(withRoots(host, prev), path, r.entries)
+        : setNodeError(withRoots(host, prev), path, r?.error ?? "read failed"),
+    );
+  } catch (err) {
+    host.setState((prev) => setNodeError(withRoots(host, prev), path, String(err)));
+  }
 }
 
 function onToggle(host: ExplorerHost, node: TreeNode, e: MouseEvent): void {

@@ -6,8 +6,9 @@
  * extension scope so the registration is captured against this extension and
  * re-keyed to `<id>/<command>`.
  *
- * These are pure Node capabilities (node:fs) — listing a directory and gating
- * a file open (path confinement + size/binary checks). The renderer entry
+ * These are pure Node capabilities (node:fs) — listing a directory, gating
+ * a file open (path confinement + size/binary checks), and keeping which rows
+ * are open per workspace (`./expanded-store.ts`). The renderer entry
  * (`./renderer.ts`) owns the tree UI and drives these handlers over the
  * dispatch bus.
  */
@@ -15,6 +16,7 @@
 import { registerProcesses, type HandlerPayload } from "openp41ge-sdk";
 import { createDir, createFile, listDir, MAX_LIST_DEPTH, type TreeNode } from "./tree.js";
 import { inspectFile, isWithinRoot, looksBinary, type OpenFileResult } from "./inspect.js";
+import { loadExpanded, saveExpanded } from "./expanded-store.js";
 
 /** Result envelope returned by the `read-dir` process. */
 export interface ReadDirResult {
@@ -113,6 +115,8 @@ registerProcesses({
   "open-file": openFile,
   "create-dir": createDirProcess,
   "write-file": createFileProcess,
+  "load-expanded": loadExpanded,
+  "save-expanded": saveExpanded,
 });
 
 export { createDir, createFile, listDir, inspectFile, isWithinRoot, looksBinary };
