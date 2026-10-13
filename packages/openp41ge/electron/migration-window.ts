@@ -166,7 +166,9 @@ export function openMigrationWindow(options: MigrationWindowOptions): void {
   const checkNow = async (): Promise<Requirements | null> => {
     if (checking || state.phase !== "offline") return null;
     checking = true;
-    const requirements = await checkRequirements(probe);
+    const requirements = await checkRequirements(probe, state.requirements, (progress) => {
+      if (state.phase === "offline") show({ ...state, requirements: progress });
+    });
     checking = false;
     if (state.phase !== "offline") return null;
     if (JSON.stringify(requirements) !== JSON.stringify(state.requirements)) {

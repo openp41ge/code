@@ -4,7 +4,8 @@
  * (what they are, and any error, stay in the journal and the logs). When one
  * fails it says so and suggests downloading the app again from GitHub
  * (Download / Quit). Offline, a checklist shows what the download needs
- * (internet, GitHub; the main process checks them every few seconds), and
+ * (internet, the distribution servers; the main process checks them every
+ * few seconds, with a blue spinner while one is being checked), and
  * Continue is disabled until every item is met; the user presses it to go
  * on. A failed check says so plainly (Quit / Continue). Otherwise the status
  * sits on the right of the top bar, red or green. The bottom bar holds only
@@ -36,7 +37,7 @@ export interface MigrationsViewState {
    *  process's `Requirements`). */
   readonly requirements?: {
     readonly internet: boolean;
-    readonly github: "ok" | "unreachable" | "rate-limited";
+    readonly github: "ok" | "unreachable" | "rate-limited" | "checking";
     /** When GitHub takes requests again (epoch ms). */
     readonly githubResetAt?: number;
   };
@@ -70,8 +71,9 @@ const STYLES = `
   .mg-check[data-state="ok"] .mg-check-icon { color:#6fc872; }
   .mg-check[data-state="bad"] .mg-check-icon { color:var(--accent-error, #f44747); }
   .mg-check[data-state="checking"] { color:var(--text-secondary, #999); }
-  .mg-check[data-state="checking"] .mg-check-icon::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; animation:mg-pulse 1.2s ease-in-out infinite; }
-  @keyframes mg-pulse { 50% { opacity:.3; } }
+  .mg-spinner { width:10px; height:10px; border-radius:50%; border:2px solid rgba(74,158,255,.25); border-top-color:var(--accent, #4a9eff); animation:mg-spin .8s linear infinite; }
+  @keyframes mg-spin { to { transform:rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .mg-spinner { animation:none; } }
   .mg-progress { margin:12px 14px 0; height:6px; border-radius:3px; background:var(--bg-tertiary, #2c2c2c); overflow:hidden; }
   .mg-progress-fill { height:100%; border-radius:3px; background:var(--accent, #4a9eff); transition:width .25s ease-out; }
   .mg-bottombar { flex:none; height:34px; box-sizing:border-box; display:flex; align-items:stretch; border-top:1px solid var(--border-divider, #2a2a2a); background:var(--bg-secondary, #161616); color:var(--text-secondary, #999); font-size:11px; user-select:none; }
@@ -133,13 +135,13 @@ function checklist(state: MigrationsViewState): HTMLElement {
         ? ["ok", "Connected to the internet"]
         : ["bad", "Not connected to the internet"]
       : ["checking", "Checking the internet connection…"],
-    !r
-      ? ["checking", "Checking GitHub…"]
+    !r || r.github === "checking"
+      ? ["checking", "Checking the distribution servers…"]
       : r.github === "ok"
-        ? ["ok", "GitHub can be reached"]
+        ? ["ok", "Distribution servers are reachable"]
         : r.github === "rate-limited"
           ? ["bad", rateLimited(r.githubResetAt)]
-          : ["bad", "GitHub can't be reached"],
+          : ["bad", "Distribution servers can't be reached"],
   ];
   const list = el("ul", "mg-checklist");
   for (const [checkState, text] of items) {
@@ -148,6 +150,7 @@ function checklist(state: MigrationsViewState): HTMLElement {
     const icon = el("span", "mg-check-icon");
     if (checkState === "ok") icon.innerHTML = CHECK_ICON;
     if (checkState === "bad") icon.innerHTML = QUIT_ICON;
+    if (checkState === "checking") icon.append(el("span", "mg-spinner"));
     item.append(icon, el("span", "mg-check-text", text));
     list.append(item);
   }
@@ -155,7 +158,7 @@ function checklist(state: MigrationsViewState): HTMLElement {
 }
 
 function rateLimited(resetAt: number | undefined): string {
-  const base = "GitHub has limited requests from this network";
+  const base = "The distribution servers have limited requests from this network";
   if (resetAt === undefined) return `${base}. Try again later.`;
   const time = new Date(resetAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   return `${base}. Try again at ${time}.`;

@@ -5,7 +5,9 @@
  *   - GitHub: its API (the release list), github.com and the servers release
  *     files download from all answer, and the API is not refusing this
  *     network for too many requests (about 60 an hour without signing in).
- *     Reading the API's limit does not count against it.
+ *     Reading the API's limit does not count against it. When the
+ *     connection is first seen, or comes back, `progress` reports them as
+ *     being checked (the window's spinner) until they answer.
  *
  * The network is behind `RequirementsProbe` (Electron's `net` in the app).
  */
@@ -16,7 +18,7 @@ const DOWNLOAD_HOSTS = ["https://github.com/", "https://release-assets.githubuse
 
 export interface Requirements {
   readonly internet: boolean;
-  readonly github: "ok" | "unreachable" | "rate-limited";
+  readonly github: "ok" | "unreachable" | "rate-limited" | "checking";
   /** When GitHub takes requests again (epoch ms), if it said. */
   readonly githubResetAt?: number;
 }
@@ -34,8 +36,13 @@ export function requirementsMet(r: Requirements): boolean {
   return r.internet && r.github === "ok";
 }
 
-export async function checkRequirements(probe: RequirementsProbe): Promise<Requirements> {
+export async function checkRequirements(
+  probe: RequirementsProbe,
+  previous?: Requirements,
+  progress?: (checking: Requirements) => void,
+): Promise<Requirements> {
   if (!probe.isOnline()) return { internet: false, github: "unreachable" };
+  if (!previous?.internet) progress?.({ internet: true, github: "checking" });
   try {
     const [api] = await Promise.all([
       probe.get(RATE_LIMIT_URL),
