@@ -13,7 +13,9 @@ interface MigrationsBridge {
   onState(callback: (state: MigrationsViewState) => void): () => void;
   retry(): void;
   quit(): void;
-  showJournal(): void;
+  download(): void;
+  /** Fit the window to the page's height. */
+  resize(height: number): void;
 }
 
 const api = (
@@ -28,11 +30,13 @@ if (!bridge) throw new Error("migrations: preload bridge missing");
 const actions = {
   retry: () => bridge.retry(),
   quit: () => bridge.quit(),
-  showJournal: () => bridge.showJournal(),
+  download: () => bridge.download(),
 };
 
 function show(state: MigrationsViewState): void {
   renderMigrations(root!, state, actions, { mac });
+  const page = root!.querySelector(".mg");
+  if (page) bridge!.resize(page.getBoundingClientRect().height);
 }
 
 bridge.onState(show);

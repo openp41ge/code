@@ -234,7 +234,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
 
   /** Migration window bridge (shown at startup while data updates run). */
   migrations: {
-    /** The current state: each update's row, and the phase. */
+    /** The current state: the phase, and how many updates are done of how many. */
     get: () => ipcRenderer.invoke("migrations:get"),
     /** Every change to the state. Returns unsubscribe. */
     onState: (callback) => {
@@ -242,12 +242,14 @@ contextBridge.exposeInMainWorld("openp41ge", {
       ipcRenderer.on("migrations:state", handler);
       return () => ipcRenderer.removeListener("migrations:state", handler);
     },
-    /** Run the failed update and the rest again. */
+    /** Download or check again (offline, a failed check). */
     retry: () => ipcRenderer.send("migrations:retry"),
     /** Quit the app. */
     quit: () => ipcRenderer.send("migrations:quit"),
-    /** Show the journal (what ran, and the failure) in Finder. */
-    showJournal: () => ipcRenderer.send("migrations:show-journal"),
+    /** Open the app's releases on GitHub (after a failed update). */
+    download: () => ipcRenderer.send("migrations:download"),
+    /** Fit the window to the page's height (after each render). */
+    resize: (height) => ipcRenderer.send("migrations:size", height),
   },
 
   /** Fatal error window bridge (main-process system-level fatal errors). */

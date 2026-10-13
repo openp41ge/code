@@ -6,10 +6,11 @@
  * could not be downloaded (offline: Retry downloads again), when the check
  * itself failed (Retry), or when the data was last used by a newer version
  * (Quit only: this version may not understand it). It runs them
- * straight away showing each one's progress, and closes itself shortly after
+ * straight away showing only the progress (n of N; what they are and their
+ * errors stay in the journal and the logs), and closes itself shortly after
  * they are done (`onDone` then starts the app). When one fails it stays,
- * with the error, Retry, Quit and Show the journal; closing it then quits the
- * app — the app never opens on half-updated data.
+ * suggesting the app is downloaded again from GitHub (Download, Quit);
+ * closing it then quits the app — the app never opens on half-updated data.
  */
 
 import { app, BrowserWindow, ipcMain, shell } from "electron";
@@ -22,14 +23,22 @@ import {
 } from "../src/main/services/migrations/migration-session.js";
 import type { SourcedSet } from "../src/main/services/migrations/pending-migrations.js";
 import type { StartupPlan } from "../src/main/services/migrations/startup-migrations.js";
+import { toWindowView } from "../src/main/services/migrations/window-view.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const WIDTH = 520;
-const HEIGHT = 380;
+/** The height before the page reports its own (it fits its content). */
+const HEIGHT = 200;
+const MIN_HEIGHT = 120;
+const MAX_HEIGHT = 600;
+/** Show the window anyway if the page has not reported its height by then. */
+const SHOW_FALLBACK_MS = 1000;
 /** How long "Done" shows before the window closes. */
 const DONE_MS = 800;
+/** Where a failed update sends the user: the app's releases. */
+const DOWNLOAD_URL = "https://github.com/openp41ge/code/releases";
 
 /** The window's state: the session's, or downloading / offline. */
 type WindowState =
@@ -46,8 +55,6 @@ export interface MigrationWindowOptions {
   replan(): Promise<StartupPlan>;
   /** Run one set and record it in the journal. */
   apply(set: SourcedSet): { ok: boolean; error?: string };
-  /** The journal file (Show the journal reveals it). */
-  readonly journalFile: string;
   /** Start the app: the sets `ran`, or a retry found `none` left or that
    *  they can wait (`deferred`). Called once, after the window closes. */
   onDone(outcome: "ran" | "none" | "deferred"): void;
@@ -60,9 +67,8 @@ export function openMigrationWindow(options: MigrationWindowOptions): void {
   const win = new BrowserWindow({
     width: WIDTH,
     height: HEIGHT,
-    minWidth: WIDTH,
-    minHeight: 300,
-    resizable: true,
+    useContentSize: true,
+    resizable: false,
     maximizable: false,
     fullscreenable: false,
     show: false,
@@ -82,7 +88,7 @@ export function openMigrationWindow(options: MigrationWindowOptions): void {
   let state: WindowState = { phase: "checking", rows: [] };
   const show = (next: WindowState) => {
     state = next;
-    if (!win.isDestroyed()) win.webContents.send("migrations:state", state);
+    if (!win.isDestroyed()) win.webContents.send("migrations:state", toWindowView(state));
   };
   const finish = (how: typeof outcome) => {
     outcome = how;
@@ -132,28 +138,41 @@ export function openMigrationWindow(options: MigrationWindowOptions): void {
     }
   };
 
-  ipcMain.handle("migrations:get", (event) => (fromThisWindow(event) ? state : null));
+  ipcMain.handle("migrations:get", (event) => (fromThisWindow(event) ? toWindowView(state) : null));
   ipcMain.on("migrations:retry", (event) => {
     if (fromThisWindow(event)) void retry();
   });
   ipcMain.on("migrations:quit", (event) => {
     if (fromThisWindow(event)) app.quit();
   });
-  ipcMain.on("migrations:show-journal", (event) => {
-    if (fromThisWindow(event)) shell.showItemInFolder(options.journalFile);
+  // The page reports its height after each render; the window fits it, and
+  // shows once it has (so it does not open at the wrong size).
+  const reveal = () => {
+    if (win.isDestroyed() || win.isVisible()) return;
+    win.show();
+    win.focus();
+  };
+  ipcMain.on("migrations:size", (event, height: unknown) => {
+    if (!fromThisWindow(event) || typeof height !== "number" || !Number.isFinite(height)) return;
+    const h = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, Math.ceil(height)));
+    win.setContentSize(WIDTH, h);
+    reveal();
+  });
+  ipcMain.on("migrations:download", (event) => {
+    if (fromThisWindow(event)) void shell.openExternal(DOWNLOAD_URL);
   });
 
   win.once("ready-to-show", () => {
     if (win.isDestroyed()) return;
-    win.show();
-    win.focus();
+    setTimeout(reveal, SHOW_FALLBACK_MS);
     follow(options.initial);
   });
   win.on("closed", () => {
     ipcMain.removeHandler("migrations:get");
     ipcMain.removeAllListeners("migrations:retry");
     ipcMain.removeAllListeners("migrations:quit");
-    ipcMain.removeAllListeners("migrations:show-journal");
+    ipcMain.removeAllListeners("migrations:download");
+    ipcMain.removeAllListeners("migrations:size");
     if (done) options.onDone(outcome);
     else app.quit();
   });

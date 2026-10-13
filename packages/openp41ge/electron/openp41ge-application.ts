@@ -572,7 +572,6 @@ export class Openp41geApplication {
         initial: first,
         replan: plan,
         apply: (set) => applyMigration(root, set),
-        journalFile: path.join(root, "migrations", "journal.json"),
         onDone: (outcome) => {
           if (outcome === "ran") {
             // Every downloaded set ran: the data is at this version now.
