@@ -9,7 +9,8 @@
  * moves them.)
  *
  * Precedence (highest first):
- *   1. `OPENP41GE_DIR`       — explicit user/script override.
+ *   1. `OPENP41GE_DIR`       — explicit user/script override (Chromium's
+ *                               profile then lives inside it too).
  *   2. `~/.openp41ge-code`      — packaged release (app.isPackaged === true).
  *   3. `~/.openp41ge-code-dev`  — dev build (app.isPackaged === false).
  */
@@ -44,4 +45,16 @@ export function resolveAppDataDir(isPackaged: boolean): string {
   const override = process.env.OPENP41GE_DIR;
   if (override) return override;
   return path.join(os.homedir(), appDataDirName(isPackaged));
+}
+
+/**
+ * Absolute Chromium profile folder: with an `OPENP41GE_DIR` override it is
+ * inside that folder (so a run on a throwaway folder shares nothing with the
+ * user's apps), otherwise `chromiumProfileDirName` under the OS app-data
+ * folder (`appData`, Electron's `app.getPath("appData")`).
+ */
+export function resolveChromiumProfileDir(isPackaged: boolean, appData: string): string {
+  const override = process.env.OPENP41GE_DIR;
+  if (override) return path.join(override, "chromium-profile");
+  return path.join(appData, chromiumProfileDirName(isPackaged));
 }

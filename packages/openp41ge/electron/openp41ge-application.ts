@@ -55,7 +55,7 @@ import { WorkspaceRegistry } from "../src/main/services/workspace-registry.js";
 import { ConfigService, updateChannelForVersion } from "../src/main/services/config-service.js";
 import { AutoUpdaterService } from "./auto-updater-service.js";
 import { ReleasesFeed, releasesFeedDeps } from "./releases-feed.js";
-import { chromiumProfileDirName, resolveAppDataDir } from "../src/main/services/app-data-dir.js";
+import { resolveAppDataDir, resolveChromiumProfileDir } from "../src/main/services/app-data-dir.js";
 import {
   StorageMove,
   legacyAppDataDirName,
@@ -407,14 +407,18 @@ export class Openp41geApplication {
 
   private _initChromeFlags(): void {
     app.setName("openp41ge code");
-    // Chromium's profile from before the rename moves to the new name first.
+    // Chromium's profile from before the rename moves to the new name first
+    // (not with an `OPENP41GE_DIR` override: the profile is inside it then).
     const appData = app.getPath("appData");
+    const profile = resolveChromiumProfileDir(app.isPackaged, appData);
     app.setPath(
       "userData",
-      new StorageMove().moveFolder(
-        path.join(appData, legacyChromiumProfileDirName(app.isPackaged)),
-        path.join(appData, chromiumProfileDirName(app.isPackaged)),
-      ),
+      process.env.OPENP41GE_DIR
+        ? profile
+        : new StorageMove().moveFolder(
+            path.join(appData, legacyChromiumProfileDirName(app.isPackaged)),
+            profile,
+          ),
     );
     app.commandLine.appendSwitch("disable-features", "FontationsFontBackend");
     app.commandLine.appendSwitch("enable-gpu-rasterization");
