@@ -720,19 +720,21 @@ export function initDragSystem(): () => void {
   // Found through the event's composed path: a grid may be inside shadow roots
   // (the manager window's is), where `e.target` is the outermost host. A
   // window that drags its own tabs (the Logs window) marks its host
-  // `data-own-tab-drags` and is left alone.
+  // `data-own-tab-drags` and is left alone. Only a tab in a tab bar is a
+  // drag: a tab's content pane carries its tab id too, and a press there
+  // must keep its default (focusing an input, selecting text).
   const onMouseDown = (e: MouseEvent) => {
     const path = e.composedPath().filter((el): el is HTMLElement => el instanceof HTMLElement);
     const tabBtn = path.find((el) => el.hasAttribute("data-tab-id"));
     if (!tabBtn) return;
+    const tabBarEl = tabBtn.closest?.("tab-bar");
+    if (!tabBarEl) return;
     if (path.some((el) => el.classList.contains("tab-close"))) return;
     if (path.some((el) => el.hasAttribute("data-own-tab-drags"))) return;
 
     e.preventDefault();
 
     const tabId = tabBtn.getAttribute("data-tab-id") || "";
-    const tabBarEl = tabBtn.closest?.("tab-bar");
-    if (!tabBarEl) return;
 
     const tabBar = tabBarEl as HTMLElement & { winId?: string; col?: number };
     const winId = tabBar.winId || "";
