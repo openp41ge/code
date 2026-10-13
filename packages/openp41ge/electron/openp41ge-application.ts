@@ -12,6 +12,7 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createLogger } from "openp41ge-core-logger";
+import { chromeSwitches } from "./chrome-switches.js";
 import { addSentryBreadcrumb } from "../src/main/services/sentry.js";
 
 // ─── Service imports ─────────────────────────────────────────────────────
@@ -404,9 +405,9 @@ export class Openp41geApplication {
   private _initChromeFlags(): void {
     // The app's name and Chromium's folders are set earlier, in
     // `initChromiumStorage` (main.ts), before Sentry starts.
-    app.commandLine.appendSwitch("disable-features", "FontationsFontBackend");
-    app.commandLine.appendSwitch("enable-gpu-rasterization");
-    app.commandLine.appendSwitch("remote-debugging-port", "9222");
+    for (const [name, value] of chromeSwitches(app.isPackaged)) {
+      app.commandLine.appendSwitch(name, value);
+    }
   }
 
   // ── Step 3: Config ────────────────────────────────────────────────────
