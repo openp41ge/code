@@ -1,10 +1,13 @@
 /**
- * window-view.ts — what the migration window is sent: its phase and how many
- * updates are done out of how many. The updates' descriptions and errors are
- * not shown to the user; they stay in the journal and the logs.
+ * window-view.ts — what the user is shown about the data updates: the
+ * migration window's phase and how many are done of how many, and the
+ * manager window's Migrations tab summary. The updates' descriptions, what
+ * they did and their errors are not shown; they stay in the journal and the
+ * logs.
  */
 
 import type { MigrationRow } from "./migration-session.js";
+import type { MigrationJournal } from "./pending-migrations.js";
 
 /** The window's state in the main process (see migration-window.ts). */
 export interface WindowStateLike {
@@ -33,5 +36,32 @@ export function toWindowView(state: WindowStateLike): MigrationWindowView {
     completed: state.rows.filter((r) => r.state === "done").length,
     total: state.rows.length,
     ...(state.dataVersion !== undefined ? { dataVersion: state.dataVersion } : {}),
+  };
+}
+
+/** The Migrations tab's summary (mirrored in the renderer's global.d.ts). */
+export interface MigrationsSummary {
+  readonly appVersion: string;
+  readonly dataVersion?: string;
+  /** How many data updates have run on this data folder. */
+  readonly updates: number;
+  /** When the last one ran (ISO). */
+  readonly lastUpdateAt?: string;
+  /** The last run stopped on an update that has not run since. */
+  readonly failed: boolean;
+}
+
+export function migrationsSummary(
+  journal: MigrationJournal,
+  appVersion: string,
+  dataVersion: string | undefined,
+): MigrationsSummary {
+  const last = journal.applied.at(-1);
+  return {
+    appVersion,
+    ...(dataVersion ? { dataVersion } : {}),
+    updates: journal.applied.length,
+    ...(last ? { lastUpdateAt: last.at } : {}),
+    failed: journal.failed !== undefined,
   };
 }

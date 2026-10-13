@@ -1,6 +1,7 @@
 /**
- * Data-migrations IPC — the manager window's Migrations tab reads what the
- * data migrations did: the app's version, the data version, and the journal.
+ * Data-migrations IPC — the manager window's Migrations tab reads a summary
+ * of the data updates: the app's version, the data version, how many ran and
+ * when, and whether the last run failed (not the journal's details).
  */
 
 import { app, ipcMain } from "electron";
@@ -8,16 +9,10 @@ import {
   readDataVersion,
   readJournal,
 } from "../../src/main/services/migrations/pending-migrations.js";
+import { migrationsSummary } from "../../src/main/services/migrations/window-view.js";
 
 export function registerDataMigrationsHandlers(dataDir: string): void {
-  ipcMain.handle("data-migrations:status", () => {
-    const journal = readJournal(dataDir);
-    const dataVersion = readDataVersion(dataDir);
-    return {
-      appVersion: app.getVersion(),
-      ...(dataVersion ? { dataVersion } : {}),
-      applied: journal.applied,
-      ...(journal.failed ? { failed: journal.failed } : {}),
-    };
-  });
+  ipcMain.handle("data-migrations:status", () =>
+    migrationsSummary(readJournal(dataDir), app.getVersion(), readDataVersion(dataDir)),
+  );
 }

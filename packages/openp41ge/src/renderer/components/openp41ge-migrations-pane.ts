@@ -1,10 +1,12 @@
 /**
  * openp41ge-migrations-pane — the manager window's Migrations tab.
  *
- * What the data migrations (the data-migrations plan) did to this data
- * folder: its data version next to the app's, the last failure, and each
- * instruction set that ran, newest first, with when and what it did. Read
- * only — migrations run in the migration window at startup.
+ * The data updates (the data-migrations plan) of this data folder: its data
+ * version next to the app's, whether it is up to date (or the last update
+ * couldn't be finished, and where to get the app again), and how many
+ * updates ran and when the last did — never what they were (that stays in
+ * the journal and the logs). Read only — updates run in the migration
+ * window at startup.
  *
  * Test seam: override the static `deps`. By default the
  * `window.openp41ge.dataMigrations` bridge is used.
@@ -27,12 +29,23 @@ const when = (iso: string): string => {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 };
 
+/** One line: up to date or not, and how many updates ran and when. */
+function summary(s: Status): string {
+  if (s.failed) {
+    return "This version of openp41ge code needs to update your data, and the update couldn't be finished. Download the latest version from GitHub and install it again.";
+  }
+  if (s.updates === 0) return "Your data is up to date. No data updates have run on it.";
+  const count = s.updates === 1 ? "1 data update" : `${s.updates} data updates`;
+  return `Your data is up to date. ${count} ran on it${s.lastUpdateAt ? `, the last on ${when(s.lastUpdateAt)}` : ""}.`;
+}
+
 @customElement("openp41ge-migrations-pane")
 export class Openp41geMigrationsPane extends LitElement {
   static deps: MigrationsPaneDeps | null = null;
 
   @state() private _status: Status | null = null;
-  @state() private _error = "";
+  /** Reading the status failed (the error is in the log). */
+  @state() private _failedToLoad = false;
 
   private get _deps(): MigrationsPaneDeps {
     return (
@@ -50,16 +63,15 @@ export class Openp41geMigrationsPane extends LitElement {
   private async _load(): Promise<void> {
     try {
       this._status = await this._deps.status();
-      this._error = "";
+      this._failedToLoad = false;
     } catch (err) {
       log.warn("migrations status failed:", err);
-      this._error = String(err);
+      this._failedToLoad = true;
     }
   }
 
   override render(): TemplateResult {
     const s = this._status;
-    const applied = s ? [...s.applied].reverse() : [];
     return html`
       <div class="mp">
         <div class="mp-scroll">
@@ -72,44 +84,17 @@ export class Openp41geMigrationsPane extends LitElement {
                     <span class="mp-sep">·</span>
                     <span>App ${s.appVersion}</span>
                   </div>
-                  <ul class="mp-list">
-                    ${
-                      s.failed
-                        ? html`<li class="mp-item mp-item--failed">
-                            <div class="mp-title">Failed: ${s.failed.id}</div>
-                            <div class="mp-meta">${when(s.failed.at)}</div>
-                            <div class="mp-error">${s.failed.error}</div>
-                          </li>`
-                        : nothing
-                    }
-                    ${applied.map(
-                      (a) =>
-                        html`<li class="mp-item">
-                          <div class="mp-title">${a.description ?? a.id}</div>
-                          <div class="mp-meta">${a.id} · ${when(a.at)}</div>
-                          ${
-                            a.done.length > 0
-                              ? html`<ul class="mp-done">
-                                  ${a.done.map((line) => html`<li>${line}</li>`)}
-                                </ul>`
-                              : html`<div class="mp-meta">Nothing needed changing.</div>`
-                          }
-                        </li>`,
-                    )}
-                  </ul>
-                  ${
-                    applied.length === 0 && !s.failed
-                      ? html`<p class="mp-state">
-                          No data migrations have run on this data folder.
-                        </p>`
-                      : nothing
-                  }`
+                  <p class="mp-state ${s.failed ? "mp-state--failed" : ""}">${summary(s)}</p>`
               : nothing
           }
         </div>
         <footer class="mp-footer">
           <span class="mp-footer-status"
-            >${this._error ? html`<span class="mp-error">${this._error}</span>` : nothing}</span
+            >${
+              this._failedToLoad
+                ? html`<span class="mp-error">Couldn't read the data update status</span>`
+                : nothing
+            }</span
           >
           <span class="mp-footer-spacer"></span>
           <button
@@ -157,47 +142,15 @@ export class Openp41geMigrationsPane extends LitElement {
       margin: 0;
       padding: 14px;
       font-size: 13px;
+      line-height: 18px;
       color: var(--muted-color, #8b93a1);
     }
-    .mp-list {
-      list-style: none;
-      margin: 0;
-      padding: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .mp-item {
-      padding: 10px 12px;
-      border: 1px solid var(--divider, #2d2d2d);
-      background: var(--bg-secondary, #161616);
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      min-width: 0;
-    }
-    .mp-item--failed {
-      border-color: rgba(244, 71, 71, 0.5);
-    }
-    .mp-title {
-      font-size: 13px;
-      color: var(--text-primary, #d4d4d4);
-    }
-    .mp-meta {
-      font-size: 11px;
-      color: var(--text-secondary, #888);
+    .mp-state--failed {
+      color: var(--accent-error, #f44747);
     }
     .mp-error {
       font-size: 12px;
       color: var(--accent-error, #f44747);
-      overflow-wrap: anywhere;
-    }
-    .mp-done {
-      margin: 2px 0 0;
-      padding-left: 16px;
-      font-size: 12px;
-      line-height: 1.5;
-      color: var(--text-secondary, #aaa);
       overflow-wrap: anywhere;
     }
     .mp-footer {

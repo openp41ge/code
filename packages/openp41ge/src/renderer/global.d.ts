@@ -362,8 +362,11 @@ declare global {
         status: () => Promise<{
           appVersion: string;
           dataVersion?: string;
-          applied: ReadonlyArray<{ id: string; description?: string; at: string; done: string[] }>;
-          failed?: { id: string; at: string; error: string };
+          /** How many data updates have run, and when the last did. */
+          updates: number;
+          lastUpdateAt?: string;
+          /** The last run stopped on an update that has not run since. */
+          failed: boolean;
         }>;
       };
 
