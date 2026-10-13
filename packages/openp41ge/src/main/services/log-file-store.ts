@@ -25,6 +25,11 @@ import {
 
 const log = createLogger("openp41ge", "LogFileStore");
 
+/** A level's label (as saved in the file) → the level. */
+const LEVEL_BY_LABEL = new Map(
+  Object.entries(LOG_LEVEL_LABELS).map(([level, label]) => [label, Number(level) as LogLevel]),
+);
+
 export interface LogFileInfo {
   name: string;
   sizeBytes: number;
@@ -296,10 +301,10 @@ export class LogFileStore {
     try {
       const raw = JSON.parse(line) as Record<string, unknown>;
       const levelLabel = String(raw.level ?? "INFO").toUpperCase();
-      const levelIdx = Object.keys(LOG_LEVEL_LABELS).indexOf(levelLabel);
       return {
         timestamp: typeof raw.timestamp === "number" ? raw.timestamp : Date.now(),
-        level: levelIdx >= 0 ? levelIdx : LogLevel.INFO,
+        // The file holds the label ("ERROR"); read back the level it names.
+        level: LEVEL_BY_LABEL.get(levelLabel) ?? LogLevel.INFO,
         levelLabel,
         system: String(raw.system ?? "unknown"),
         source: String(raw.source ?? "unknown"),
