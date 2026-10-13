@@ -8,12 +8,14 @@
 
 import type { MigrationRow } from "./migration-session.js";
 import type { MigrationJournal } from "./pending-migrations.js";
+import type { Requirements } from "./requirements.js";
 
 /** The window's state in the main process (see migration-window.ts). */
 export interface WindowStateLike {
   readonly phase: MigrationWindowView["phase"];
   readonly rows: readonly MigrationRow[];
   readonly dataVersion?: string;
+  readonly requirements?: Requirements;
 }
 
 /** What the window shows (mirrored by the renderer's `MigrationsViewState`). */
@@ -28,6 +30,8 @@ export interface MigrationWindowView {
   readonly total: number;
   /** The version that last used the data (`newer`). */
   readonly dataVersion?: string;
+  /** `offline`: what the download needs, once checked. */
+  readonly requirements?: Requirements;
 }
 
 export function toWindowView(state: WindowStateLike): MigrationWindowView {
@@ -36,6 +40,7 @@ export function toWindowView(state: WindowStateLike): MigrationWindowView {
     completed: state.rows.filter((r) => r.state === "done").length,
     total: state.rows.length,
     ...(state.dataVersion !== undefined ? { dataVersion: state.dataVersion } : {}),
+    ...(state.requirements ? { requirements: state.requirements } : {}),
   };
 }
 

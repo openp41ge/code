@@ -3,7 +3,9 @@
  * (instruction sets) this version needs run, before the app reads any data.
  *
  * It opens only when updates are pending, when one this version requires
- * could not be downloaded (offline: Retry downloads again), when the check
+ * could not be downloaded (offline: it checks what the download needs —
+ * internet, GitHub — every few seconds, and Continue, once they are met,
+ * downloads again), when the release lacks one (failed), when the check
  * itself failed (Retry), or when the data was last used by a newer version
  * (Quit only: this version may not understand it). It runs them
  * straight away showing only the progress (n of N; what they are and their
@@ -13,7 +15,7 @@
  * closing it then quits the app — the app never opens on half-updated data.
  */
 
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, ipcMain, net, shell } from "electron";
 import { appTitle, keepWindowTitle } from "./app-title.js";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -24,6 +26,12 @@ import {
 import type { SourcedSet } from "../src/main/services/migrations/pending-migrations.js";
 import type { StartupPlan } from "../src/main/services/migrations/startup-migrations.js";
 import { toWindowView } from "../src/main/services/migrations/window-view.js";
+import {
+  checkRequirements,
+  requirementsMet,
+  type Requirements,
+  type RequirementsProbe,
+} from "../src/main/services/migrations/requirements.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,12 +47,42 @@ const SHOW_FALLBACK_MS = 1000;
 const DONE_MS = 800;
 /** Where a failed update sends the user: the app's releases. */
 const DOWNLOAD_URL = "https://github.com/openp41ge/code/releases";
+/** How often the offline checklist is checked again. */
+const REQUIREMENTS_MS = 3000;
+/** How long one check waits for an answer. */
+const PROBE_TIMEOUT_MS = 5000;
+
+/** The network, through Electron's `net` (the system's proxy settings). */
+const probe: RequirementsProbe = {
+  isOnline: () => net.isOnline(),
+  get: async (url) => {
+    const res = await net.fetch(url, {
+      headers: { "User-Agent": "openp41ge", Accept: "application/vnd.github+json" },
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    });
+    return { status: res.status, text: await res.text() };
+  },
+  reach: async (url) => {
+    await net.fetch(url, {
+      method: "HEAD",
+      redirect: "manual",
+      headers: { "User-Agent": "openp41ge" },
+      signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+    });
+  },
+};
 
 /** The window's state: the session's, or downloading / offline. */
 type WindowState =
   | MigrationSessionState
   | { readonly phase: "checking"; readonly rows: readonly [] }
-  | { readonly phase: "offline"; readonly rows: readonly []; readonly error: string }
+  | {
+      readonly phase: "offline";
+      readonly rows: readonly [];
+      readonly error: string;
+      readonly requirements?: Requirements;
+    }
+  | { readonly phase: "failed"; readonly rows: readonly []; readonly error: string }
   | { readonly phase: "error"; readonly rows: readonly []; readonly error: string }
   | { readonly phase: "newer"; readonly rows: readonly []; readonly dataVersion: string };
 
@@ -109,6 +147,9 @@ export function openMigrationWindow(options: MigrationWindowOptions): void {
       void run();
     } else if (plan.kind === "offline") {
       show({ phase: "offline", rows: [], error: plan.error });
+      void checkNow();
+    } else if (plan.kind === "missing") {
+      show({ phase: "failed", rows: [], error: plan.error });
     } else if (plan.kind === "error") {
       show({ phase: "error", rows: [], error: plan.error });
     } else if (plan.kind === "newer") {
@@ -120,6 +161,21 @@ export function openMigrationWindow(options: MigrationWindowOptions): void {
   const fromThisWindow = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) =>
     !win.isDestroyed() && event.sender === win.webContents;
 
+  /** Offline: check what the download needs, and show it if it changed. */
+  let checking = false;
+  const checkNow = async (): Promise<Requirements | null> => {
+    if (checking || state.phase !== "offline") return null;
+    checking = true;
+    const requirements = await checkRequirements(probe);
+    checking = false;
+    if (state.phase !== "offline") return null;
+    if (JSON.stringify(requirements) !== JSON.stringify(state.requirements)) {
+      show({ ...state, requirements });
+    }
+    return requirements;
+  };
+  const recheck = setInterval(() => void checkNow(), REQUIREMENTS_MS);
+
   let running = false;
   const run = async () => {
     if (running || !session) return;
@@ -130,6 +186,11 @@ export function openMigrationWindow(options: MigrationWindowOptions): void {
   };
   const retry = async () => {
     if (running) return;
+    if (state.phase === "offline") {
+      // Continue is only offered once everything is met; check it still is.
+      const requirements = (await checkNow()) ?? state.requirements;
+      if (!requirements || !requirementsMet(requirements)) return;
+    }
     if (state.phase === "offline" || state.phase === "error") {
       show({ phase: "checking", rows: [] });
       follow(await options.replan());
@@ -168,6 +229,7 @@ export function openMigrationWindow(options: MigrationWindowOptions): void {
     follow(options.initial);
   });
   win.on("closed", () => {
+    clearInterval(recheck);
     ipcMain.removeHandler("migrations:get");
     ipcMain.removeAllListeners("migrations:retry");
     ipcMain.removeAllListeners("migrations:quit");

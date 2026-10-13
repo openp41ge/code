@@ -4,9 +4,12 @@
  *   - `none`: nothing to run (fresh install, up to date, or every set in the
  *     range already applied — the new version is then recorded);
  *   - `run`: these sets, in the migration window;
- *   - `offline`: a set this version requires is not applied and could not
- *     be had — the download failed, or the releases do not carry it — the
- *     window's offline state (Retry / Quit);
+ *   - `offline`: a set this version requires is not applied and the
+ *     download failed — the window's offline state (what the download needs,
+ *     then Continue / Quit);
+ *   - `missing`: the download worked but the releases do not carry a set
+ *     this version requires — nothing the user can fix here: the window's
+ *     failed state (download the app again / Quit);
  *   - `deferred`: the download failed but every required set is applied —
  *     start now and look again next time;
  *   - `newer`: the data was last used by a newer version, whose layout this
@@ -31,6 +34,7 @@ export type StartupPlan =
   | { readonly kind: "none" }
   | { readonly kind: "run"; readonly sets: readonly SourcedSet[] }
   | { readonly kind: "offline"; readonly error: string }
+  | { readonly kind: "missing"; readonly error: string }
   | { readonly kind: "deferred" }
   | { readonly kind: "newer"; readonly dataVersion: string }
   | { readonly kind: "error"; readonly error: string };
@@ -86,7 +90,7 @@ async function plan(options: StartupMigrationsOptions): Promise<StartupPlan> {
     const absent = options.required.filter((id) => !available.has(id));
     if (absent.length > 0) {
       return {
-        kind: "offline",
+        kind: "missing",
         error: `This version needs data updates its release does not include: ${absent.join(", ")}`,
       };
     }
