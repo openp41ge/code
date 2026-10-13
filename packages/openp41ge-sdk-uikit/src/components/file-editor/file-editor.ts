@@ -1324,7 +1324,7 @@ export class FileEditorElement extends LitElement {
    *
    * @param filePath - The disk path of the file (used to derive a display name).
    * @param sizeBytes - The file's actual size in bytes.
-   * @param limitBytes - The configured editor.maxFileSize limit in bytes.
+   * @param limitBytes - The configured editor/file.maxFileSize limit in bytes.
    */
   showTooLarge(filePath: string, sizeBytes: number, limitBytes: number): void {
     const name = filePath.split("/").filter(Boolean).pop() || filePath;

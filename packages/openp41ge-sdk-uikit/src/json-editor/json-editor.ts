@@ -20,8 +20,10 @@
  *    or arrowing into indentation jumps to the first typable character.
  *  - Auto-closing pairs, auto-indent, auto-format (unchanged).
  *
- * The public API is unchanged: `value`, `editedValue`, `rowHeight`, `readonly`
- * and the `json-editor-change` / `json-editor-open` events.
+ * The public API: `value`, `editedValue`, `rowHeight`, `fontSize`, `readonly`
+ * and the `json-editor-change` / `json-editor-open` events. Row height and
+ * font size default to the shared `setJsonEditorDefaults` values, which the
+ * host app sets from its editor settings (an editor's own property wins).
  *
  * Emits:
  *  - `json-editor-change` `{ value }` when the text parses to a new value.
@@ -188,11 +190,36 @@ interface VisibleLine {
   start: number;
 }
 
+/** Row height and font size every `<json-editor>` uses unless it sets its own. */
+export interface JsonEditorDefaults {
+  /** Row (line) height in px. */
+  rowHeight: number;
+  /** Text size in px. */
+  fontSize: number;
+}
+
+const jsonEditorDefaults: JsonEditorDefaults = { rowHeight: 20, fontSize: 13 };
+/** Connected editors, updated when the shared defaults change. */
+const liveEditors = new Set<JsonEditorElement>();
+
+/**
+ * Set the row height and/or font size every `<json-editor>` uses (the host
+ * app's editor settings). Mounted editors update at once; an editor's own
+ * `rowHeight` / `fontSize` wins.
+ */
+export function setJsonEditorDefaults(defaults: Partial<JsonEditorDefaults>): void {
+  Object.assign(jsonEditorDefaults, defaults);
+  for (const editor of liveEditors) editor.applySharedDefaults();
+}
+
 @customElement("json-editor")
 export class JsonEditorElement extends LitElement {
   @property({ attribute: false }) value: unknown = undefined;
   @property({ type: Boolean, attribute: "readonly" }) readonly = false;
-  @property({ type: Number, attribute: "row-height" }) rowHeight = 20;
+  /** Row height in px; unset: the shared default (`setJsonEditorDefaults`). */
+  @property({ type: Number, attribute: "row-height" }) rowHeight: number | undefined = undefined;
+  /** Text size in px; unset: the shared default (`setJsonEditorDefaults`). */
+  @property({ type: Number, attribute: "font-size" }) fontSize: number | undefined = undefined;
   /** JSON Schema describing the document. Hovering an object key shows the
    *  matching property's `description` (tooltip content comes from here). */
   @property({ attribute: false }) schema: unknown = null;
@@ -332,7 +359,7 @@ export class JsonEditorElement extends LitElement {
       overflow: hidden;
       color: var(--text-primary, #d4d4d4);
       font-family: ui-monospace, "Cascadia Code", "Fira Code", Menlo, Consolas, monospace;
-      font-size: 13px;
+      font-size: var(--je-font-size, 13px);
       background: var(--bg-primary, #1e1e1e);
       text-align: left;
     }
@@ -812,6 +839,7 @@ export class JsonEditorElement extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
+    liveEditors.add(this);
     this._digitPx = this._effectiveDigitPx();
     if (this._text === "" && this.value !== undefined) {
       this._applyValue();
@@ -825,6 +853,7 @@ export class JsonEditorElement extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
+    liveEditors.delete(this);
     document.removeEventListener("selectionchange", this._onSelectionChange);
     this._stopCaretBlink();
     this._caretEls = [];
@@ -869,7 +898,7 @@ export class JsonEditorElement extends LitElement {
     if (changed.has("value") && this._formatValue(this.value) !== this._text) {
       this._applyValue();
     }
-    if (changed.has("rowHeight")) {
+    if (changed.has("rowHeight") || changed.has("fontSize")) {
       this._applyRowHeight();
     }
     if (changed.has("showDefaults") || changed.has("defaults") || changed.has("explicitPaths")) {
@@ -900,8 +929,30 @@ export class JsonEditorElement extends LitElement {
     this._rebuild(false);
   }
 
+  /** Re-apply the shared row height / font size (`setJsonEditorDefaults`). */
+  applySharedDefaults(): void {
+    this._applyRowHeight();
+    this.requestUpdate();
+  }
+
+  /** The row height in use (px): this editor's own, else the shared default. */
+  private _rowH(): number {
+    return Math.max(1, Number(this.rowHeight) || jsonEditorDefaults.rowHeight);
+  }
+
+  /** The font size in use (px): this editor's own, else the shared default. */
+  private _fontPx(): number {
+    return Math.max(1, Number(this.fontSize) || jsonEditorDefaults.fontSize);
+  }
+
+  /** Apply the row height and font size (and what depends on them). */
   private _applyRowHeight(): void {
-    const lh = Math.max(1, Number(this.rowHeight) || 20);
+    const lh = this._rowH();
+    const fontPx = this._fontPx();
+    if (this.style.getPropertyValue("--je-font-size") !== fontPx + "px") {
+      this.style.setProperty("--je-font-size", fontPx + "px");
+      this._contentCharW = 0; // measured at the old size
+    }
     this.style.setProperty("--je-row-height", lh + "px");
     this.style.setProperty(
       "--je-gutter-w",
@@ -1147,7 +1198,7 @@ export class JsonEditorElement extends LitElement {
       foldColumn({
         // Square collapsible buttons: the fold column is as wide as the row
         // is tall, so the full-width chevron button is always a square.
-        width: () => Math.max(1, Math.round(Number(this.rowHeight) || 20)),
+        width: () => Math.max(1, Math.round(this._rowH())),
         onToggle: (line) => this._toggleFold(line),
       }),
     ]);
@@ -1160,9 +1211,9 @@ export class JsonEditorElement extends LitElement {
    *  the hovered row). */
   private _syncGutter(): void {
     if (!this._gutter) return;
-    const rowH = Math.max(1, Number(this.rowHeight) || 20);
+    const rowH = this._rowH();
     const gutterW = gutterWidthFor(this._lineCount(), this._digitPx);
-    const foldW = Math.max(1, Math.round(Number(this.rowHeight) || 20));
+    const foldW = Math.max(1, Math.round(this._rowH()));
     if (gutterW !== this._gutterW || foldW !== this._gutterFoldW) {
       this._gutterW = gutterW;
       this._gutterFoldW = foldW;
@@ -1244,7 +1295,7 @@ export class JsonEditorElement extends LitElement {
     while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
 
     const rows = this.renderRoot.querySelectorAll(".je-lines .je-row");
-    const rowH = Math.max(1, Number(this.rowHeight) || 20);
+    const rowH = this._rowH();
     for (const [s, e] of merged) {
       if (s === e) continue;
       const segs: { rowIndex: number; left: number; right: number }[] = [];
@@ -1414,7 +1465,8 @@ export class JsonEditorElement extends LitElement {
     }
     const s = document.createElement("span");
     s.style.cssText =
-      "position:absolute;visibility:hidden;white-space:pre;font-family:ui-monospace,'Cascadia Code','Fira Code',Menlo,Consolas,monospace;font-size:13px;";
+      "position:absolute;visibility:hidden;white-space:pre;font-family:ui-monospace,'Cascadia Code','Fira Code',Menlo,Consolas,monospace;" +
+      `font-size:${this._fontPx()}px;`;
     s.textContent = "0".repeat(100);
     document.body.appendChild(s);
     const w = s.getBoundingClientRect().width / 100;
@@ -1721,7 +1773,7 @@ export class JsonEditorElement extends LitElement {
     // edge and never clips past the viewport's right edge (it can sit further
     // left or further right than the key rather than being cut off).
     const tipW = tip.offsetWidth;
-    const rowH = Math.max(1, Number(this.rowHeight) || 20);
+    const rowH = this._rowH();
     const cw = this._measureCharW() > 0 ? this._measureCharW() : 8;
     const keyW = p.keyLen * cw;
     let left = 10 + p.start * cw + (keyW - tipW) / 2;
@@ -1833,7 +1885,7 @@ export class JsonEditorElement extends LitElement {
     }
     const v = this._visibleLines[rowIdx];
     const col = Math.min(selStart - v.start, v.text.length);
-    const rowH = Math.max(1, Number(this.rowHeight) || 20);
+    const rowH = this._rowH();
     const cw = this._measureCharW() > 0 ? this._measureCharW() : 8;
     const x = 10 + col * cw;
     const y = (rowIdx + 1) * rowH + 2;
@@ -2149,7 +2201,7 @@ export class JsonEditorElement extends LitElement {
    *  delete / overwrite border. Returns null when nothing is highlighted. */
   private _hlBlock(): { top: number; height: number; color: string } | null {
     if (this._dangerLines.size === 0) return null;
-    const rowH = Math.max(1, Number(this.rowHeight) || 20);
+    const rowH = this._rowH();
     let first = -1;
     let last = -1;
     for (let i = 0; i < this._visibleLines.length; i++) {
@@ -2208,7 +2260,7 @@ export class JsonEditorElement extends LitElement {
       }
       this._updateSelectionHighlight();
     }
-    const rowH = Math.max(1, Number(this.rowHeight) || 20);
+    const rowH = this._rowH();
     const idx = Math.floor(e.offsetY / rowH);
     const line = idx >= 0 && idx < this._visibleLines.length ? this._visibleLines[idx].line : null;
     if (line !== this._hoverLine) {
@@ -2236,7 +2288,7 @@ export class JsonEditorElement extends LitElement {
 
   /** Map a mousedown on the textarea to an offset in `_visibleText`. */
   private _clickedPos(e: MouseEvent): number {
-    const rowH = Math.max(1, Number(this.rowHeight) || 20);
+    const rowH = this._rowH();
     const idx = Math.floor(e.offsetY / rowH);
     const v = this._visibleLines[Math.max(0, idx)];
     if (!v) return 0;
@@ -2673,7 +2725,7 @@ export class JsonEditorElement extends LitElement {
       const el = this._caretEls.pop()!;
       el.remove();
     }
-    const lh = Math.max(1, Number(this.rowHeight) || 20);
+    const lh = this._rowH();
     const cw = this._defaultCharW();
     const vis = this._visibleText;
     for (let i = 0; i < all.length; i++) {
@@ -3081,7 +3133,7 @@ export class JsonEditorElement extends LitElement {
       HTMLTextAreaElement | undefined;
     const vp = this.renderRoot.querySelector(".je-viewport") as HTMLElement | undefined;
     if (!ta || !vp) return;
-    const lh = Math.max(1, Number(this.rowHeight) || 20);
+    const lh = this._rowH();
     const line = ta.value.slice(0, ta.selectionStart).split("\n").length - 1;
     const top = line * lh;
     if (top < vp.scrollTop) vp.scrollTop = top;

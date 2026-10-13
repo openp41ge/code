@@ -1,6 +1,6 @@
 /**
  * global-settings-schema — JSON Schema of the platform's own settings
- * (`{ appTheme, updateChannel, lineHeight, editorFontSize, editor, dragConsumers }`, a
+ * (`{ appTheme, updateChannel, "editor/*", "editor/file", "editor/json", dragConsumers }`, a
  * subset of `UserConfig`): the "Platform" entry of the manager's Settings
  * list, edited in the settings editor (services/settings-sources.ts). It gives
  * the editor its key tooltips, and saves are checked against it.
@@ -13,7 +13,7 @@ export const GLOBAL_SETTINGS_SCHEMA = {
   title: "Global editor settings",
   type: "object",
   additionalProperties: true,
-  description: "Theme, text size, file editor, updates.",
+  description: "Theme, editors, updates.",
   properties: {
     updateChannel: {
       type: "string",
@@ -27,22 +27,43 @@ export const GLOBAL_SETTINGS_SCHEMA = {
       description:
         'The active editor theme: "dark" or "light". Changes are picked up by every editor the next time it renders.',
     },
-    lineHeight: {
-      type: "number",
-      minimum: 14,
-      maximum: 100,
-      description:
-        "Base line height in pixels for every editor. Both source and settings editors read this globally; no per-editor offsets.",
-    },
-    editorFontSize: {
-      type: "number",
-      description: "Base editor font size in pixels. Raised/lowered uniformly across editors.",
-    },
-    editor: {
+    "editor/*": {
       type: "object",
       additionalProperties: false,
-      description: "The file editor.",
+      description:
+        "Settings every editor follows (the file editor and the JSON editors). An editor's own section, editor/file or editor/json, wins over these.",
       properties: {
+        lineHeight: {
+          type: "number",
+          minimum: 14,
+          maximum: 100,
+          description: "Line height in pixels.",
+        },
+        fontSize: {
+          type: "number",
+          minimum: 8,
+          maximum: 40,
+          description: "Font size in pixels.",
+        },
+      },
+    },
+    "editor/file": {
+      type: "object",
+      additionalProperties: false,
+      description: "The file editor. Line height and font size here win over editor/*.",
+      properties: {
+        lineHeight: {
+          type: "number",
+          minimum: 14,
+          maximum: 100,
+          description: "Line height in pixels.",
+        },
+        fontSize: {
+          type: "number",
+          minimum: 8,
+          maximum: 40,
+          description: "Font size in pixels.",
+        },
         maxFileSize: {
           type: "number",
           minimum: 1,
@@ -63,6 +84,26 @@ export const GLOBAL_SETTINGS_SCHEMA = {
           type: "boolean",
           description:
             "When a file is saved, end it with a newline if it does not already (default true; an empty file stays empty).",
+        },
+      },
+    },
+    "editor/json": {
+      type: "object",
+      additionalProperties: false,
+      description:
+        "The JSON editors (the Settings editor, the workspace editor's JSON view). Line height and font size here win over editor/*.",
+      properties: {
+        lineHeight: {
+          type: "number",
+          minimum: 14,
+          maximum: 100,
+          description: "Line height in pixels.",
+        },
+        fontSize: {
+          type: "number",
+          minimum: 8,
+          maximum: 40,
+          description: "Font size in pixels.",
         },
       },
     },

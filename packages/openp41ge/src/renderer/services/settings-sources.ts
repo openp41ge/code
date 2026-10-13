@@ -21,9 +21,9 @@ export const PLATFORM_SETTINGS_ID = "openp41ge";
 export const PLATFORM_SETTINGS_KEYS = [
   "appTheme",
   "updateChannel",
-  "lineHeight",
-  "editorFontSize",
-  "editor",
+  "editor/*",
+  "editor/file",
+  "editor/json",
   "dragConsumers",
 ] as const;
 

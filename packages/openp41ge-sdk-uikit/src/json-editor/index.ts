@@ -7,6 +7,7 @@
 
 export {
   JsonEditorElement,
+  setJsonEditorDefaults,
   JSON_EDITOR_CHANGE,
   JSON_EDITOR_OPEN,
   JSON_EDITOR_OVERWRITE,
@@ -61,4 +62,4 @@ export { tokenizeJsonFull, selectableRanges } from "./json-tokenize";
 export type { JsonToken as JsonTokenFull, SelectableRange } from "./json-tokenize";
 
 export { renderMarkdown, isMarkdownFileRef, highlightCodeBlock } from "./md-render";
-export type { ResolveResource } from "./json-editor";
+export type { ResolveResource, JsonEditorDefaults } from "./json-editor";

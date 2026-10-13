@@ -25,6 +25,12 @@ import {
 } from "openp41ge-sdk-uikit/file-editor";
 import type { IFormatter } from "openp41ge-sdk-uikit/file-editor";
 import { appServices } from "../../app";
+import {
+  editorFontSize,
+  editorLineHeight,
+  editorSetting,
+  isEditorSettingsKey,
+} from "../../services/editor-settings";
 
 /** Built-in JSON formatter (pretty-print). */
 const jsonFormatter: IFormatter = {
@@ -146,11 +152,12 @@ export class FileEditorController extends BaseController implements FileViewerCo
       // so _viewportEl is available before loadFile() is called.
       await this._awaitEditorReady();
 
-      // Size gate BEFORE any read: files over editor.maxFileSize open the tab
+      // Size gate BEFORE any read: files over editor/file.maxFileSize open the tab
       // with a "too large" message instead of loading content into a model.
       // No bytes are read for oversized files, so the renderer never blocks on
       // a huge readRange.
-      const limit = appServices.configService.get("editor.maxFileSize") as number | undefined;
+      const limit = editorSetting(appServices.configService, "file", "maxFileSize") as
+        number | undefined;
       const stat = window.openp41ge?.file?.stat ? await window.openp41ge.file.stat(path) : null;
       if (!shouldOpenFile(stat?.size, limit)) {
         this._editor.showTooLarge(path, stat!.size, limit ?? DEFAULT_EDITOR_MAX_FILE_SIZE);
@@ -330,26 +337,22 @@ export class FileEditorController extends BaseController implements FileViewerCo
     this._editor.setTheme(themeId);
   }
 
-  /** Apply editor settings (line height, font size, word wrap, save cleanup) from config. */
+  /** Apply the file editor's settings from config (`editor/file`, else
+   *  `editor/*`): line height, font size, word wrap and the save cleanup. */
   private _applyEditorSettings(): void {
     if (!this._editor) return;
-    const lineHeight = appServices.configService.get("lineHeight") as number | undefined;
-    const fontSize = appServices.configService.get("editorFontSize") as number | undefined;
-    if (typeof lineHeight === "number" && lineHeight >= 14 && lineHeight <= 40) {
-      this._editor.setEditorLineHeight(lineHeight);
-    }
-    if (typeof fontSize === "number" && fontSize >= 10 && fontSize <= 30) {
-      this._editor.setEditorFontSize(fontSize);
-    }
-    // Word-wrap default (the `editor.wordWrap` setting): applied to files
-    // without a per-file override; per-file choices are remembered per path.
-    const wordWrap = appServices.configService.get("editor.wordWrap") as boolean | undefined;
-    this._editor.setWordWrapDefault(Boolean(wordWrap));
+    const config = appServices.configService;
+    const lineHeight = editorLineHeight(config, "file");
+    const fontSize = editorFontSize(config, "file");
+    if (lineHeight !== undefined) this._editor.setEditorLineHeight(lineHeight);
+    if (fontSize !== undefined) this._editor.setEditorFontSize(fontSize);
+    // Word-wrap default: applied to files without a per-file override;
+    // per-file choices are remembered per path.
+    this._editor.setWordWrapDefault(editorSetting(config, "file", "wordWrap") === true);
     // What a save tidies first: both on unless set to false.
     this._editor.setSaveCleanup({
-      trimTrailingWhitespace:
-        appServices.configService.get("editor.trimTrailingWhitespace") !== false,
-      insertFinalNewline: appServices.configService.get("editor.insertFinalNewline") !== false,
+      trimTrailingWhitespace: editorSetting(config, "file", "trimTrailingWhitespace") !== false,
+      insertFinalNewline: editorSetting(config, "file", "insertFinalNewline") !== false,
     });
   }
 
@@ -424,10 +427,8 @@ export class FileEditorController extends BaseController implements FileViewerCo
     this._boundConfigChanged = (e: Event) => {
       const detail = (e as CustomEvent).detail as { key?: string; value?: unknown };
       if (!detail || !detail.key) return;
-      // React to editor config changes
-      if (detail.key === "lineHeight" || detail.key === "editorFontSize") {
-        this._applyEditorSettings();
-      }
+      // React to editor config changes (any `editor/` section).
+      if (isEditorSettingsKey(detail.key)) this._applyEditorSettings();
     };
 
     // Listen for config changes to update syntax theme

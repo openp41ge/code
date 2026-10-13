@@ -1,7 +1,7 @@
 /**
  * FileSizeGate — pure decision logic for the editor's open-size limit.
  *
- * The VSCode-style guard: a file larger than `editor.maxFileSize` opens its tab
+ * The VSCode-style guard: a file larger than `editor/file.maxFileSize` opens its tab
  * with a "file is too large to open in the editor" message instead of loading
  * content. Kept as a pure, dependency-free module so the threshold behaviour is
  * unit-testable without IPC, DOM, or the app services.

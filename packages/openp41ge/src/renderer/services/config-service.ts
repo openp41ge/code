@@ -17,11 +17,13 @@ export interface UserConfig {
   appTheme: "dark" | "light";
   /** Auto-update channel — "latest" (stable) or a prerelease track ("alpha"/"beta"/"rc"). */
   updateChannel: "latest" | "alpha" | "beta" | "rc";
-  /** Platform-wide line height (px) — sub-package editors align to this. */
-  lineHeight: number;
-  /** Platform-wide editor font size (px) — sub-package editors align to this. */
-  editorFontSize: number;
-  editor: {
+  /** Settings every editor follows; `editor/file` / `editor/json` win over
+   *  these (see `editor-settings.ts`). */
+  "editor/*": { lineHeight: number; fontSize: number };
+  /** The file editor's settings. */
+  "editor/file": {
+    lineHeight?: number;
+    fontSize?: number;
     /** Max file size in bytes the editor will open (larger files show a "too large" message). */
     maxFileSize: number;
     /** Whether the file editor wraps long lines by default. */
@@ -31,6 +33,8 @@ export interface UserConfig {
     /** Saving a non-empty file ends it with a newline. */
     insertFinalNewline: boolean;
   };
+  /** The JSON editors' overrides. */
+  "editor/json": { lineHeight?: number; fontSize?: number };
 }
 
 // ─── ConfigService ───────────────────────────────────────────────────────
@@ -113,7 +117,7 @@ export class ConfigService {
     }
   }
 
-  /** Get a specific key (dot-separated, e.g., "editor.maxFileSize"). */
+  /** Get a specific key (dot-separated, e.g., "editor/file.maxFileSize"). */
   get(key: string): unknown {
     if (!this._config) return undefined;
     const keys = key.split(".");

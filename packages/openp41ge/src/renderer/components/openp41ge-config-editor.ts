@@ -34,6 +34,7 @@ import type { ConfigSchema } from "openp41ge-sdk";
 import { createLogger } from "openp41ge-core-logger";
 import type { ExtensionConfigBridge } from "../services/extension-configs";
 import { settingsBridge, type PlatformConfigBridge } from "../services/settings-sources";
+import { appServices } from "../app";
 import { resetIcon, saveIcon, showDefaultsIcon, sortKeysIcon } from "./settings-icons";
 
 const log = createLogger("openp41ge", "config-editor");
@@ -71,7 +72,14 @@ export class Openp41geConfigEditor extends LitElement {
     const extension = window.openp41ge?.extension?.config;
     const platform = window.openp41ge?.config;
     if (!extension || !platform) return extension ?? null;
-    this.bridge = settingsBridge(extension, platform as unknown as PlatformConfigBridge);
+    // Saves go through this window's config service: it updates this
+    // window's cache and listeners (its JSON editors follow editor/json),
+    // then the IPC, which reaches the other windows.
+    const platformBridge = {
+      ...(platform as unknown as PlatformConfigBridge),
+      set: (key: string, value: unknown) => appServices.configService.set(key, value),
+    };
+    this.bridge = settingsBridge(extension, platformBridge);
     return this.bridge;
   }
 

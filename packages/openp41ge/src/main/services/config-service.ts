@@ -24,18 +24,25 @@ const log = createLogger("openp41ge", "ConfigService");
 
 // ─── Default config ──────────────────────────────────────────────────────
 
+/** Settings every kind of editor follows (`editor/*`). */
+export interface SharedEditorSettings {
+  /** Line height (px). */
+  lineHeight: number;
+  /** Font size (px). */
+  fontSize: number;
+}
+
 export interface UserConfig {
   version: number;
   appTheme: "dark" | "light";
   /** Auto-update channel — "latest" (stable) or a prerelease track ("alpha"/"beta"/"rc").
    *  The default stable channel never receives prerelease builds. */
   updateChannel: "latest" | "alpha" | "beta" | "rc";
-  /** Platform-wide line height (px) — the openp41ge platform setting that all
-   *  sub-package editors (file editor, JSON editor, …) align to. */
-  lineHeight: number;
-  /** Platform-wide editor font size (px) — sub-package editors align to this. */
-  editorFontSize: number;
-  editor: {
+  /** Settings every editor follows (file and JSON editors); a kind's own
+   *  section (`editor/file`, `editor/json`) wins over these. */
+  "editor/*": SharedEditorSettings;
+  /** The file editor's settings. */
+  "editor/file": Partial<SharedEditorSettings> & {
     /** Max file size in bytes the editor will open (larger files show a "too large" message). */
     maxFileSize: number;
     /** Whether the file editor wraps long lines by default (a file's own toggle wins). */
@@ -45,6 +52,8 @@ export interface UserConfig {
     /** Saving a non-empty file ends it with a newline. */
     insertFinalNewline: boolean;
   };
+  /** The JSON editors' (Settings editor, workspace editor) overrides. */
+  "editor/json": Partial<SharedEditorSettings>;
   /**
    * Which consumer opens a dropped payload kind, when more than one can:
    * kind (`namespace/kind`) → consumer id (`<extensionId>/<id>`, or a bare
@@ -80,14 +89,14 @@ const DEFAULT_CONFIG: UserConfig = {
   version: 1,
   appTheme: "dark",
   updateChannel: "latest",
-  lineHeight: 20,
-  editorFontSize: 14,
-  editor: {
+  "editor/*": { lineHeight: 20, fontSize: 14 },
+  "editor/file": {
     maxFileSize: DEFAULT_MAX_FILE_SIZE,
     wordWrap: false,
     trimTrailingWhitespace: true,
     insertFinalNewline: true,
   },
+  "editor/json": {},
   dragConsumers: {},
 };
 
@@ -98,6 +107,53 @@ const AGENTS_EXTENSION_ID = "openp41ge-extension-agents";
 /** The Explorer extension's id: its config section takes the retired
  *  platform `explorer` settings (see `_migrateConfig`). */
 const EXPLORER_EXTENSION_ID = "openp41ge-extension-explorer";
+
+/**
+ * Old editor setting → where it is now, newest name first (when two old
+ * names hold a value, the first one moved wins).
+ */
+const MOVED_EDITOR_SETTINGS: ReadonlyArray<readonly [from: string, to: string]> = [
+  ["lineHeight", "editor/*.lineHeight"],
+  ["editor.lineHeight", "editor/*.lineHeight"],
+  ["editorFontSize", "editor/*.fontSize"],
+  ["fontSize", "editor/*.fontSize"],
+  ["editor.fontSize", "editor/*.fontSize"],
+  ["editor.maxFileSize", "editor/file.maxFileSize"],
+  ["editor.wordWrap", "editor/file.wordWrap"],
+  ["editor.trimTrailingWhitespace", "editor/file.trimTrailingWhitespace"],
+  ["editor.insertFinalNewline", "editor/file.insertFinalNewline"],
+];
+
+/** The value at a dot path (`a.b`), or undefined. */
+function readPath(obj: Record<string, unknown>, dotPath: string): unknown {
+  let cur: unknown = obj;
+  for (const key of dotPath.split(".")) {
+    if (!cur || typeof cur !== "object" || !(key in (cur as object))) return undefined;
+    cur = (cur as Record<string, unknown>)[key];
+  }
+  return cur;
+}
+
+/** Set the value at a dot path, creating sections on the way. */
+function writePath(obj: Record<string, unknown>, dotPath: string, value: unknown): void {
+  const keys = dotPath.split(".");
+  let cur = obj;
+  for (const key of keys.slice(0, -1)) {
+    if (!cur[key] || typeof cur[key] !== "object") cur[key] = {};
+    cur = cur[key] as Record<string, unknown>;
+  }
+  cur[keys[keys.length - 1]] = value;
+}
+
+/** Remove the value at a dot path (its section is left in place). */
+function deletePath(obj: Record<string, unknown>, dotPath: string): void {
+  const keys = dotPath.split(".");
+  const parent = readPath(obj, keys.slice(0, -1).join("."));
+  const target = keys.length === 1 ? obj : parent;
+  if (target && typeof target === "object") {
+    delete (target as Record<string, unknown>)[keys[keys.length - 1]];
+  }
+}
 
 /** A provider's legacy `model` becomes `defaultModel` (unless that is set). */
 function renameLegacyModel(agent: Record<string, unknown>): void {
@@ -265,7 +321,7 @@ export class ConfigService {
     this._configPath = path.join(this._configDir, "config.json");
     this._platformDefaults = JSON.parse(JSON.stringify(DEFAULT_CONFIG)) as UserConfig;
     this._platformDefaults.updateChannel = updateChannel;
-    this._config = { ...this._platformDefaults };
+    this._config = structuredClone(this._platformDefaults);
   }
 
   /** Load config from disk on startup. Creates with defaults if missing. */
@@ -278,7 +334,7 @@ export class ConfigService {
       if (fs.existsSync(this._configPath)) {
         const raw = fs.readFileSync(this._configPath, "utf-8");
         const parsed = JSON.parse(raw) as Partial<UserConfig>;
-        this._config = deepMerge({ ...this._platformDefaults }, parsed);
+        this._config = deepMerge({ ...structuredClone(this._platformDefaults) }, parsed);
         // Everything in the file is explicitly set, so remember its leaf paths
         // as pins/overrides so they aren't pruned by `toOverrides`.
         this._explicitKeys = collectLeafPaths(parsed);
@@ -305,7 +361,7 @@ export class ConfigService {
         extra: { configPath: path.basename(this._configPath) },
         level: "warning",
       });
-      this._config = { ...this._platformDefaults };
+      this._config = structuredClone(this._platformDefaults);
     }
   }
 
@@ -437,7 +493,7 @@ export class ConfigService {
           try {
             const raw = fs.readFileSync(this._configPath, "utf-8");
             const parsed = JSON.parse(raw) as Partial<UserConfig>;
-            this._config = deepMerge({ ...this._platformDefaults }, parsed);
+            this._config = deepMerge({ ...structuredClone(this._platformDefaults) }, parsed);
             if (this._migrateConfig(this._config)) {
               this._writeAtomic(this._config);
             }
@@ -492,35 +548,40 @@ export class ConfigService {
       delete cfg.explorer;
       changed = true;
     }
-    // Retired settings nothing read: the editor font family, syntax themes.
+    // Retired settings nothing read: syntax themes (and the editor font
+    // family, dropped with the old `editor` section below).
     if ("syntaxThemes" in cfg) {
       delete cfg.syntaxThemes;
       changed = true;
     }
-    const editor = config.editor as Record<string, unknown> | undefined;
-    if (editor && typeof editor === "object" && "fontFamily" in editor) {
-      delete editor.fontFamily;
+    if (this._moveEditorSettings(cfg)) changed = true;
+    return changed;
+  }
+
+  /**
+   * Move the editor settings from their old keys into `editor/*` (every
+   * editor) and `editor/file` (the file editor). A value the user already
+   * wrote at the new key wins; a moved value stays explicit (so one pinned at
+   * its default is kept). The old `editor` section is dropped. Returns true
+   * when anything moved.
+   */
+  private _moveEditorSettings(cfg: Record<string, unknown>): boolean {
+    let changed = false;
+    for (const [from, to] of MOVED_EDITOR_SETTINGS) {
+      const value = readPath(cfg, from);
+      if (value === undefined) continue;
+      deletePath(cfg, from);
+      this._explicitKeys.delete(from);
       changed = true;
+      if (this._explicitKeys.has(to)) continue;
+      writePath(cfg, to, value);
+      this._explicitKeys.add(to);
     }
-    if (editor && typeof editor === "object") {
-      if (typeof editor.lineHeight === "number") {
-        config.lineHeight = editor.lineHeight as number;
-        delete editor.lineHeight;
-        changed = true;
+    if ("editor" in cfg) {
+      delete cfg.editor;
+      for (const key of [...this._explicitKeys]) {
+        if (key.startsWith("editor.")) this._explicitKeys.delete(key);
       }
-      if (typeof editor.fontSize === "number") {
-        config.editorFontSize = editor.fontSize as number;
-        delete editor.fontSize;
-        changed = true;
-      }
-    }
-    // Rename: the editor font size was lifted to the top level as `fontSize`;
-    // it is now `editorFontSize`. Promote a lingering top-level `fontSize` —
-    // the default is always merged in by deepMerge, so this must overwrite
-    // (not guard against) the defaulted `editorFontSize`.
-    if (typeof cfg.fontSize === "number") {
-      config.editorFontSize = cfg.fontSize as number;
-      delete cfg.fontSize;
       changed = true;
     }
     return changed;
