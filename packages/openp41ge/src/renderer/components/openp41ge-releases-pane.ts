@@ -12,7 +12,9 @@
  *
  * The list comes from the main process, which checks in the background (see
  * electron/releases-feed.ts), so showing the tab fetches nothing. Skeleton
- * rows show until there is a list; the refresh button checks now.
+ * rows show until there is a list; the refresh button checks now, and says
+ * in a toast when that check fails (a failed background check keeps the list
+ * quietly). The bottom bar holds buttons, never messages.
  *
  * Release text is untrusted external text and is rendered escaped (never
  * `unsafeHTML`).
@@ -21,6 +23,7 @@ import { LitElement, html, css, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { createLogger } from "openp41ge-core-logger";
 import { releasesDeps } from "../services/releases-deps";
+import { toastService } from "./openp41ge-toast";
 import {
   selectInRange,
   selectLatestPerChannel,
@@ -121,21 +124,26 @@ export class Openp41geReleasesPane extends LitElement {
   private _refresh(): void {
     void releasesDeps()
       .refreshReleases()
-      .catch((err: unknown) => log.warn("releases check failed:", err));
+      .then(
+        (snapshot) => {
+          if (snapshot.error) this._checkFailed(snapshot.error);
+        },
+        (err: unknown) => this._checkFailed(err),
+      );
+  }
+
+  private _checkFailed(err: unknown): void {
+    log.warn("releases check failed:", err);
+    toastService.show("Couldn't check for releases", "error", 5000);
   }
 
   override render(): TemplateResult {
-    const { checking, error, fetchedAt } = this._snapshot;
+    const { checking, fetchedAt } = this._snapshot;
     const hasList = this._snapshot.releases.length > 0 || (fetchedAt !== null && !checking);
-    const status =
-      error && hasList && !checking
-        ? html`<span class="rp-error" title=${error}>Couldn't check for releases</span>`
-        : nothing;
     return html`
       <div class="rp">
         <div class="rp-scroll" role="list">${this._body(hasList)}</div>
         <footer class="rp-footer">
-          <span class="rp-footer-status"> ${status} </span>
           <span class="rp-footer-spacer"></span>
           <button
             class="rp-footer-btn"
@@ -315,7 +323,7 @@ export class Openp41geReleasesPane extends LitElement {
         opacity: 0.45;
       }
     }
-    /* ── Bottom bar: status + square buttons ──────────────────────────── */
+    /* ── Bottom bar: square buttons ──────────────────────────── */
     .rp-footer {
       display: flex;
       align-items: center;
@@ -324,20 +332,6 @@ export class Openp41geReleasesPane extends LitElement {
       padding-left: 10px;
       border-top: 1px solid var(--divider, #333);
       background: var(--bg-secondary, #161616);
-    }
-    .rp-footer-status {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      min-width: 0;
-      font-size: 11px;
-      color: var(--text-secondary, #888);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .rp-error {
-      color: #e57373;
     }
     .rp-footer-spacer {
       flex: 1;

@@ -6,7 +6,8 @@
  * couldn't be finished, and where to get the app again), and how many
  * updates ran and when the last did — never what they were (that stays in
  * the journal and the logs). Read only — updates run in the migration
- * window at startup.
+ * window at startup. A status that can't be read is said in a toast; the
+ * bottom bar holds buttons, never messages.
  *
  * Test seam: override the static `deps`. By default the
  * `window.openp41ge.dataMigrations` bridge is used.
@@ -14,6 +15,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { createLogger } from "openp41ge-core-logger";
+import { toastService } from "./openp41ge-toast";
 
 const log = createLogger("openp41ge", "migrations-pane");
 
@@ -44,8 +46,6 @@ export class Openp41geMigrationsPane extends LitElement {
   static deps: MigrationsPaneDeps | null = null;
 
   @state() private _status: Status | null = null;
-  /** Reading the status failed (the error is in the log). */
-  @state() private _failedToLoad = false;
 
   private get _deps(): MigrationsPaneDeps {
     return (
@@ -63,10 +63,9 @@ export class Openp41geMigrationsPane extends LitElement {
   private async _load(): Promise<void> {
     try {
       this._status = await this._deps.status();
-      this._failedToLoad = false;
     } catch (err) {
       log.warn("migrations status failed:", err);
-      this._failedToLoad = true;
+      toastService.show("Couldn't read the data update status", "error", 5000);
     }
   }
 
@@ -89,13 +88,6 @@ export class Openp41geMigrationsPane extends LitElement {
           }
         </div>
         <footer class="mp-footer">
-          <span class="mp-footer-status"
-            >${
-              this._failedToLoad
-                ? html`<span class="mp-error">Couldn't read the data update status</span>`
-                : nothing
-            }</span
-          >
           <span class="mp-footer-spacer"></span>
           <button
             class="mp-refresh"
@@ -148,11 +140,6 @@ export class Openp41geMigrationsPane extends LitElement {
     .mp-state--failed {
       color: var(--accent-error, #f44747);
     }
-    .mp-error {
-      font-size: 12px;
-      color: var(--accent-error, #f44747);
-      overflow-wrap: anywhere;
-    }
     .mp-footer {
       display: flex;
       align-items: center;
@@ -161,13 +148,6 @@ export class Openp41geMigrationsPane extends LitElement {
       padding-left: 10px;
       border-top: 1px solid var(--divider, #333);
       background: var(--bg-secondary, #161616);
-    }
-    .mp-footer-status {
-      min-width: 0;
-      font-size: 11px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
     .mp-footer-spacer {
       flex: 1;

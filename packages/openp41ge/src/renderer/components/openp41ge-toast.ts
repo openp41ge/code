@@ -107,7 +107,7 @@ class Openp41geToastService implements IToastService {
   private _container: HTMLElement | null = null;
 
   private _getContainer(): HTMLElement {
-    if (!this._container) {
+    if (!this._container?.isConnected) {
       injectStyle();
       let existing = document.querySelector("openp41ge-toast") as HTMLElement | null;
       if (!existing) {

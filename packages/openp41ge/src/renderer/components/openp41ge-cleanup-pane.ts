@@ -7,7 +7,8 @@
  * cannot be read — is listed here for the user to decide. Each item shows
  * its worktrees' / branches' work (never individual files), and offers
  * Delete (asks first, with the same summary) and Show in Finder. The bottom
- * bar's button runs the cleanup now.
+ * bar's button runs the cleanup now. A failure is said in a toast (the error
+ * is in the log); the bottom bar holds buttons, never messages.
  *
  * Test seam: override the static `deps`. By default the
  * `window.openp41ge.cleanup` bridge and the app's confirm dialog are used.
@@ -15,6 +16,7 @@
 import { LitElement, html, css, nothing, type TemplateResult } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { showConfirm } from "../confirm-service";
+import { toastService } from "./openp41ge-toast";
 import { branchWorkLines } from "../services/repository-work";
 import { createLogger } from "openp41ge-core-logger";
 
@@ -45,6 +47,8 @@ function workLines(repo: Item["repositories"][number]): string[] {
   return [...branchWorkLines(repo.branches), ...(repo.stashed ? ["stashed changes"] : [])];
 }
 
+const failed = (message: string): void => toastService.show(message, "error", 5000);
+
 const itemTitle = (item: Item): string =>
   item.kind === "workspace" ? `Deleted workspace ${item.name}` : item.name;
 
@@ -55,7 +59,6 @@ export class Openp41geCleanupPane extends LitElement {
   @state() private _items: Item[] = [];
   @state() private _loaded = false;
   @state() private _running = false;
-  @state() private _error = "";
   private _offChanged: (() => void) | null = null;
 
   private get _deps(): CleanupPaneDeps {
@@ -86,10 +89,9 @@ export class Openp41geCleanupPane extends LitElement {
   private async _load(): Promise<void> {
     try {
       this._items = await this._deps.list();
-      this._error = "";
     } catch (err) {
       log.warn("cleanup list failed:", err);
-      this._error = String(err);
+      failed("Couldn't read what to clean up");
     }
     this._loaded = true;
   }
@@ -99,10 +101,9 @@ export class Openp41geCleanupPane extends LitElement {
     this._running = true;
     try {
       this._items = await this._deps.run();
-      this._error = "";
     } catch (err) {
       log.warn("cleanup run failed:", err);
-      this._error = String(err);
+      failed("Cleanup couldn't run");
     } finally {
       this._running = false;
     }
@@ -127,7 +128,8 @@ export class Openp41geCleanupPane extends LitElement {
     if (!agreed) return;
     const result = await this._deps.delete(item.path);
     if (!result.ok) {
-      this._error = result.error ?? "The delete failed";
+      log.warn(`cleanup delete of ${item.path} failed:`, result.error);
+      failed(`Couldn't delete ${itemTitle(item)}`);
       return;
     }
     this._items = this._items.filter((i) => i.path !== item.path);
@@ -151,9 +153,6 @@ export class Openp41geCleanupPane extends LitElement {
           }
         </div>
         <footer class="cp-footer">
-          <span class="cp-footer-status">
-            ${this._error ? html`<span class="cp-error">${this._error}</span>` : nothing}
-          </span>
           <span class="cp-footer-spacer"></span>
           <button
             class="cp-run ${this._running ? "cp-run--running" : ""}"
@@ -218,9 +217,6 @@ export class Openp41geCleanupPane extends LitElement {
       font-size: 13px;
       line-height: 1.5;
       color: var(--muted-color, #8b93a1);
-    }
-    .cp-error {
-      color: #e57373;
     }
     .cp-list {
       list-style: none;
@@ -303,13 +299,6 @@ export class Openp41geCleanupPane extends LitElement {
       padding-left: 10px;
       border-top: 1px solid var(--divider, #333);
       background: var(--bg-secondary, #161616);
-    }
-    .cp-footer-status {
-      min-width: 0;
-      font-size: 11px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
     .cp-footer-spacer {
       flex: 1;
