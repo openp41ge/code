@@ -8,7 +8,7 @@
  * few seconds, with a blue spinner while one is being checked), and
  * Continue is disabled until every item is met; the user presses it to go
  * on. A failed check says so plainly (Quit / Continue). Otherwise the status
- * sits on the right of the top bar, red or green. The bottom bar holds only
+ * sits right below the text, red or green; the top bar holds only the title. The bottom bar holds only
  * the buttons (with the app's tooltips), and is left out without any.
  *
  * The page is as tall as its content; the window fits itself to it.
@@ -78,7 +78,7 @@ const STYLES = `
   .mg-progress-fill { height:100%; border-radius:3px; background:var(--accent, #4a9eff); transition:width .25s ease-out; }
   .mg-bottombar { flex:none; height:34px; box-sizing:border-box; display:flex; align-items:stretch; border-top:1px solid var(--border-divider, #2a2a2a); background:var(--bg-secondary, #161616); color:var(--text-secondary, #999); font-size:11px; user-select:none; }
   .mg-title { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .mg-status { flex:none; text-transform:none; letter-spacing:0; font-weight:500; }
+  .mg-status { padding:8px 14px 0; font-size:12px; line-height:17px; font-weight:500; color:var(--text-primary, #d4d4d4); }
   .mg-status--ok { color:#6fc872; }
   .mg-status--bad { color:var(--accent-error, #f44747); }
   .mg-spacer { flex:1; }
@@ -168,7 +168,7 @@ function requirementsMet(state: MigrationsViewState): boolean {
   return state.requirements?.internet === true && state.requirements.github === "ok";
 }
 
-/** The top bar's status (offline shows the checklist instead). */
+/** The status below the text (offline shows the checklist instead). */
 function statusText(state: MigrationsViewState): string | null {
   if (state.phase === "checking") return "Downloading the update…";
   if (state.phase === "offline") return null;
@@ -238,14 +238,14 @@ export function renderMigrations(
       state.phase === "newer" || state.phase === "error" ? "Your data" : "Updating your data",
     ),
   );
-  const status = statusText(state);
-  if (status !== null) {
-    const tone = statusTone(state);
-    titlebar.append(el("span", tone ? `mg-status mg-status--${tone}` : "mg-status", status));
-  }
 
   const body = el("div", "mg-body");
   body.append(el("div", "mg-intro", introText(state)));
+  const status = statusText(state);
+  if (status !== null) {
+    const tone = statusTone(state);
+    body.append(el("div", tone ? `mg-status mg-status--${tone}` : "mg-status", status));
+  }
   if (state.phase === "running" || state.phase === "done") body.append(progressBar(state));
   if (state.phase === "offline") body.append(checklist(state));
 
