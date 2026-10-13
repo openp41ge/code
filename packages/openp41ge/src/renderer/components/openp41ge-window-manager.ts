@@ -125,6 +125,13 @@ export class Openp41geWindowManager extends LitElement {
   // focused, as in a workspace window. ═══
   @state() private _windowFocused = document.hasFocus();
   @state() private _sidebarFocused = false;
+  /** The tab bar's tabs are scrolled past its left / right edge (that edge
+   *  fades, as the workspace window's sidebars do). */
+  @state() private _tabbarFadeLeft = false;
+  @state() private _tabbarFadeRight = false;
+  /** The tabs are wider than their strip. */
+  @state() private _tabbarOverflow = false;
+  private _tabbarResize: ResizeObserver | null = null;
   private readonly _onFocusZoneMouseDown = (e: Event): void => {
     const target = e.target as Element | null;
     if (target?.closest?.(".wm-sidebar")) this._sidebarFocused = true;
@@ -362,8 +369,13 @@ export class Openp41geWindowManager extends LitElement {
    *  management tabs can be reordered / dragged. Also listens for the drop
    *  target's reorder event on the bar. */
   firstUpdated(): void {
-    const barEl = this.shadowRoot?.querySelector<HTMLElement>(".wm-tabbar");
+    // The tabs scroll in their own strip; the + stays at the bar's end.
+    const barEl = this.shadowRoot?.querySelector<HTMLElement>(".wm-tabbar-scroll");
     if (!barEl) return;
+    if (typeof ResizeObserver !== "undefined") {
+      this._tabbarResize = new ResizeObserver(() => this._measureTabbarFade());
+      this._tabbarResize.observe(barEl);
+    }
     this._unregisterManagerBar = registerManagerTabBar(barEl, this._myWindowId());
     barEl.addEventListener(MANAGER_TAB_REORDER_EVENT, this._onManagerTabReorder);
     this._setupRowDrag();
@@ -395,6 +407,8 @@ export class Openp41geWindowManager extends LitElement {
     this._offRemoveTab = null;
     this._unregisterManagerBar?.();
     this._unregisterManagerBar = null;
+    this._tabbarResize?.disconnect();
+    this._tabbarResize = null;
     for (const el of this._tooltipTargets) tooltipController.detach(el);
     this._tooltipTargets = [];
     this._overlayScrollbar?.destroy();
@@ -412,6 +426,7 @@ export class Openp41geWindowManager extends LitElement {
       this._saveTabs();
     }
     this._measureListOverflow();
+    this._measureTabbarFade();
     const btns = this.shadowRoot?.querySelectorAll<HTMLElement>(
       ".dw-search, .wm-search-toggle, .wm-search-clear, .dw-add, .dw-delete, .dw-delete-cancel, .dw-delete-confirm, .wm-tab-close, .wm-tabbar-add",
     );
@@ -458,6 +473,18 @@ export class Openp41geWindowManager extends LitElement {
    * removed so a scrolled-to-bottom last row doesn't double up with the viewport
    * edge. Measure after every render and on window resize.
    */
+  /** Fade each edge of the tab strip the tabs are scrolled past. */
+  private _measureTabbarFade = (): void => {
+    const el = this.shadowRoot?.querySelector<HTMLElement>(".wm-tabbar-scroll");
+    if (!el) return;
+    const left = el.scrollLeft > 2;
+    const right = el.scrollWidth - el.clientWidth - el.scrollLeft > 2;
+    if (left !== this._tabbarFadeLeft) this._tabbarFadeLeft = left;
+    if (right !== this._tabbarFadeRight) this._tabbarFadeRight = right;
+    const overflow = el.scrollWidth > el.clientWidth;
+    if (overflow !== this._tabbarOverflow) this._tabbarOverflow = overflow;
+  };
+
   private _measureListOverflow = (): void => {
     const body = this.shadowRoot?.querySelector(".wm-body");
     if (!body) return;
@@ -1570,6 +1597,7 @@ export class Openp41geWindowManager extends LitElement {
            like the workspace window's <tab-bar>. Hosts the "Workspaces" tab
            (active), a per-tab close button, and a trailing "+" new-tab button. */
         .wm-tabbar {
+          position: relative;
           display: flex;
           align-items: center;
           flex-shrink: 0;
@@ -1577,13 +1605,48 @@ export class Openp41geWindowManager extends LitElement {
           padding: 0;
           background: var(--bg-secondary, #161616);
           border-bottom: 1px solid var(--divider, #2d2d2d);
+          overflow: hidden;
+          user-select: none;
+        }
+        /* Only the tabs scroll, so the + stays at the end of the bar and the
+           tabs pass behind a fade at its edge (as in the workspace window's
+           sidebars). */
+        .wm-tabbar-scroll {
+          display: flex;
+          align-items: center;
+          flex: 1;
+          min-width: 0;
+          height: 100%;
           overflow-x: auto;
           overflow-y: hidden;
           scrollbar-width: none;
-          user-select: none;
         }
-        .wm-tabbar::-webkit-scrollbar {
+        .wm-tabbar-scroll::-webkit-scrollbar {
           display: none;
+        }
+        /* Overflowing, the last tab's divider would double the +'s border. */
+        .wm-tabbar-scroll--overflow .wm-tab--last {
+          border-right: none;
+        }
+        .wm-tabbar-fade {
+          position: absolute;
+          top: 0;
+          width: 16px;
+          height: 100%;
+          pointer-events: none;
+          opacity: 0;
+          transition: opacity 0.12s ease;
+        }
+        .wm-tabbar-fade[data-shown] {
+          opacity: 1;
+        }
+        .wm-tabbar-fade--left {
+          left: 0;
+          background: linear-gradient(to right, rgba(0, 0, 0, 0.35), transparent);
+        }
+        .wm-tabbar-fade--right {
+          right: 34px;
+          background: linear-gradient(to left, rgba(0, 0, 0, 0.35), transparent);
         }
         .wm-tab {
           display: inline-flex;
@@ -1643,8 +1706,8 @@ export class Openp41geWindowManager extends LitElement {
         .wm-tab-close {
           margin-left: 10px;
         }
-        /* Trailing "+" new-tab button, full-height square pinned to the right
-           side of the bar (margin-left:auto pushes it to the end). */
+        /* Trailing "+" new-tab button, full-height square at the end of the
+           bar, outside the tabs' scroll strip (it never scrolls away). */
         .wm-tabbar-add {
           display: inline-flex;
           align-items: center;
@@ -1652,7 +1715,7 @@ export class Openp41geWindowManager extends LitElement {
           flex-shrink: 0;
           width: 34px;
           height: 34px;
-          margin: 0 0 0 auto;
+          margin: 0;
           font-size: 16px;
           line-height: 1;
           color: var(--text-secondary, #999);
@@ -2568,36 +2631,49 @@ export class Openp41geWindowManager extends LitElement {
         <div class="wm-drawer-layer">
           <div class="wm-sidebar">
             <div class="wm-tabbar">
-              ${this._openTabs.map(
-                (id) => html`
-                  <div
-                    class="wm-tab ${this._activeTab === id ? "wm-tab--active" : ""}"
-                    data-manager-tab=${id}
-                    ?data-focused=${
-                      this._activeTab === id && this._windowFocused && this._sidebarFocused
-                    }
-                    @click=${() => this._activateTab(id)}
-                  >
-                    ${
-                      MANAGER_TAB_ICONS[id]
-                        ? html`<span class="wm-tab-icon"
-                            >${unsafeHTML(MANAGER_TAB_ICONS[id])}</span
-                          >`
-                        : nothing
-                    }
-                    <span class="wm-tab-title">${MANAGER_TAB_LABELS[id]}</span>
-                    <tab-close
-                      class="wm-tab-close"
-                      data-tip="Close tab"
-                      ?active=${this._activeTab === id}
-                      @click=${(e: Event) => {
-                        e.stopPropagation();
-                        this._closeTab(id);
-                      }}
-                    ></tab-close>
-                  </div>
-                `,
-              )}
+              <div
+                class="wm-tabbar-scroll ${this._tabbarOverflow ? "wm-tabbar-scroll--overflow" : ""}"
+                @scroll=${this._measureTabbarFade}
+              >
+                ${this._openTabs.map(
+                  (id, i) => html`
+                    <div
+                      class="wm-tab ${this._activeTab === id ? "wm-tab--active" : ""} ${i === this._openTabs.length - 1 ? "wm-tab--last" : ""}"
+                      data-manager-tab=${id}
+                      ?data-focused=${
+                        this._activeTab === id && this._windowFocused && this._sidebarFocused
+                      }
+                      @click=${() => this._activateTab(id)}
+                    >
+                      ${
+                        MANAGER_TAB_ICONS[id]
+                          ? html`<span class="wm-tab-icon"
+                              >${unsafeHTML(MANAGER_TAB_ICONS[id])}</span
+                            >`
+                          : nothing
+                      }
+                      <span class="wm-tab-title">${MANAGER_TAB_LABELS[id]}</span>
+                      <tab-close
+                        class="wm-tab-close"
+                        data-tip="Close tab"
+                        ?active=${this._activeTab === id}
+                        @click=${(e: Event) => {
+                          e.stopPropagation();
+                          this._closeTab(id);
+                        }}
+                      ></tab-close>
+                    </div>
+                  `,
+                )}
+              </div>
+              <div
+                class="wm-tabbar-fade wm-tabbar-fade--left"
+                ?data-shown=${this._tabbarFadeLeft}
+              ></div>
+              <div
+                class="wm-tabbar-fade wm-tabbar-fade--right"
+                ?data-shown=${this._tabbarFadeRight}
+              ></div>
               <div
                 class="wm-tabbar-add"
                 aria-label="New tab"
