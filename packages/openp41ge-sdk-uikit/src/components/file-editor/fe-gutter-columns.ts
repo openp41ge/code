@@ -157,11 +157,11 @@ export function makeFeDiffBeforeColumn(opts: {
     create() {
       const cell = document.createElement("div") as FeCell;
       cell.className = "fe-inline-left-label";
-      // overflow:visible (not hidden) so the separator dot can straddle the
-      // column's right edge and sit on the shared border; the inner text span
-      // clips its own nowrap text instead.
+      // overflow:visible (overriding the gutter's `.eg-cell` clip) so the
+      // separator dot can straddle the column's right edge and sit on the
+      // shared border; the inner text span clips its own nowrap text instead.
       cell.style.cssText =
-        "position:absolute;left:0;right:0;box-sizing:border-box;cursor:pointer;" +
+        "position:absolute;left:0;right:0;box-sizing:border-box;cursor:pointer;overflow:visible;" +
         "display:flex;align-items:flex-start;justify-content:flex-end;padding-right:8px;" +
         `user-select:none;font-family:${FONT_STACK};`;
       const textSpan = document.createElement("div");
