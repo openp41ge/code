@@ -2,7 +2,8 @@
  * The focus line on a tab handle: the focused tab (the active tab of the
  * focused cell or sidebar, while the window is focused; it is marked
  * `data-focused`) has a blue bar floating half above its top edge — 3px
- * thick with rounded ends, half the tab's width and centred.
+ * thick with rounded ends, half the tab's width (at most MAX_WIDTH) and
+ * centred.
  *
  * Half of it is outside the tab, and tab bars scroll sideways, which clips
  * anything outside them (as do the grid and its cells). So the line is not
@@ -20,6 +21,8 @@
  */
 
 const HEIGHT = 3;
+/** The longest the line gets, however wide its tab (as in openp41ge explorer). */
+const MAX_WIDTH = 50;
 
 export class FocusLineLayer {
   readonly element: HTMLElement;
@@ -90,8 +93,9 @@ export class FocusLineLayer {
       return;
     }
     const r = tab.getBoundingClientRect();
-    let left = r.left + r.width / 4;
-    let right = left + r.width / 2;
+    const width = Math.min(r.width / 2, MAX_WIDTH);
+    let left = r.left + (r.width - width) / 2;
+    let right = left + width;
     // Clip to every ancestor that scrolls sideways (the tab's bar, the grid).
     for (const el of this._watched) {
       if (el.scrollWidth <= el.clientWidth) continue;
