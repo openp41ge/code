@@ -720,9 +720,9 @@ export function renderExplorer(host: ExplorerHost): TemplateResult {
          holding focus. */
       /* Row focus: only while the explorer grid owns focus (focus-within), so
          the blue focused-row bar/border appears only when the explorer tab is
-         focused — clicking away hides it, refocusing the tab restores it. */
-      .explorer-tree:focus-within .row:focus,
-      .explorer-tree:focus-within .row:focus-visible,
+         focused — clicking away hides it, refocusing the tab restores it.
+         Only the Explorer's own focused row is highlighted (never a row just
+         holding DOM focus), so one row is highlighted at a time. */
       .explorer-tree:focus-within .row.row--focused {
         background: rgba(74, 158, 255, 0.12);
         box-shadow: inset 0 0 0 1px var(--tree-focus, #4a9eff);
@@ -898,6 +898,9 @@ function renderNode(host: ExplorerHost, node: TreeNode, depth: number): Template
       data-drag-source-id=${isFile ? FILE_DRAG_SOURCE_ID : nothing}
       style="padding-left:${padding}px"
       @click=${(e: MouseEvent) => {
+        // A file row's mousedown is cancelled (it is a drag source), so the
+        // browser does not move focus to it: move it here.
+        (e.currentTarget as HTMLElement).focus();
         host.setState((prev) => setFocused(withRoots(host, prev), node.path));
         return isDir ? onToggle(host, node, e) : onOpenFile(host, node, e);
       }}
