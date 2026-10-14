@@ -1627,9 +1627,13 @@ export class Openp41geWindowManager extends LitElement {
         .wm-tabbar-scroll::-webkit-scrollbar {
           display: none;
         }
-        /* Overflowing, the last tab's divider would double the +'s border. */
+        /* Overflowing, the last tab's divider would double the +'s border.
+           Hide it by colour only: this class is set from measuring the
+           strip, so changing the strip's size here would flip that
+           measurement back and loop the render (it froze the window at the
+           one sidebar width where the 1px decided overflow). */
         .wm-tabbar-scroll--overflow .wm-tab--last {
-          border-right: none;
+          border-right-color: transparent;
         }
         .wm-tabbar-fade {
           position: absolute;
