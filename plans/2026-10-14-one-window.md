@@ -82,10 +82,16 @@ Each step ships on its own; the old windows keep working until step 5.
    dispatcher's in-memory state, which goes to such windows only
    (`electron/window-binding.ts`) and loses a window when it closes; its
    sidebar + menus offer, and its grid opens, only "none" tab types.
-4. **Top-bar workspace picker; replacing a window's workspace.** The label
-   becomes a button + overlay. Picking a workspace rebinds the window in the
-   main process (its meta, its dispatcher), unmounts the old layout and loads
-   the new workspace's layout.
+4. **Done (2026-10-14).** **Top-bar workspace picker; replacing a window's
+   workspace.** The title bar's workspace name is a button opening a picker
+   (filter, the current one marked, "No workspace"); with unsaved files in
+   the window it asks first. `window:switch-workspace` (main) plans the
+   switch (`electron/workspace-switch.ts`): the old state drops the window,
+   or keeps its layout when it was that workspace's last window; the window
+   becomes a closed workspace's first saved window, else a fresh one; then it
+   takes the new id and reloads (`rebindWindow`). Found on the way: the main
+   process's console.error forwarding recursed forever when a window's page
+   went away mid-send (100% CPU); fixed (`console-error-forwarder.ts`).
 5. **Cross-workspace drags; remove the old windows.** A workspace-free grid
    tab dropped on a window of another workspace moves between the two
    dispatchers. Then drop the `manager` and `logs` window types, the Window

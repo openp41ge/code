@@ -42,6 +42,8 @@ declare global {
         open: () => void;
         /** With `{ errorId }`, the window opens that error's log entry. */
         openLogsWindow: (target?: { errorId: string }) => void;
+        /** Replace the workspace this window shows (null: none); the window reloads. */
+        switchWorkspace?: (workspacePath: string | null) => Promise<boolean>;
         /** A workspace window asked to open logs in its grid (the error to reveal, or null). */
         onOpenLogsInWindow?: (callback: (errorId: string | null) => void) => () => void;
         openWindowSummaries: () => Promise<Array<{ windowId: string; windowType: "workspace" | "manager" | "logs"; workspacePath: string | null }>>;

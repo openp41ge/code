@@ -277,6 +277,11 @@ contextBridge.exposeInMainWorld("openp41ge", {
     openLogsWindow: (target) => {
       ipcRenderer.send("logs-window:open", target ?? null);
     },
+    /** Replace the workspace this window shows (null: none). The window
+     *  reloads as a window of that workspace; resolves false when nothing
+     *  changed. */
+    switchWorkspace: (workspacePath) =>
+      ipcRenderer.invoke("window:switch-workspace", workspacePath),
     /** Fired in a workspace window asked to open logs in its grid (the error
      *  to reveal, or null). */
     onOpenLogsInWindow: (callback) => {

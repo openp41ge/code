@@ -81,6 +81,35 @@ export function setRegistry(r: WorkspaceRegistry): void {
   _registry = r;
 }
 
+/** The id a live window is known by, or null. */
+export function windowIdOf(win: BrowserWindow): string | null {
+  for (const [id, bw] of openp41geWindows) if (bw === win) return id;
+  return null;
+}
+
+/**
+ * Give a live window a new id and binding (switching its workspace), then
+ * reload it so its renderer starts over as that window.
+ */
+export function rebindWindow(
+  win: BrowserWindow,
+  newId: string,
+  meta: Pick<Openp41geWindowMeta, "windowType" | "workspacePath">,
+): void {
+  const oldId = windowIdOf(win);
+  if (oldId === null) return;
+  openp41geWindows.delete(oldId);
+  openp41geWindowMeta.delete(oldId);
+  openp41geWindows.set(newId, win);
+  openp41geWindowMeta.set(newId, {
+    windowType: meta.windowType,
+    workspacePath: meta.workspacePath,
+  });
+  log.info("window-rebind", { from: oldId, to: newId, workspacePath: meta.workspacePath });
+  notifyOpenWindowsChanged();
+  win.webContents.reload();
+}
+
 /** The id of the openp41ge window a webContents belongs to, or null. */
 export function windowIdForSender(event: { sender: Electron.WebContents }): string | null {
   for (const [id, bw] of openp41geWindows) {
@@ -252,6 +281,7 @@ export function createOpenp41geWindow(
     },
   });
   keepWindowTitle(win);
+  const openp41geWinIdAtCreate = openp41geWinId;
 
   openp41geWindows.set(openp41geWinId, win);
   openp41geWindowMeta.set(openp41geWinId, windowMeta);
@@ -266,18 +296,22 @@ export function createOpenp41geWindow(
   // Tell any open Window Manager to refresh its "open windows" column.
   notifyOpenWindowsChanged();
 
+  // The window's id and binding can change (switching its workspace), so the
+  // handlers below read them when they run.
   win.webContents.on("did-finish-load", () => {
-    log.info("window-loaded", { windowId: openp41geWinId, type: windowMeta.windowType });
-    const d = resolveDispatcherFor(windowMeta.workspacePath);
+    const windowId = windowIdOf(win) ?? openp41geWinId;
+    const meta = openp41geWindowMeta.get(windowId) ?? windowMeta;
+    log.info("window-loaded", { windowId, type: meta.windowType });
+    const d = resolveDispatcherFor(meta.workspacePath);
     if (d) {
       win.webContents.send("openp41ge:init", {
-        windowId: openp41geWinId,
+        windowId,
         workspace: JSON.stringify(d.getWorkspace()),
         isDev,
-        windowType: windowMeta.windowType,
-        workspacePath: windowMeta.workspacePath,
-        initialTab: windowMeta.initialTab,
-        revealErrorId: windowMeta.revealErrorId,
+        windowType: meta.windowType,
+        workspacePath: meta.workspacePath,
+        initialTab: meta.initialTab,
+        revealErrorId: meta.revealErrorId,
         dataDir: _appDataDir,
       });
     }
@@ -288,6 +322,7 @@ export function createOpenp41geWindow(
   });
 
   win.on("closed", () => {
+    const openp41geWinId = windowIdOf(win) ?? openp41geWinIdAtCreate;
     const meta = openp41geWindowMeta.get(openp41geWinId);
     log.info("window-close", {
       windowId: openp41geWinId,

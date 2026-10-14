@@ -13,6 +13,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createLogger } from "openp41ge-core-logger";
 import { chromeSwitches } from "./chrome-switches.js";
+import { installConsoleErrorForwarder } from "./console-error-forwarder.js";
 import { addSentryBreadcrumb } from "../src/main/services/sentry.js";
 
 // ─── Service imports ─────────────────────────────────────────────────────
@@ -90,8 +91,11 @@ import {
   dispatcherForEvent,
   workspacePathForSender,
   windowIdForSender,
+  windowIdOf,
+  rebindWindow,
   type Openp41geWindowType,
 } from "./window-manager.js";
+import { planWorkspaceSwitch } from "./workspace-switch.js";
 
 // ─── IPC handler registrations ──────────────────────────────────────────
 import { registerDispatchHandlers } from "./ipc-handlers/dispatch-handler.js";
@@ -145,6 +149,7 @@ const CLEANUP_STARTUP_DELAY_MS = 15_000;
 const CLEANUP_SETTLE_MS = 10_000;
 
 const cleanupLog = createLogger("openp41ge", "repository-cleanup");
+const switchLog = createLogger("openp41ge", "workspace-switch");
 
 export class Openp41geApplication {
   // ── Public ────────────────────────────────────────────────────────────
@@ -321,6 +326,7 @@ export class Openp41geApplication {
     const forwardError = (message: string, source?: string, stack?: string) => {
       const payload = JSON.stringify({ message, source, stack });
       for (const [, bw] of openp41geWindows) {
+        if (bw.isDestroyed() || bw.webContents.isDestroyed()) continue;
         try {
           bw.webContents.send("openp41ge:error", payload);
         } catch {
@@ -361,29 +367,11 @@ export class Openp41geApplication {
     });
 
     // Also intercept console.error in main process.
-    const origError = console.error;
-    console.error = (...args: unknown[]) => {
-      const msg = args.map((a) => (typeof a === "object" ? String(a) : String(a))).join(" ");
-      // Don't forward pure Node diagnostics to the renderers — they are
-      // not application errors and would otherwise freeze every window
-      // in the blocking overlay. Real uncaught exceptions / rejections /
-      // app-level console.error are handled below and still forwarded.
-      const isNodeWarning =
-        (/^\(node:\d+\)\s*Warning:/i.test(msg.trim()) ||
-          msg.includes("Closing file descriptor") ||
-          msg.includes("MaxListenersExceededWarning") ||
-          msg.includes("DeprecationWarning")) &&
-        !msg.toLowerCase().includes("error");
-      if (!isNodeWarning && msg.trim().length > 0) {
-        addSentryBreadcrumb({
-          category: "console",
-          level: "warning",
-          message: msg.slice(0, 300),
-        });
-        forwardError(msg, "main-process");
-      }
-      origError.apply(console, args);
-    };
+    installConsoleErrorForwarder(console, {
+      forward: (message) => forwardError(message, "main-process"),
+      breadcrumb: (message) =>
+        addSentryBreadcrumb({ category: "console", level: "warning", message }),
+    });
   }
 
   // ── Step 2: Paths and Chrome flags ────────────────────────────────────
@@ -827,6 +815,12 @@ export class Openp41geApplication {
   // ── Step 6: IPC handlers ──────────────────────────────────────────────
 
   private _registerIpcHandlers(): void {
+    // The window's top-bar workspace picker: replace the workspace it shows.
+    ipcMain.handle("window:switch-workspace", (event, workspacePath: unknown) => {
+      const win = BrowserWindow.fromWebContents(event.sender);
+      if (!win || (workspacePath !== null && typeof workspacePath !== "string")) return false;
+      return this._switchWorkspace(win, workspacePath || null);
+    });
     registerDispatchHandlers(dispatcherForEvent);
     registerFileHandlers(this.fileSystem, dispatcherForEvent);
     registerWindowHandlers(dispatcherForEvent, this.tabNames);
@@ -957,6 +951,65 @@ export class Openp41geApplication {
         });
       }
     }
+  }
+
+  /**
+   * Replace the workspace `win` shows with `newPath` (null: none). Its old
+   * state drops the window (a workspace's last window keeps its layout in the
+   * file, as closing it would); it becomes a window of the new workspace's
+   * state (a closed workspace's saved window, else a fresh one) and reloads.
+   */
+  private _switchWorkspace(win: BrowserWindow, newPath: string | null): boolean {
+    const windowId = windowIdOf(win);
+    const meta = windowId ? openp41geWindowMeta.get(windowId) : undefined;
+    if (!windowId || meta?.windowType !== "workspace") return false;
+    const oldPath = meta.workspacePath ?? null;
+    const live = [...openp41geWindows].filter(([, bw]) => !bw.isDestroyed()).map(([id]) => id);
+    const liveOf = (p: string | null): string[] =>
+      live.filter((id) => {
+        const m = openp41geWindowMeta.get(id);
+        return m?.windowType === "workspace" && (m.workspacePath ?? null) === p;
+      });
+    const newOpen = newPath !== null && liveOf(newPath).length > 0;
+    const restored = newPath !== null && !newOpen ? this.workspaceSessionStore.load(newPath) : null;
+    const plan = planWorkspaceSwitch({
+      windowId,
+      oldPath,
+      newPath,
+      liveWindowIds: live,
+      otherLiveWindowsOfOld: liveOf(oldPath).filter((id) => id !== windowId).length,
+      liveWindowsOfNew: newPath === null ? 0 : liveOf(newPath).length,
+      savedWindowIdsOfNew: restored?.windows.map((w) => w.id) ?? [],
+    });
+    if (!plan) return false;
+
+    const oldDispatcher = oldPath ? this.registry.get(oldPath) : this.dispatcher;
+    if (oldDispatcher) {
+      if (plan.old === "keep") {
+        oldDispatcher.persist();
+      } else if (oldDispatcher.getWorkspace().windows.some((w) => w.id === windowId)) {
+        oldDispatcher.apply("closeWindow", [windowId]);
+        oldDispatcher.broadcast();
+      }
+    }
+
+    const dispatcher = newPath ? this.registry.getOrCreate(newPath) : this.dispatcher;
+    if (restored) dispatcher.setWorkspace(restored);
+    let newId: string;
+    if (plan.window.kind === "saved") {
+      newId = plan.window.id;
+    } else {
+      dispatcher.apply("newWindow", []);
+      const ws = dispatcher.getWorkspace();
+      newId = ws.windows[ws.windows.length - 1]?.id ?? "";
+      if (!newId) return false;
+    }
+    this.workspaceSessionStore.setCurrentWorkspacePath(newPath);
+    void this.extensionManager.setWorkspacePath(newPath);
+    rebindWindow(win, newId, { windowType: "workspace", workspacePath: newPath });
+    dispatcher.broadcast();
+    switchLog.info("switched", { from: oldPath, to: newPath, window: newId, plan });
+    return true;
   }
 
   private _createInitialWindow(): void {
