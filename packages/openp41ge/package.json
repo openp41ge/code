@@ -5,18 +5,14 @@
   "type": "module",
   "main": "dist-electron/electron/main.js",
   "scripts": {
-    "dev": "bash scripts/dev.sh",
-    "dev:tools": "OPENP41GE_DEVTOOLS=1 bash scripts/dev.sh",
-    "dev:renderer": "bash scripts/dev-renderer.sh",
-    "dev:electron": "bash scripts/dev-electron.sh",
-    "build": "vite build && bash scripts/build-electron.sh",
-    "build:electron": "bash scripts/build-electron.sh",
+    "dev": "nx run openp41ge:dev",
+    "build": "nx run openp41ge:build",
+    "build:electron": "nx run openp41ge:build:electron",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
-    "clean": "bash scripts/clean.sh",
+    "clean": "nx run openp41ge:clean",
     "dist": "node scripts/bundle-extensions.ts && electron-builder",
     "dist:mac": "node scripts/bundle-extensions.ts && electron-builder --mac",
-    "start": "electron .",
-    "start:devtools": "OPENP41GE_DEVTOOLS=1 electron ."
+    "start": "electron ."
   },
   "devDependencies": {
     "@sentry/cli": "^3.8.0",

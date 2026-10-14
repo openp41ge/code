@@ -105,12 +105,11 @@ declare global {
         acknowledge: () => void;
       };
       drag: {
-        start: (label: string, screenX: number, screenY: number, emoji?: string, tabId?: string, winId?: string, worksetId?: string, tabWidth?: number, tabHeight?: number, offsetX?: number, offsetY?: number, dragType?: string, filePath?: string, captureRect?: { x: number; y: number; width: number; height: number }, inset?: number, openTabData?: { appType?: string; tabConfig?: Record<string, unknown> }, payloadData?: import("openp41ge-sdk-uikit").PayloadDragData) => void;
+        start: (label: string, screenX: number, screenY: number, emoji?: string, tabId?: string, winId?: string, worksetId?: string, tabWidth?: number, tabHeight?: number, offsetX?: number, offsetY?: number, dragType?: string, filePath?: string, captureRect?: { x: number; y: number; width: number; height: number }, inset?: number, payloadData?: import("openp41ge-sdk-uikit").PayloadDragData) => void;
         move: (screenX: number, screenY: number) => void;
         setOpacity: (opacity: number) => void;
         end: () => void;
         activate: () => void;
-        prepareBitmap: (rect: { x: number; y: number; width: number; height: number }) => void;
         ghostForward: (screenX: number, screenY: number) => void;
         check: (screenX: number, screenY: number, dragData?: string) => Promise<{ target: Record<string, unknown> | null; windowId: string } | null>;
         getActive: () => Promise<{
@@ -118,8 +117,6 @@ declare global {
           label: string;
           dragData:
             | { tabId: string; winId: string; worksetId: string; type: "tab"; title?: string }
-            | { type: "open-tab"; appType: string; title?: string; tabConfig?: Record<string, unknown> }
-            | { type: "manager-tab"; tabId: string; winId: string; title?: string }
             | import("openp41ge-sdk-uikit").PayloadDragData;
         } | null>;
         endSession: () => void;

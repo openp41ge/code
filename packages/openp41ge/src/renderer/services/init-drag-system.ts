@@ -33,7 +33,6 @@ import { PayloadDragSource } from "./drag-sources/payload-drag-source";
 import type { DragEngagePoint, PayloadDragRequest } from "./extension-drag-service";
 import { extensionDrag } from "./extension-drag";
 import { resolveCrossWindowPayloadDrop } from "./payload-cross-window";
-import { LogStreamDragSource } from "./drag-sources/log-stream-drag-source";
 import { ClosedSidebarDropTarget } from "./drop-targets/closed-sidebar-drop-target";
 import {
   SidebarDropTarget,
@@ -266,33 +265,6 @@ let _payloadRowPrevDraggable: string | null = null;
 let _suppressPayloadRowClick = false;
 
 /**
- * Deferred drag:start params for log-stream (Logs sidebar row) drags — captured
- * on mousedown, fired on the first POSITION event exactly like file/tab/git
- * backlog. The open-tab payload rides `openTabData` so a TARGET window's
- * cross-window drop can open a stream-scoped log-viewer pane.
- */
-let _pendingLogStreamDragStart: {
-  label: string;
-  screenX: number;
-  screenY: number;
-  system: string;
-  winId: string;
-  offsetX: number;
-  offsetY: number;
-  elementWidth: number;
-  elementHeight: number;
-  /** Source row rect (viewport coords) for the main-process capturePage snapshot. */
-  captureRect: { x: number; y: number; width: number; height: number };
-} | null = null;
-
-/** Set to true when a log-stream drag engages so the trailing browser `click`
- * on the source row can be suppressed — otherwise releasing back over the
- * sidebar after a drag is seen as a click and re-opens the stream as if it
- * were a plain click. A stream should only open on an explicit grid drop (or
- * a plain click that never became a drag). */
-let _suppressLogStreamRowClick = false;
-
-/**
  * The window ID of this renderer, resolved lazily.
  * Cannot be cached at init time because openp41ge:init (which sets
  * _windowId in the preload) arrives after bootstrap runs. Use
@@ -511,67 +483,6 @@ function _resolveExtensionDropTarget(
   return target;
 }
 
-// ─── Mousedown: initiate log-stream (Logs sidebar row) drags ─────────────
-// Module-level so the synthetic Mousedown test hooks can drive it directly.
-function onLogStreamMouseDown(e: MouseEvent): void {
-  // Only the primary (left) button engages drags — right/middle clicks must
-  // never start a drag or interrupt an existing one.
-  if (e.button !== 0) return;
-
-  // Log-stream sidebar rows (retired Logs system tab) were built in the light DOM.
-  const row = e
-    .composedPath()
-    .find(
-      (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute("data-log-system"),
-    );
-  if (!row) return;
-
-  // New gesture — clear any unconsumed suppression flag from a previous drag.
-  _suppressLogStreamRowClick = false;
-
-  // Prevent text-selection / native text drag on the row during the gesture.
-  e.preventDefault();
-
-  const system = row.getAttribute("data-log-system") || "";
-  if (!system) return;
-  const title = system;
-  const winId = _resolveMyWinId();
-
-  // Calculate offset from cursor to element's top-left corner (screen coords).
-  const rect = row.getBoundingClientRect();
-  const elScreenX = window.screenX + rect.left;
-  const elScreenY = window.screenY + rect.top;
-  const offsetX = e.screenX - elScreenX;
-  const offsetY = e.screenY - elScreenY;
-
-  const dragSource = new LogStreamDragSource(system, title);
-  dragSource.setOffset(offsetX, offsetY);
-  _currentSource = dragSource;
-  _sidebarTabDragSide = null; // not a sidebar-tab drag
-  _orchestrator?.startDrag(dragSource, e.clientX, e.clientY);
-
-  // Defer drag:start until the first POSITION event (after threshold met),
-  // mirroring the file/tab/git pattern so the main process captures a
-  // pixel-accurate bitmap of the source row.
-  _pendingLogStreamDragStart = {
-    label: title,
-    screenX: e.screenX,
-    screenY: e.screenY,
-    system,
-    winId,
-    offsetX,
-    offsetY,
-    elementWidth: row.offsetWidth,
-    elementHeight: row.offsetHeight,
-    captureRect: {
-      x: rect.x + TAB_GHOST_CAPTURE_INSET,
-      y: rect.y + TAB_GHOST_CAPTURE_INSET,
-      width: Math.max(1, rect.width - TAB_GHOST_CAPTURE_INSET * 2),
-      height: Math.max(1, rect.height - TAB_GHOST_CAPTURE_INSET * 2),
-    },
-  };
-}
-
 // ─── Dummy drag source for cross-window ghost preview ────────────────────
 
 /**
@@ -667,27 +578,6 @@ export function initDragSystem(): () => void {
   cleanups.push(() => document.removeEventListener("mousedown", onMouseDown));
 
   // ── Mousedown: initiate log-stream (Logs sidebar row) drags ──────────
-  document.addEventListener("mousedown", onLogStreamMouseDown);
-  cleanups.push(() => document.removeEventListener("mousedown", onLogStreamMouseDown));
-
-  // ── Suppress the trailing click after a log-stream drag ──────────────
-  // Once a log-stream drag engages (threshold met -> _suppressLogStreamRowClick
-  // true), the browser may still synthesize a `click` on the source row if press
-  // and release stayed within the click slop. That click would re-open the stream
-  // via the sidebar's @click handler. Capture phase, consumed once.
-  const onLogStreamRowClickSuppress = (e: MouseEvent) => {
-    if (!_suppressLogStreamRowClick) return;
-    _suppressLogStreamRowClick = false;
-    const hasLogRow = e
-      .composedPath()
-      .some((el) => el instanceof HTMLElement && el.hasAttribute("data-log-system"));
-    if (hasLogRow) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-    }
-  };
-  document.addEventListener("click", onLogStreamRowClickSuppress, true);
-  cleanups.push(() => document.removeEventListener("click", onLogStreamRowClickSuppress, true));
 
   // ── Mousedown: initiate sidebar tab drags ────────────────────────────
   const onSidebarTabMouseDown = (e: MouseEvent) => {
@@ -812,7 +702,6 @@ export function initDragSystem(): () => void {
     _pendingDragStart = null;
     _pendingPayloadDragStart = null;
     _pendingSidebarDragStart = null;
-    _pendingLogStreamDragStart = null;
     if (_localDragActive) {
       clearGridGhost();
 
@@ -864,16 +753,10 @@ export function initDragSystem(): () => void {
         _localDragActive = true;
         log.info("drag-start", {
           sourceType: _currentSource?.type ?? "unknown",
-          label:
-            _pendingDragStart?.label ??
-            _pendingSidebarDragStart?.label ??
-            _pendingLogStreamDragStart?.label,
+          label: _pendingDragStart?.label ?? _pendingSidebarDragStart?.label,
         });
         // Payload drags: swallow the trailing click on the source element.
         _suppressPayloadRowClick = !!_pendingPayloadDragStart;
-        // And for log-stream rows: releasing back over the Logs sidebar must not
-        // re-open the stream as if it were a plain click.
-        _suppressLogStreamRowClick = !!_pendingLogStreamDragStart;
 
         // First POSITION event fires after the drag threshold is met — now
         // it's safe to show the main-process BrowserWindow ghost and broadcast
@@ -966,37 +849,9 @@ export function initDragSystem(): () => void {
             undefined,
             p.captureRect,
             undefined,
-            undefined,
             p.data,
           );
           _pendingPayloadDragStart = null;
-        } else if (_pendingLogStreamDragStart) {
-          const p = _pendingLogStreamDragStart;
-          // Log-stream ghost: identical bitmap treatment to files/git entries
-          // — the main process captures the source sidebar row and renders it
-          // in the DragGhostManager window at the row's exact dimensions. The
-          // open-tab payload (appType/tabConfig) rides `openTabData` so a
-          // TARGET window's cross-window drop can open a stream-scoped
-          // log-viewer pane without seeing the source row.
-          window.openp41ge.drag.start(
-            p.label,
-            p.screenX,
-            p.screenY,
-            undefined,
-            undefined,
-            p.winId,
-            undefined,
-            p.elementWidth,
-            p.elementHeight,
-            p.offsetX,
-            p.offsetY,
-            "open-tab",
-            undefined,
-            p.captureRect,
-            TAB_GHOST_CAPTURE_INSET,
-            { appType: "log-viewer", tabConfig: { system: p.system } },
-          );
-          _pendingLogStreamDragStart = null;
         }
         window.openp41ge.drag.activate();
       }
@@ -1020,8 +875,6 @@ export function initDragSystem(): () => void {
     _localDragActive = false;
     _dropHandled = false;
     _pendingSidebarDragStart = null;
-    _pendingLogStreamDragStart = null;
-    _suppressLogStreamRowClick = false;
     _pendingPayloadDragStart = null;
     _currentSource = null;
     _restorePayloadRowDraggable();
@@ -1222,8 +1075,6 @@ export function initDragSystem(): () => void {
     _dragActivated = false;
     _focusedOnEntry = false;
     _localDragActive = false;
-    _pendingLogStreamDragStart = null;
-    _suppressLogStreamRowClick = false;
     _orchestrator?.cancelDrag();
     window.openp41ge.drag.end();
     clearGridGhost();
@@ -1294,72 +1145,6 @@ async function _handleCrossWindowDrop(
       tabId: (data as { tabId?: string }).tabId,
       dragType: data.type,
     });
-
-    // Open-tab drops (log streams) open their pane in the target
-    // window/grid; a boundary drop splits a new column.
-    if (data.type === "open-tab") {
-      const tabConfig = (data as { tabConfig?: Record<string, unknown> }).tabConfig ?? {};
-      const appType = (data as { appType?: string }).appType;
-
-      // ── Log-system drop: open a system-scoped log-viewer pane ────────────
-      if (appType === "log-viewer") {
-        const system = (tabConfig as { system?: string }).system;
-        if (!system) {
-          window.openp41ge.drag.endSession();
-          return;
-        }
-        const gridEl = (target as IDropTarget & { element: HTMLElement }).element.closest(
-          "tab-grid",
-        ) as HTMLElement | null;
-        if (gridEl) {
-          const gridRect = gridEl.getBoundingClientRect();
-          const relX = clientX - gridRect.left;
-          const cols = (gridEl as HTMLElement & { cols?: number }).cols || 1;
-          const pos = computeDropTarget(gridEl, relX, gridRect.width, cols);
-          const targetCol = pos.col;
-          const winId = (gridEl as HTMLElement & { winId?: string }).winId || _resolveMyWinId();
-          const tabName = system;
-
-          if (pos.isBoundary) {
-            const splitLeft =
-              pos.boundaryIndex === 0
-                ? true
-                : pos.boundaryIndex >= cols
-                  ? false
-                  : targetCol >= pos.boundaryIndex;
-            const splitCol =
-              pos.boundaryIndex === 0 ? 0 : pos.boundaryIndex >= cols ? cols - 1 : targetCol;
-            window.openp41ge.workspace.dispatch(
-              "splitFileOpen",
-              winId,
-              "log-viewer",
-              tabName,
-              undefined,
-              splitCol,
-              splitLeft,
-              { system },
-            );
-          } else {
-            window.openp41ge.workspace.dispatch(
-              "actionOpenFile",
-              winId,
-              "log-viewer",
-              tabName,
-              undefined,
-              targetCol,
-              true,
-              { system },
-            );
-          }
-        }
-        window.openp41ge.drag.endSession();
-        return;
-      }
-
-      // Any other app type has no cross-window open.
-      window.openp41ge.drag.endSession();
-      return;
-    }
 
     // Any other drag type (e.g. sidebar-tab) must not trigger a grid tab
     // move/split cross-window — sidebar tabs are window-local. End the remote
@@ -1588,7 +1373,6 @@ if (typeof window !== "undefined") {
     },
     forceCrossWindowGhostCleanup: () => _hideCrossWindowGhost(),
     gridEl: () => document.querySelector("tab-grid") as HTMLElement | null,
-    getLogStreamPendingStart: () => _pendingLogStreamDragStart,
     getCurrentDragSourceType: () => _currentSource?.type ?? null,
     getCurrentDragData: () => _currentSource?.getDragData() ?? null,
     resetTestDragState: () => {
@@ -1596,8 +1380,6 @@ if (typeof window !== "undefined") {
       _currentSource = null;
       _pendingDragStart = null;
       _pendingSidebarDragStart = null;
-      _pendingLogStreamDragStart = null;
-      _suppressLogStreamRowClick = false;
       _localDragActive = false;
       _sidebarTabDragSide = null;
     },
@@ -1630,10 +1412,9 @@ let _crossWindowGridCols = 1;
  * split/cell-center classification via computeDropTarget.
  */
 function _updateCrossWindowGhost(clientX: number, clientY: number): void {
-  // Sidebar-tab drags are sidebar-only, and workspace-skeleton drags open a
-  // window on drop — neither may light up a central grid as a drop zone, so
-  // skip the grid ghost preview entirely.
-  if (_remoteDragType === "sidebar-tab" || _remoteDragType === "workspace") {
+  // Sidebar-tab drags are sidebar-only — they may not light up a central grid
+  // as a drop zone, so skip the grid ghost preview entirely.
+  if (_remoteDragType === "sidebar-tab") {
     _hideCrossWindowGhost();
     return;
   }
@@ -1873,7 +1654,7 @@ export function openp41geTargetResolver(clientX: number, clientY: number): IDrop
   }
 
   // Normal (non-sidebar) drag: check grid tab bars and grid cells
-  const isFileDrag = !!payloadDrag || _currentSource?.type === "open-tab";
+  const isFileDrag = !!payloadDrag;
   const tabBarEl = _closestComposed(el, "tab-bar");
   if (tabBarEl instanceof HTMLElement) {
     // Payload drags use the tab bar's own target: it shows the insert line and

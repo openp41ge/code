@@ -9,43 +9,32 @@ Use this skill when investigating bugs, unexpected behaviour, crashes, or visual
 
 ## 1. Start the App in Dev Mode
 
-From the monorepo root (`/Users/rk/Repository/openp41ge/code/master`), run:
+From the monorepo root (`code/master`), run:
 
 ```bash
-cd packages/openp41ge
-pnpm dev
+pnpm nx run openp41ge:dev
+# or, in packages/openp41ge: pnpm dev (the same target)
 ```
 
-This runs `scripts/dev.sh`, which:
+The `dev` target:
 
-1. Builds `openp41ge-file-editor` (generates `.d.ts`)
-2. Compiles Electron main process TypeScript (`build-electron.sh`)
-3. Starts the Vite dev server on `http://localhost:8642`
-4. Launches Electron pointing at the Vite dev server (hot-reload)
+1. Builds the libraries, the official extensions and the Electron main process
+   (its `dependsOn`; cached when unchanged)
+2. Starts the Vite dev server on `http://localhost:8642`
+3. Launches Electron pointing at it (the renderer hot-reloads), with Chrome
+   remote debugging on port `9222` (unpackaged builds; `electron/chrome-switches.ts`)
 
-**With DevTools auto-open:**
+The app opens one window with no workspace; pick one from the title bar.
 
-```bash
-OPENP41GE_DEVTOOLS=1 pnpm dev:tools
-# or
-cd packages/openp41ge && OPENP41GE_DEVTOOLS=1 bash scripts/dev.sh
-```
-
-To open DevTools after the app has started, press the shortcut or run:
+**DevTools:** Window menu → Devtools (⌥⌘I) in dev builds, or from the renderer:
 
 ```js
-// In DevTools console or via chrome_devtools_evaluate:
 window.openp41ge.window.openDevTools();
 ```
 
-The main process TypeScript does **not** hot-reload — restart `pnpm dev` after changing `electron/*.ts`.
-
-**Renderer-only (hot-reloads, no Electron):**
-
-```bash
-cd packages/openp41ge && bash scripts/dev-renderer.sh
-# Then open http://localhost:8642 in a browser
-```
+The main process TypeScript does **not** hot-reload, and neither do the
+extensions (they load from their builds) — restart the `dev` target after
+changing `electron/*.ts` or an extension.
 
 > **Dev port** — openp41ge deliberately uses an uncommon port (`8642`, not
 > Vite's `5173` or other agents' usual ports) so stray dev servers never end
@@ -57,7 +46,7 @@ cd packages/openp41ge && bash scripts/dev-renderer.sh
 
 ### Chrome DevTools Remote Debugging
 
-When the app is running with `pnpm dev`, you can use the `chrome_devtools_*` tools to inspect the renderer process directly:
+When the app is running (the `dev` target), you can use the `chrome_devtools_*` tools to inspect the renderer process directly:
 
 1. **List pages**: `chrome_devtools_list_pages` — discover available renderer pages.
 2. **Select page**: `chrome_devtools_select_page` — choose the Openp41ge window.
@@ -276,7 +265,7 @@ window.openp41ge.lifecycle.onError((data) => {
 1. The global error system has caught a runtime error
 2. Read the error message on the overlay
 3. Check `sessionStorage.getItem("openp41ge:captured-errors")` for stored errors
-4. Open DevTools (`OPENP41GE_DEVTOOLS=1` and restart, or use `chrome_devtools_evaluate`)
+4. Open DevTools (Window menu → Devtools, or use `chrome_devtools_evaluate`)
 5. Fix the root cause — the overlay clears when errors are resolved and the app reloads
 
 ### "The explorer sidebar doesn't show any repos"

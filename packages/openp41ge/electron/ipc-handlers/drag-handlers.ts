@@ -38,17 +38,8 @@ interface ActiveDragSession {
 let _activeSession: ActiveDragSession | null = null;
 let _cursorPollInterval: ReturnType<typeof setInterval> | null = null;
 // The DragGhostManager instance (set in registerDragHandlers) — used to keep
-// the ghost following the cursor globally and to detect workspace drag-outs.
+// the ghost following the cursor globally.
 let _dragGhost: DragGhostManager | null = null;
-// A skeleton bitmap pre-captured at pointer-down (before drag.start) so the ghost
-// can render the real skeleton the instant the drag begins, instead of waiting
-// for the async capture that runs in the drag-start handler.
-let _preparedBitmap: string | null = null;
-let _preparedRect: { x: number; y: number; width: number; height: number } | null = null;
-// The in-flight capture that resolves into _preparedBitmap. Kept so drag-start
-// can AWAIT the pointer-down capture instead of starting a second capturePage
-// (which raced the first one and made the skeleton pop late / not at all).
-let _preparing: Promise<string | null> | null = null;
 
 function _startCursorPoll(): void {
   _stopCursorPoll();
@@ -136,38 +127,14 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
       filePath,
       captureRect,
       inset,
-      openTabData,
       payloadData,
     } = parsed;
 
     // Show the ghost IMMEDIATELY (synchronous, row-styled for files / git
     // entries) so even a very quick drag gets visible feedback. Blocking on
     // capturePage first meant a fast drag could end (drag.end hides the ghost)
-    // before the slow capture resolved -> no drag element at all. If a skeleton
-    // bitmap was pre-captured at pointer-down, use it so the ghost pops with the
-    // real skeleton instantly (no placeholder, no async capture wait).
-    const isRowStyle =
-      dragType === "file" ||
-      dragType === "open-tab" ||
-      dragType === "workspace" ||
-      dragType === "payload";
-    const rectMatch =
-      !!captureRect &&
-      !!_preparedRect &&
-      _preparedRect.x === Math.round(captureRect.x) &&
-      _preparedRect.y === Math.round(captureRect.y) &&
-      _preparedRect.width === Math.round(captureRect.width) &&
-      _preparedRect.height === Math.round(captureRect.height);
-    const preparedBitmap = dragType === "workspace" && rectMatch ? _preparedBitmap : null;
-    // The pointer-down capture may still be in flight on a fast drag. Await it
-    // rather than issuing a second capturePage, which raced the first.
-    const pendingPrepare =
-      dragType === "workspace" && rectMatch && !preparedBitmap ? _preparing : null;
-    if (preparedBitmap) {
-      _preparedBitmap = null;
-      _preparedRect = null;
-      _preparing = null;
-    }
+    // before the slow capture resolved -> no drag element at all.
+    const isRowStyle = dragType === "file" || dragType === "payload";
     dragGhost.show(
       label,
       screenX,
@@ -181,22 +148,6 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
       undefined,
       dragType,
     );
-    // If a skeleton bitmap was pre-captured at pointer-down, swap it in now so
-    // the ghost pops with the real skeleton immediately (no async capture wait).
-    // The placeholder/shape is already visible from show(); this upgrades it.
-    if (preparedBitmap) {
-      dragGhost.setBitmap(
-        preparedBitmap,
-        typeof tabWidth === "number" ? tabWidth : captureRect ? Math.round(captureRect.width) : 132,
-        typeof tabHeight === "number"
-          ? tabHeight
-          : captureRect
-            ? Math.round(captureRect.height)
-            : 84,
-        typeof inset === "number" ? inset : 0,
-      );
-    }
-
     // Track the active drag session for cross-window drops
     const sender = _event.sender;
     for (const [sid, bw] of openp41geWindows) {
@@ -212,20 +163,6 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
             type,
             title: label,
             ...(type === "file" && filePath ? { filePath } : {}),
-            ...(type === "workspace" && filePath ? { filePath } : {}),
-            // Persist the open-tab payload so a TARGET window's cross-window
-            // drop can resolve appType/tabConfig without seeing the source row.
-            ...(type === "open-tab" &&
-            openTabData &&
-            typeof openTabData === "object" &&
-            typeof openTabData.appType === "string"
-              ? {
-                  appType: openTabData.appType,
-                  ...(openTabData.tabConfig && typeof openTabData.tabConfig === "object"
-                    ? { tabConfig: openTabData.tabConfig as Record<string, unknown> }
-                    : {}),
-                }
-              : {}),
             // Persist an extension's typed payload drag (payload, sourceId,
             // contexts, crossWindow) verbatim so the TARGET window can resolve
             // it — the renderer validates the payload before using it.
@@ -238,39 +175,16 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
       }
     }
 
-    // Async upgrade: capture a pixel-accurate bitmap of the source element (file
-    // row or workspace skeleton) and swap it into the ghost in-place — only if the
+    // Async upgrade: capture a pixel-accurate bitmap of the source element
+    // (a tab, a row) and swap it into the ghost in-place — only if the
     // drag is still ACTIVE (the session object identity is unchanged), otherwise
     // the drag already ended and we must not resurrect a ghost after drag.end.
-    if (pendingPrepare) {
-      // Reuse the pointer-down capture instead of starting a second capturePage
-      // (which raced the first and made the skeleton pop late / not at all).
-      const session = _activeSession;
-      pendingPrepare.then((bm) => {
-        if (bm && _activeSession === session && !sender.isDestroyed()) {
-          dragGhost.setBitmap(
-            bm,
-            typeof tabWidth === "number"
-              ? tabWidth
-              : captureRect
-                ? Math.round(captureRect.width)
-                : 132,
-            typeof tabHeight === "number"
-              ? tabHeight
-              : captureRect
-                ? Math.round(captureRect.height)
-                : 84,
-            typeof inset === "number" ? inset : 0,
-          );
-        }
-      });
-    } else if (
+    if (
       captureRect &&
       typeof captureRect.x === "number" &&
       typeof captureRect.y === "number" &&
       typeof captureRect.width === "number" &&
       typeof captureRect.height === "number" &&
-      !preparedBitmap &&
       !sender.isDestroyed()
     ) {
       const session = _activeSession;
@@ -326,60 +240,10 @@ export function registerDragHandlers(dragGhost: DragGhostManager): void {
     }
   });
 
-  // Pre-capture the source element region at pointer-down so the ghost can pop
-  // with the real skeleton the instant the drag starts (see drag-start).
-  ipcMain.on("openp41ge:drag-prepare-bitmap", (event, raw: string) => {
-    const rect = JSON.parse(raw);
-    if (
-      !rect ||
-      typeof rect.x !== "number" ||
-      typeof rect.y !== "number" ||
-      typeof rect.width !== "number" ||
-      typeof rect.height !== "number" ||
-      event.sender.isDestroyed()
-    ) {
-      return;
-    }
-    const requestRect = {
-      x: Math.round(rect.x),
-      y: Math.round(rect.y),
-      width: Math.round(rect.width),
-      height: Math.round(rect.height),
-    };
-    // Hover also requests a capture (pointerenter); a pointerdown re-request for
-    // the SAME region must not clobber it — otherwise a fast grab-and-drag starts
-    // a fresh capture that races the hover one and isn't ready at drag.start.
-    const sameRect =
-      !!_preparedRect &&
-      _preparedRect.x === requestRect.x &&
-      _preparedRect.y === requestRect.y &&
-      _preparedRect.width === requestRect.width &&
-      _preparedRect.height === requestRect.height;
-    if (sameRect && (_preparedBitmap || _preparing)) return;
-    _preparedRect = requestRect;
-    _preparedBitmap = null;
-    _preparing = (async () => {
-      try {
-        const img = await event.sender.capturePage(requestRect);
-        if (!img || img.isEmpty()) return null;
-        const bm = img.toDataURL();
-        _preparedBitmap = bm;
-        return bm;
-      } catch {
-        _preparedBitmap = null;
-        _preparedRect = null;
-        return null;
-      }
-    })();
-  });
-
   ipcMain.on("openp41ge:drag-end", () => {
     _stopCursorPoll();
     dragGhost.hide();
     _activeSession = null;
-    _preparedBitmap = null;
-    _preparedRect = null;
-    _preparing = null;
     _broadcastDragState(false, null);
   });
 

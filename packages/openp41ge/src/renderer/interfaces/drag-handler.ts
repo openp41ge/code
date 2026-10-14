@@ -21,14 +21,7 @@
 /** Data payload identifying what is being dragged */
 export type DragSourceData =
   | { type: "tab"; tabId: string; winId: string; worksetId: string; title?: string }
-  | { type: "openp41ge-tab"; tabId: string; winId: string; worksetId: string; title?: string }
-  | { type: "manager-tab"; tabId: string; winId: string; title?: string }
-  | {
-      type: "open-tab";
-      appType: string;
-      title?: string;
-      tabConfig?: Record<string, unknown>;
-    };
+  | { type: "openp41ge-tab"; tabId: string; winId: string; worksetId: string; title?: string };
 
 /**
  * A drag source provides:
