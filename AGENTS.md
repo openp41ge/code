@@ -279,7 +279,8 @@ merge: the user's values live in `config.json` under
 `extensions.<extensionId>` (only what the user wrote), and are validated
 against the schema on save. The extension never manages its own settings file.
 
-The platform's JSON config editor is the `config-editor` grid tab
+The platform's config editor is the `config-editor` grid tab — a form built
+from the schema (the UI kit's `<json-form>`), with a switch to the JSON view —
 (`{ extensionId }`), opened by `host.config.openEditor()`. It is also the
 platform's consumer for a dropped `config-overrides` payload (`settingsId` is
 the extension id), registered through the _same_ registration system

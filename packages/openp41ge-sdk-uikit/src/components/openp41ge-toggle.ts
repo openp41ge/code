@@ -15,6 +15,7 @@
  *  - `onLabel`  (String, default "On") — label shown when on.
  *  - `offLabel` (String, default "Off") — label shown when off.
  *  - `label`    (String) — accessible name (aria-label) for the control.
+ *  - `disabled` (Boolean, reflected) — shown but not changeable.
  *
  * Events (bubbling, composed):
  *  - `change` — fired when the user toggles. `detail.checked` is the new state.
@@ -27,6 +28,11 @@ export class Openp41geToggle extends LitElement {
   static styles = css`
     :host {
       display: inline-block;
+    }
+    :host([disabled]) .toggle {
+      opacity: 0.5;
+      cursor: default;
+      pointer-events: none;
     }
     .toggle {
       display: inline-flex;
@@ -77,6 +83,8 @@ export class Openp41geToggle extends LitElement {
   @property({ type: String }) onLabel = "On";
   @property({ type: String }) offLabel = "Off";
   @property({ type: String }) label = "";
+  /** Shown but not changeable. */
+  @property({ type: Boolean, reflect: true }) disabled = false;
 
   private _onChange(e: Event): void {
     const checked = (e.target as HTMLInputElement).checked;
@@ -96,6 +104,7 @@ export class Openp41geToggle extends LitElement {
         <input
           type="checkbox"
           .checked=${this.checked}
+          ?disabled=${this.disabled}
           aria-label=${this.label || "toggle"}
           @change=${this._onChange}
         />

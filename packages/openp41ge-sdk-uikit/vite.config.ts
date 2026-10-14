@@ -11,6 +11,7 @@ export default defineConfig({
         tooltip: path.resolve(__dirname, "src/components/tooltip/index.ts"),
         "drop-indicator": path.resolve(__dirname, "src/components/drop-indicator/index.ts"),
         "json-editor": path.resolve(__dirname, "src/json-editor/index.ts"),
+        "json-form": path.resolve(__dirname, "src/json-form/index.ts"),
       },
       formats: ["es"],
       fileName: (format, entryName) => `${entryName}.js`,

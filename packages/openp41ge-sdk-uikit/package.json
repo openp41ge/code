@@ -28,6 +28,10 @@
     "./json-editor": {
       "types": "./dist/json-editor/index.d.ts",
       "import": "./dist/json-editor.js"
+    },
+    "./json-form": {
+      "types": "./dist/json-form/index.d.ts",
+      "import": "./dist/json-form.js"
     }
   },
   "main": "dist/index.js",

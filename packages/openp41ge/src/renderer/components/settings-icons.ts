@@ -1,6 +1,6 @@
 /**
  * settings-icons.ts — the icons of the settings editors' bars (Save, Reset,
- * Show default values, Sort keys).
+ * Show default values, Sort keys, the JSON view switch).
  */
 
 import { html, type TemplateResult } from "lit";
@@ -36,5 +36,25 @@ export function showDefaultsIcon(): TemplateResult {
 export function sortKeysIcon(): TemplateResult {
   return html`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
     <path d="M120-240v-80h240v80H120Zm0-200v-80h480v80H120Zm0-200v-80h720v80H120Z" />
+  </svg>`;
+}
+
+/** JSON view ({ }) icon — the Form/JSON switch, as the workspace editor's. */
+export function jsonIcon(): TemplateResult {
+  return html`<svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 16 16"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path
+      d="M6 3.5C5 3.5 4.5 4 4.5 5v1c0 .8-.4 1.2-1.5 1.5 1.1.3 1.5.7 1.5 1.5v1c0 1 .5 1.5 1.5 1.5"
+    />
+    <path
+      d="M10 3.5c1 0 1.5.5 1.5 1.5v1c0 .8.4 1.2 1.5 1.5-1.1.3-1.5.7-1.5 1.5v1c0 1-.5 1.5-1.5 1.5"
+    />
   </svg>`;
 }

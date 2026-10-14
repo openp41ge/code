@@ -13,14 +13,20 @@
  * edit kept). While there are no unsaved edits, a change made elsewhere (another
  * window, the file edited by hand) is picked up.
  *
- * Bottom bar: Save and Reset on the left; Show default values and Sort keys on
- * the right — as the Explorer settings tab.
+ * It opens in a Form view of the settings (`<json-form>`, with the schema's
+ * problems with the values under their fields); the JSON view (`<json-editor>`)
+ * is a switch away, as in the workspace editor. Both edit the same staged
+ * values.
+ *
+ * Bottom bar: Save and Reset on the left; on the right, in the JSON view, Show
+ * default values and Sort keys, then the Form/JSON switch.
  */
 
 import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { state } from "lit/decorators.js";
 import { tooltipContent } from "openp41ge-sdk-uikit";
 import "openp41ge-sdk-uikit/json-editor";
+import "openp41ge-sdk-uikit/json-form";
 import {
   cloneDeep,
   mergeDefaults,
@@ -30,12 +36,12 @@ import {
   stripDefaults,
   type JsonPath,
 } from "openp41ge-sdk-uikit/json-editor";
-import type { ConfigSchema } from "openp41ge-sdk";
+import { configErrors, type ConfigSchema } from "openp41ge-sdk";
 import { createLogger } from "openp41ge-core-logger";
 import type { ExtensionConfigBridge } from "../services/extension-configs";
 import { settingsBridge, type PlatformConfigBridge } from "../services/settings-sources";
 import { appServices } from "../app";
-import { resetIcon, saveIcon, showDefaultsIcon, sortKeysIcon } from "./settings-icons";
+import { jsonIcon, resetIcon, saveIcon, showDefaultsIcon, sortKeysIcon } from "./settings-icons";
 
 const log = createLogger("openp41ge", "config-editor");
 
@@ -61,6 +67,8 @@ export class Openp41geConfigEditor extends LitElement {
   @state() private _saved: Doc | null = null;
   @state() private _pinned = new Set<string>();
   @state() private _showDefaults = false;
+  /** The Form view, or the JSON view. */
+  @state() private _mode: "form" | "json" = "form";
   @state() private _loading = true;
   @state() private _saving = false;
   @state() private _error = "";
@@ -186,10 +194,31 @@ export class Openp41geConfigEditor extends LitElement {
     }
   }
 
+  /** The schema's problems with the staged values, by path (`a.b[0]`). */
+  private _formErrors(): Array<{ path: string; message: string }> {
+    if (!this._schema || !this._overrides) return [];
+    return configErrors(this._schema, this._overrides).map((message) => {
+      const at = message.indexOf(": ");
+      return { path: at > 0 ? message.slice(0, at) : "", message };
+    });
+  }
+
   private _body(): TemplateResult {
     if (this._loading) return html`<p class="cfe-note">Loading…</p>`;
     if (!this._schema) {
       return html`<p class="cfe-note">${this.extensionId} has no settings.</p>`;
+    }
+    if (this._mode === "form") {
+      return html`<div class="cfe-editor cfe-editor--form">
+        <json-form
+          .schema=${this._schema}
+          .value=${this._overrides ?? {}}
+          .defaults=${this._defaults}
+          .errors=${this._formErrors()}
+          @json-form-change=${(e: CustomEvent) => this._sync((e.detail as { value: Doc }).value)}
+          @keydown=${(e: KeyboardEvent) => this._onKeyDown(e)}
+        ></json-form>
+      </div>`;
     }
     return html`<div class="cfe-editor">
       <json-editor
@@ -233,6 +262,11 @@ export class Openp41geConfigEditor extends LitElement {
         .cfe-editor > json-editor {
           flex: 1;
           min-height: 0;
+        }
+        .cfe-editor--form {
+          overflow: auto;
+          padding: 16px;
+          box-sizing: border-box;
         }
         .cfe-note {
           flex: 1;
@@ -292,6 +326,10 @@ export class Openp41geConfigEditor extends LitElement {
           height: 14px;
           fill: currentColor;
         }
+        /* Outline icons (the JSON switch's braces) are drawn with stroke. */
+        .cfe-btn svg[stroke] {
+          fill: none;
+        }
       </style>
       <div class="cfe-pane">
         ${this._body()}
@@ -318,26 +356,45 @@ export class Openp41geConfigEditor extends LitElement {
             ${resetIcon()}
           </button>
           <span class="cfe-spacer"></span>
+          ${
+            this._mode === "json"
+              ? html`<button
+                    class="cfe-btn ${this._showDefaults ? "cfe-btn--on" : ""}"
+                    type="button"
+                    aria-label="Show default values"
+                    aria-pressed="${this._showDefaults}"
+                    ?disabled=${!editable}
+                    @click=${() => (this._showDefaults = !this._showDefaults)}
+                    ${tooltipContent({ type: "simple", text: "Show default values" })}
+                  >
+                    ${showDefaultsIcon()}
+                  </button>
+                  <button
+                    class="cfe-btn"
+                    type="button"
+                    aria-label="Sort keys"
+                    ?disabled=${!editable}
+                    @click=${() =>
+                      this._overrides && this._sync(sortJsonKeys(this._overrides) as Doc)}
+                    ${tooltipContent({ type: "simple", text: "Sort keys" })}
+                  >
+                    ${sortKeysIcon()}
+                  </button>`
+              : nothing
+          }
           <button
-            class="cfe-btn ${this._showDefaults ? "cfe-btn--on" : ""}"
+            class="cfe-btn ${this._mode === "json" ? "cfe-btn--on" : ""}"
             type="button"
-            aria-label="Show default values"
-            aria-pressed="${this._showDefaults}"
-            ?disabled=${!editable}
-            @click=${() => (this._showDefaults = !this._showDefaults)}
-            ${tooltipContent({ type: "simple", text: "Show default values" })}
+            aria-label=${this._mode === "form" ? "Edit as JSON" : "Edit as form"}
+            aria-pressed="${this._mode === "json"}"
+            ?disabled=${!this._schema}
+            @click=${() => (this._mode = this._mode === "form" ? "json" : "form")}
+            ${tooltipContent({
+              type: "simple",
+              text: this._mode === "form" ? "Edit as JSON" : "Edit as form",
+            })}
           >
-            ${showDefaultsIcon()}
-          </button>
-          <button
-            class="cfe-btn"
-            type="button"
-            aria-label="Sort keys"
-            ?disabled=${!editable}
-            @click=${() => this._overrides && this._sync(sortJsonKeys(this._overrides) as Doc)}
-            ${tooltipContent({ type: "simple", text: "Sort keys" })}
-          >
-            ${sortKeysIcon()}
+            ${jsonIcon()}
           </button>
         </div>
       </div>

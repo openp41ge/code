@@ -35,6 +35,7 @@ export const RUNTIME_SPECIFIERS: readonly string[] = [
   "openp41ge-sdk-uikit/tooltip",
   "openp41ge-sdk-uikit/drop-indicator",
   "openp41ge-sdk-uikit/json-editor",
+  "openp41ge-sdk-uikit/json-form",
 ];
 
 /** Directory of the runtime modules (in the build output, and the URL path in dev). */
