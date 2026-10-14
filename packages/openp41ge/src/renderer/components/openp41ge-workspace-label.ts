@@ -73,8 +73,8 @@ openp41ge-workspace-label .wl-mask { position: fixed; inset: 0; z-index: 9999; -
 openp41ge-workspace-label .wl-panel { position: absolute; top: calc(100% + 4px); right: 0; z-index: 10000; width: 280px; max-height: 60vh; display: flex; flex-direction: column; background: var(--bg-tertiary, #252526); border: 1px solid var(--border-divider, #3a3a3a); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); overflow: hidden; -webkit-app-region: no-drag; }
 openp41ge-workspace-label .wl-filter { flex: none; margin: 8px; padding: 6px 10px; border: 1px solid var(--border-divider, #333); border-radius: 5px; background: var(--bg-primary, #1e1e1e); color: var(--text-primary, #d4d4d4); font-size: 12px; font-family: inherit; outline: none; }
 openp41ge-workspace-label .wl-filter:focus { border-color: var(--accent, #4fc1ff); }
-openp41ge-workspace-label .wl-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 0 6px; }
-openp41ge-workspace-label .wl-item { display: flex; align-items: center; gap: 8px; padding: 6px 14px; font-size: 13px; color: var(--text-primary, #ddd); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+openp41ge-workspace-label .wl-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 2px; }
+openp41ge-workspace-label .wl-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 5px; font-size: 13px; color: var(--text-primary, #ddd); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 openp41ge-workspace-label .wl-item:hover { background: var(--bg-hover, #2a2d2e); }
 openp41ge-workspace-label .wl-item--current { font-weight: 600; }
 openp41ge-workspace-label .wl-item-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -82,7 +82,7 @@ openp41ge-workspace-label .wl-active { flex-shrink: 0; margin-left: auto; paddin
 openp41ge-workspace-label .wl-foot { flex: none; padding: 8px; }
 openp41ge-workspace-label .wl-close { width: 100%; padding: 6px 10px; border: 1px solid color-mix(in srgb, var(--accent-error, #f44747) 35%, transparent); border-radius: 5px; background: color-mix(in srgb, var(--accent-error, #f44747) 8%, transparent); color: color-mix(in srgb, var(--accent-error, #f44747) 70%, var(--text-primary, #ddd)); font-size: 12px; font-family: inherit; cursor: pointer; }
 openp41ge-workspace-label .wl-close:hover { background: color-mix(in srgb, var(--accent-error, #f44747) 16%, transparent); }
-openp41ge-workspace-label .wl-empty { padding: 8px 14px; font-size: 12px; color: var(--text-muted, #888); font-style: italic; }
+openp41ge-workspace-label .wl-empty { padding: 8px 10px; font-size: 12px; color: var(--text-muted, #888); font-style: italic; }
 `;
 
 export class Openp41geWorkspaceLabel extends LitElement {
