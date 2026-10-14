@@ -130,6 +130,10 @@ export interface SystemTabSettings {
  * System tabs are sidebar-based app panels (e.g. the extensions' Explorer, History, Agents).
  * They are separate from editor tab types and use a simpler lifecycle.
  */
+/** The sidebar + picker's groups, in their order. */
+export const SIDEBAR_TAB_GROUPS = ["System", "Workspace", "Logs"] as const;
+export type SidebarTabGroup = (typeof SIDEBAR_TAB_GROUPS)[number];
+
 export interface SystemTabRegistration {
   id: string;
   label: string;
@@ -140,6 +144,9 @@ export interface SystemTabRegistration {
   /** Whether it needs a workspace open (default "required"): a window with
    *  no workspace offers only "none" sidebar tabs. */
   workspace?: SurfaceWorkspace;
+  /** Its group in the sidebar's + picker. Default: "System" when it needs no
+   *  workspace, else "Workspace". */
+  group?: SidebarTabGroup;
   /** Factory function to create the system tab content controller. */
   createController: (tabId: string, config?: Record<string, unknown>) => SystemTabController;
   /** This tab's own, unique settings surface (grid tab). Optional. */

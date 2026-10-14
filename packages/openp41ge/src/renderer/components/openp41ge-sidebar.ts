@@ -11,8 +11,9 @@ import { emitEvent } from "../app";
 import type { SystemTabRegistration } from "../controllers/types";
 import { getSystemTabRegistration, getAllSystemTabRegistrations } from "../apps/app-registry";
 import { availableInWindow } from "../services/window-workspace";
+import type { Openp41geSidebarTabPicker } from "./openp41ge-sidebar-tab-picker";
+import "./openp41ge-sidebar-tab-picker";
 import { emitOpenSystemTab } from "./openp41ge-worktree-controller";
-import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 import type { SystemTabController } from "../controllers/types";
 import { focusLineLayer, syncFocusLine, tooltipContent } from "openp41ge-sdk-uikit";
 
@@ -131,23 +132,26 @@ class Openp41geSidebar extends LitElement {
     return "";
   }
 
-  /** Open the inline + menu listing all registered sidebar tabs. */
+  /** Open the + picker: every sidebar tab this window can host, grouped. */
   private _onAddTabClick(): void {
+    document.querySelector("openp41ge-sidebar-tab-picker")?.remove();
     const btn = this.querySelector(".sidebar-tab-add") as HTMLElement | null;
     const r = btn?.getBoundingClientRect();
-    const menu = document.createElement("openp41ge-contextmenu") as Openp41geContextMenuElement;
-    // Anchor the menu so it drops below the + button, right-aligned to it,
-    // and stays inside the viewport (never negative x).
-    menu.x = Math.max(8, (r?.right ?? 160) - 160);
-    menu.y = (r?.bottom ?? 0) + 2;
-    menu.items = this._menuTabRegistrations().map((reg: SystemTabRegistration) => ({
+    const picker = document.createElement(
+      "openp41ge-sidebar-tab-picker",
+    ) as Openp41geSidebarTabPicker;
+    // Below the + button, its right edge at the button's (kept on screen).
+    picker.x = (r?.right ?? 268) - 260;
+    picker.y = (r?.bottom ?? 0) + 2;
+    picker.items = this._menuTabRegistrations().map((reg: SystemTabRegistration) => ({
       label: reg.label,
+      group: reg.group ?? (reg.workspace === "none" ? "System" : "Workspace"),
       badge: this._openSidesFor(reg.id),
       // The ＋ opens the tab on the sidebar that hosts the ＋ (`this.side`), not
       // the tab type's `defaultSide`. Callers that pass no side keep `defaultSide`.
       action: () => emitOpenSystemTab(this.windowId, reg.id, reg.label, this.side),
     }));
-    document.body.appendChild(menu);
+    document.body.appendChild(picker);
   }
 
   /** Sidebar tabs offered in the ＋ menu: every registered sidebar tab (the
