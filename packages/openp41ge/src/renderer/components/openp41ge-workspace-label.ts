@@ -68,7 +68,6 @@ openp41ge-workspace-label { position: relative; display: flex; align-items: cent
 openp41ge-workspace-label .wl-button { display: flex; align-items: center; gap: 4px; max-width: min(220px, calc((100vw - 270px) / 2)); height: 26px; padding: 0 8px; border: none; border-radius: 5px; background: transparent; color: var(--text-muted, #888); font-size: 12px; font-family: inherit; cursor: pointer; -webkit-app-region: no-drag; user-select: none; white-space: nowrap; }
 openp41ge-workspace-label .wl-button:hover, openp41ge-workspace-label .wl-button[aria-expanded="true"] { background: var(--bg-hover, #2a2d2e); color: var(--text-primary, #ddd); }
 openp41ge-workspace-label .wl-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-openp41ge-workspace-label .wl-caret { flex: none; font-size: 9px; opacity: 0.7; }
 openp41ge-workspace-label .wl-mask { position: fixed; inset: 0; z-index: 9999; -webkit-app-region: no-drag; }
 openp41ge-workspace-label .wl-panel { position: absolute; top: calc(100% + 4px); right: 0; z-index: 10000; width: 280px; max-height: 60vh; display: flex; flex-direction: column; background: var(--bg-tertiary, #252526); border: 1px solid var(--border-divider, #3a3a3a); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); overflow: hidden; -webkit-app-region: no-drag; }
 openp41ge-workspace-label .wl-filter { flex: none; margin: 8px; padding: 6px 10px; border: 1px solid var(--border-divider, #333); border-radius: 5px; background: var(--bg-primary, #1e1e1e); color: var(--text-primary, #d4d4d4); font-size: 12px; font-family: inherit; outline: none; }
@@ -242,7 +241,7 @@ export class Openp41geWorkspaceLabel extends LitElement {
         title="Switch workspace"
         @click=${() => void this._toggle()}
       >
-        <span class="wl-name">${name}</span><span class="wl-caret">▾</span>
+        <span class="wl-name">${name}</span>
       </button>
       ${this._open ? this._panel() : nothing}
     `;
