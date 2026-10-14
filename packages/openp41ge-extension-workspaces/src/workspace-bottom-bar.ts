@@ -70,9 +70,16 @@ export class WorkspaceBottomBar extends LitElement {
     return html`
       <style>
         :host {
+          display: block;
+          flex-shrink: 0;
+        }
+        /* The bar is drawn on this inner element, not the host: document
+           styles (the platform's global reset, \`* { border-width: 0 }\`)
+           reach the host element and would remove its border, but not into
+           the shadow root. */
+        .wbb-bar {
           display: flex;
           align-items: stretch;
-          flex-shrink: 0;
           height: 34px;
           /* The 1px top border is included so the bar is exactly 34px tall
              (platform chrome bars are 34px, border-box). */
@@ -156,8 +163,9 @@ export class WorkspaceBottomBar extends LitElement {
           padding-right: var(--grid-edge-right-pad, 0px);
         }
       </style>
-      ${this.status ? html`<span class="wbb-status">${this.status}</span>` : nothing}
-      ${this.buttons.map(
+      <div class="wbb-bar">
+        ${this.status ? html`<span class="wbb-status">${this.status}</span>` : nothing}
+        ${this.buttons.map(
         (b) => html`
           <button
             type="button"
@@ -170,6 +178,7 @@ export class WorkspaceBottomBar extends LitElement {
           </button>
         `,
       )}
+      </div>
     `;
   }
 }
