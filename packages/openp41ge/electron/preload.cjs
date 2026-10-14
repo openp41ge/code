@@ -2,11 +2,9 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 let _windowId = null;
 let _isDev = false;
-let _windowType = "workspace";
 let _workspacePath = null;
 let _dataDir = null;
-let _initialTab = null;
-let _revealErrorId = null;
+let _launchLogs = null;
 let _initResolve = null;
 /** Promise that resolves once openp41ge:init IPC message is received. */
 const _initPromise = new Promise((resolve) => {
@@ -17,11 +15,9 @@ const _initPromise = new Promise((resolve) => {
 ipcRenderer.on("openp41ge:init", (_event, data) => {
   _windowId = data.windowId;
   _isDev = !!data.isDev;
-  _windowType = data.windowType ?? "workspace";
   _workspacePath = data.workspacePath ?? null;
   _dataDir = data.dataDir ?? null;
-  _initialTab = data.initialTab ?? null;
-  _revealErrorId = data.revealErrorId ?? null;
+  _launchLogs = data.launchLogs ?? null;
   // Store initial workspace state for the renderer to pick up
   _initialState = data.workspace;
   if (_initResolve) {
@@ -62,7 +58,6 @@ contextBridge.exposeInMainWorld("openp41ge", {
   window: {
     minimize: () => ipcRenderer.send("window:minimize"),
     maximize: () => ipcRenderer.send("window:maximize"),
-    toggleFullScreen: () => ipcRenderer.send("window:toggleFullScreen"),
     /** Animated grow-to-fit used by the custom title-bar double-click. */
     maximizeAnimated: () => ipcRenderer.send("window:maximize-animated"),
     /** Custom titlebar drag: animate a real window move over IPC. */
@@ -110,14 +105,11 @@ contextBridge.exposeInMainWorld("openp41ge", {
     /** Get this window's Openp41ge window ID. */
     getWindowId: () => _windowId,
 
-    /** Get this window's kind ("workspace" | "manager" | "logs"). */
-    getWindowType: () => _windowType,
-
     /** Get the `.openp41ge-workspace` path this window is bound to (or null). */
     getWorkspacePath: () => _workspacePath,
 
-    /** Initial tab requested for a window-manager window ("workspaces" | "settings"), or null. */
-    getLaunchTab: () => _initialTab,
+    /** Logs to open once loaded (`{ errorId? }`; a window opened for them), or null. */
+    getLaunchLogs: () => _launchLogs,
 
     /**
      * Wait for the openp41ge:init IPC message (which sets windowId and initial state).
@@ -232,7 +224,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
     quit: () => ipcRenderer.send("prerequisites:quit"),
   },
 
-  /** What the data migrations did (the manager window's Migrations tab). */
+  /** What the data migrations did (the Migrations tab). */
   dataMigrations: {
     /** The app's version, the data version, and the journal. */
     status: () => ipcRenderer.invoke("data-migrations:status"),
@@ -273,83 +265,35 @@ contextBridge.exposeInMainWorld("openp41ge", {
   },
 
   windowManager: {
-    /** Open (or focus) the Window Manager window. */
-    open: () => {
-      ipcRenderer.send("window-manager:open");
-    },
-    /** Open logs (a workspace window: a Logs tab in its grid; else the Logs
-     *  window); with `{ errorId }`, open that error's log entry. */
-    openLogsWindow: (target) => {
-      ipcRenderer.send("logs-window:open", target ?? null);
+    /** Open logs (a Logs tab in this window's grid); with `{ errorId }`,
+     *  open that error's log entry. */
+    openLogs: (target) => {
+      ipcRenderer.send("logs:open", target ?? null);
     },
     /** Replace the workspace this window shows (null: none). The window
      *  reloads as a window of that workspace; resolves false when nothing
      *  changed. */
     switchWorkspace: (workspacePath) =>
       ipcRenderer.invoke("window:switch-workspace", workspacePath),
-    /** Fired in a workspace window asked to open logs in its grid (the error
+    /** Fired when this window is asked to open logs in its grid (the error
      *  to reveal, or null). */
     onOpenLogsInWindow: (callback) => {
       const handler = (_event, errorId) => callback(errorId ?? null);
       ipcRenderer.on("logs:open-in-window", handler);
       return () => ipcRenderer.removeListener("logs:open-in-window", handler);
     },
-    /** List currently open windows (id, kind, workspace binding). */
+    /** List currently open windows (id, workspace). */
     openWindowSummaries: () => {
       return ipcRenderer.invoke("window-manager:open-window-summaries");
     },
-    /** Open a workspace-bound window for `workspacePath`. */
+    /** Open a window of the workspace `workspacePath`. */
     openWorkspaceWindow: (workspacePath) => {
       ipcRenderer.send("window-manager:open-workspace-window", workspacePath);
     },
-    /** Focus the first live workspace window bound to `workspacePath` (if any). */
+    /** Focus the first live window of `workspacePath` (if any). */
     focusWorkspaceWindow: (workspacePath) => {
       return ipcRenderer.invoke("window-manager:focus-workspace-window", workspacePath);
     },
-    /** Called when an Openp41ge window opens or closes. Returns unsubscribe. */
-    onOpenWindowsChanged: (callback) => {
-      const handler = () => callback();
-      ipcRenderer.on("window-manager:open-windows-changed", handler);
-      return () => ipcRenderer.removeListener("window-manager:open-windows-changed", handler);
-    },
-    /** Fired when a tab should be activated in an already-open manager window. */
-    onActivateTab: (callback) => {
-      const handler = (_event, tab) => callback(tab);
-      ipcRenderer.on("window-manager:activate-tab", handler);
-      return () => ipcRenderer.removeListener("window-manager:activate-tab", handler);
-    },
-    /** Move a management tab from one manager window to another / reorder it. */
-    moveTab: (sourceWinId, targetWinId, tabId, dropIndex) => {
-      ipcRenderer.send(
-        "window-manager:move-tab",
-        JSON.stringify({ sourceWinId, targetWinId, tabId, dropIndex }),
-      );
-    },
-    /** Open a NEW management window containing `tab` (drag-out), removing it
-     *  from `sourceWinId` in the main process. */
-    openWithTab: (sourceWinId, tabId, dropScreenX, dropScreenY) => {
-      ipcRenderer.send(
-        "window-manager:open-with-tab",
-        JSON.stringify({ sourceWinId, tabId, dropScreenX, dropScreenY }),
-      );
-    },
-    /** Fired on a target manager window when another window moves a tab onto it. */
-    onReceiveTab: (callback) => {
-      const handler = (_event, payload) => callback(JSON.parse(payload));
-      ipcRenderer.on("window-manager:receive-tab", handler);
-      return () => ipcRenderer.removeListener("window-manager:receive-tab", handler);
-    },
-    /** Fired on a source manager window when its tab was moved to another
-     *  window (or to a new window) — remove it from the open-tabs bar. */
-    onRemoveTab: (callback) => {
-      const handler = (_event, payload) => callback(JSON.parse(payload));
-      ipcRenderer.on("window-manager:remove-tab", handler);
-      return () => ipcRenderer.removeListener("window-manager:remove-tab", handler);
-    },
-    /** The manager grid's saved tabs (`<app-data>/manager-grid.json`), or null. */
-    loadGrid: () => ipcRenderer.invoke("manager-grid:load"),
-    /** Save the manager grid's tabs. */
-    saveGrid: (grid) => ipcRenderer.invoke("manager-grid:save", grid),
   },
 
   drag: {
@@ -770,14 +714,6 @@ contextBridge.exposeInMainWorld("openp41ge", {
     readBackward: (cursor, limit) => ipcRenderer.invoke("log:read-backward", { cursor, limit }),
     /** The persisted entry with this errorId, or null. */
     findError: (errorId) => ipcRenderer.invoke("log:find-error", errorId),
-    /** The error a logs window was opened for (its launch), or null. */
-    getLaunchErrorId: () => _revealErrorId,
-    /** Fired when an open logs window is asked to open an error. */
-    onRevealError: (callback) => {
-      const handler = (_event, errorId) => callback(errorId);
-      ipcRenderer.on("logs-window:reveal-error", handler);
-      return () => ipcRenderer.removeListener("logs-window:reveal-error", handler);
-    },
   },
 
   lifecycle: {
@@ -851,12 +787,7 @@ contextBridge.exposeInMainWorld("openp41ge", {
     },
   },
 
-  welcome: {
-    isDismissed: () => ipcRenderer.invoke("welcome:is-dismissed"),
-    setDismissed: (dismissed) => ipcRenderer.invoke("welcome:set-dismissed", dismissed),
-  },
-
-  /** The repository cleanup (manager window's Cleanup tab): what it kept. */
+  /** The repository cleanup (the Cleanup tab): what it kept. */
   cleanup: {
     list: () => ipcRenderer.invoke("cleanup:list"),
     /** Run the cleanup now; resolves with what it kept. */

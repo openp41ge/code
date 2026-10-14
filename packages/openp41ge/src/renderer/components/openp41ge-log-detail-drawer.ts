@@ -3,7 +3,7 @@
  * process, level, time; the message and its stack in copyable code blocks),
  * as a drawer sliding in from the right over a dimming mask.
  *
- * It fills its positioned parent: the host places it (the logs window over
+ * It fills its positioned parent: the host places it (a log tab over
  * the grid cell whose row was clicked, a log grid tab over its own content).
  * Clicking the mask or the close button fires `drawer-close`.
  *

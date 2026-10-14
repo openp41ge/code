@@ -266,7 +266,7 @@ may drop there. There is no source-side destination list.
 
 The user-config override is `dragConsumers` in `config.json`: payload kind →
 consumer id (`<extensionId>/<consumerId>`, or a bare platform id such as
-`file-viewer`), edited in the manager's Settings tab. It applies immediately.
+`file-viewer`), edited from the Settings sidebar tab. It applies immediately.
 
 #### Settings / configuration overrides
 
@@ -291,8 +291,8 @@ This design adds `host.drag.*` (drop-target receivers) and `host.config.*`
 (merged config read/subscribe, open the config editor) to the host context
 described in §2.3. Errors are linkable: every ERROR log entry gets a unique,
 persisted `errorId`, which `log.error(...)` returns (view and backend), and
-`host.openLog(errorId)` opens the Logs window on that entry with its details
-open. Show a failure as a generic message linking to its log entry rather
+`host.openLog(errorId)` opens that entry's stream in a Logs tab with its
+details open. Show a failure as a generic message linking to its log entry rather
 than putting the error text in the UI. The authoritative shape is `SurfaceHost` in the contract
 package (`registration.ts`), which also carries `surface`, `context`,
 `openTab`, `workspace` and `showContextMenu`.
@@ -370,6 +370,18 @@ The layout is a tree of **Workspace → Window → Grid → Placements**.
 newTree`. Operations live in the layout module.
 - **Centralized state**: workspace state is the single source of truth and is
   updated by dispatching commands.
+
+**Windows.** There is one kind of window: a top bar, two sidebars and the
+grid. A window shows **at most one workspace**; the title bar's workspace
+picker replaces it (the window reloads as a window of the chosen workspace).
+Each workspace's state is kept by its own dispatcher in the main process and
+saved to its `.openp41ge-workspace` file, shared by every window showing it;
+windows with no workspace share an in-memory state that is never saved. A tab
+type declares whether it needs a workspace (§2.4): a window with none offers
+and opens only those that need none. Any tab moves between windows of the same
+workspace; between windows of different workspaces only grid tabs that need no
+workspace move. Settings, releases, logs and the workspace list are sidebar
+and grid tabs, not windows.
 
 ### 4.2 Pane / app registration
 

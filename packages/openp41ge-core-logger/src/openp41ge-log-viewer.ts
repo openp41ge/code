@@ -239,7 +239,7 @@ export class Openp41geLogViewer extends LitElement {
    *  position:relative), stopping at the bottom bar so the thumb overlays the
    *  list, not the filter toolbar. Pass the enclosing shadow root as
    *  styleTarget so the scoped scrollbar styles reach the list in a shadow
-   *  tree (e.g. the standalone Logs window). */
+   *  tree (e.g. a log grid tab). */
   private _attachScrollbar(): void {
     if (this._scrollbar) return;
     // jsdom/test env has no ResizeObserver; skip attaching gracefully.
@@ -724,7 +724,7 @@ export class Openp41geLogViewer extends LitElement {
 
   /**
    * Programmatically open the find bar with `query`, highlight the matching
-   * lines, and jump to the first match. Used by the Logs window when a
+   * lines, and jump to the first match. Used by a log tab when a
    * cross-stream search result is opened, so the viewer lands on that hit.
    */
   /**
@@ -1045,7 +1045,7 @@ export class Openp41geLogViewer extends LitElement {
   }
 
   /** A click on a log row (not its stream name) opens the detail drawer: emit
-   *  a bubbling custom event carrying the full entry so the Logs window host
+   *  a bubbling custom event carrying the full entry so the log tab's host
    *  can show its details. The stream-name click is left to `_openFilter`. */
   private _onLogListClick = (e: MouseEvent): void => {
     const target = e.target as HTMLElement | null;

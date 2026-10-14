@@ -63,7 +63,7 @@ export function openPrerequisitesWindow(options: PrerequisitesWindowOptions): vo
     fullscreenable: false,
     show: false,
     title: appTitle(app.isPackaged, "Before you start"),
-    // The app's chrome: the page draws its own title bar (as the logs window).
+    // The app's chrome: the page draws its own title bar (as the main window does).
     ...(process.platform === "darwin" ? { titleBarStyle: "hiddenInset" as const } : {}),
     backgroundColor: "#1e1e1e",
     webPreferences: {

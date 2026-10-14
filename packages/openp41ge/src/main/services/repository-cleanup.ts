@@ -9,7 +9,7 @@
  *   - the old `workspaces-data/<id>/repos/` copies of the workspaces
  *     extension's first design.
  * Anything with uncommitted, unpushed or stashed work, or whose state cannot
- * be read, is kept and listed instead (the manager window's Cleanup tab) for
+ * be read, is kept and listed instead (the Cleanup tab) for
  * the user to decide. A clone being cloned, or cloned less than a day ago, is
  * never touched: the workspace editor clones before Save lists it.
  */

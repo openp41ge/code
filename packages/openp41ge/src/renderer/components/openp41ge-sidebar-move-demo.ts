@@ -1,5 +1,5 @@
 /**
- * <openp41ge-sidebar-move-demo> - an animated mock of a workspace window
+ * <openp41ge-sidebar-move-demo> - an animated mock of a window
  * showing a system tab being dragged from one sidebar to the other.
  *
  * Each sidebar has a system tab at its top, with content cells below. The

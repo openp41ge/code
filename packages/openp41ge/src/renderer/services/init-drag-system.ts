@@ -34,17 +34,11 @@ import type { DragEngagePoint, PayloadDragRequest } from "./extension-drag-servi
 import { extensionDrag } from "./extension-drag";
 import { resolveCrossWindowPayloadDrop } from "./payload-cross-window";
 import { LogStreamDragSource } from "./drag-sources/log-stream-drag-source";
-import { ManagerTabDragSource } from "./drag-sources/manager-tab-drag-source";
-import { MANAGER_GRID_WIN_ID } from "./manager-grid-layout";
 import { ClosedSidebarDropTarget } from "./drop-targets/closed-sidebar-drop-target";
 import {
   SidebarDropTarget,
   setSidebarDropFeedbackSuppressed,
 } from "./drop-targets/sidebar-drop-target";
-import {
-  ManagerTabBarDropTarget,
-  managerDropIndex,
-} from "./drop-targets/manager-tab-bar-drop-target";
 import { SIDEBAR_DROP_EVENT } from "openp41ge-core-constants";
 
 // ─── SidebarTabDragSource — drag source for sidebar system tabs ──────────
@@ -239,45 +233,6 @@ let _pendingSidebarDragStart: {
  * file) or when a drag is interrupted, so it never leaks into another gesture.
  */
 let _sidebarTabDragSide: "left" | "right" | null = null;
-
-/**
- * Set once a manager-tab drag engages. The orchestrator fires DRAG_EVENTS.END
- * (which makes the host tear down and null _currentSource) BEFORE it resolves
- * the drop target on mouseup, so the final resolve can't see the live source.
- * This flag lets the resolver still know the drag was a manager-tab for that
- * final resolve. Cleared when any other drag starts or the drag is torn down.
- */
-let _managerTabDragActive = false;
-
-/** Suppress the trailing browser click on the source manager tab after a drag
- *  (the manager tab's @click activates it) so a release that stayed within the
- *  click slop doesn't re-activate it as if it were a plain click. */
-let _suppressManagerTabClick = false;
-
-/** Deferred drag:start params for manager-tab drags — captured on mousedown,
- *  fired on the first POSITION event (threshold met), so the main process
- *  captures a pixel-accurate bitmap of the source tab. */
-let _pendingManagerTabDragStart: {
-  label: string;
-  screenX: number;
-  screenY: number;
-  tabId: string;
-  winId: string;
-  width: number;
-  height: number;
-  offsetX: number;
-  offsetY: number;
-  /** Source manager-tab rect (viewport coords), trimmed by TAB_GHOST_CAPTURE_INSET. */
-  captureRect: { x: number; y: number; width: number; height: number };
-} | null = null;
-
-/**
- * The Application Management window's tab-bar element and its drop target,
- * registered by <openp41ge-window-manager> via registerManagerTabBar(). Only
- * one manager window exists per renderer process, so these are singletons.
- */
-let _managerBarEl: HTMLElement | null = null;
-let _managerBarDropTarget: ManagerTabBarDropTarget | null = null;
 
 /**
  * Deferred drag:start params for extension payload drags (`startPayloadDrag`),
@@ -617,80 +572,6 @@ function onLogStreamMouseDown(e: MouseEvent): void {
   };
 }
 
-// ─── Mousedown: initiate manager-tab (Application Management tab bar) drags ─
-// Module-level so the synthetic Mousedown test hooks can drive it directly.
-function onManagerTabMouseDown(e: MouseEvent): void {
-  // Only the primary (left) button engages drags — right/middle clicks must
-  // never start a drag or interrupt an existing one.
-  if (e.button !== 0) return;
-
-  // The management window's tab bar lives in <openp41ge-window-manager>'s
-  // shadow root, so at the document boundary e.target retargets to the host.
-  // Walk composedPath() to find the actual tab carrying data-manager-tab.
-  const tabEl = e
-    .composedPath()
-    .find(
-      (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute("data-manager-tab"),
-    );
-  if (!tabEl) return;
-
-  // Don't initiate a drag from the tab's close button — it stays click-only.
-  if (
-    e
-      .composedPath()
-      .some((el) => el instanceof HTMLElement && el.classList.contains("wm-tab-close"))
-  ) {
-    return;
-  }
-
-  // New gesture — clear any unconsumed suppression flag from a previous drag.
-  _suppressManagerTabClick = false;
-
-  e.preventDefault();
-
-  const tabId = tabEl.getAttribute("data-manager-tab") || "";
-  if (!tabId) return;
-  const title =
-    (tabEl.querySelector(".wm-tab-title")?.textContent ?? tabEl.textContent ?? "").trim() || tabId;
-  const winId = _resolveMyWinId();
-
-  // Calculate the cursor offset from the tab's top-left corner so the bitmap
-  // ghost hangs from where the user actually grabbed it (screen coords).
-  const rect = tabEl.getBoundingClientRect();
-  const elScreenX = window.screenX + rect.left;
-  const elScreenY = window.screenY + rect.top;
-  const offsetX = e.screenX - elScreenX;
-  const offsetY = e.screenY - elScreenY;
-
-  const dragSource = new ManagerTabDragSource(tabEl, tabId, winId, title);
-  dragSource.setOffset(offsetX, offsetY);
-  _currentSource = dragSource;
-  _sidebarTabDragSide = null; // not a sidebar-tab drag
-  _managerTabDragActive = true;
-  _orchestrator?.startDrag(dragSource, e.clientX, e.clientY);
-
-  // Defer drag:start until the first POSITION event (after threshold met),
-  // mirroring the grid/sidebar tab pattern so the main process captures a
-  // pixel-accurate bitmap of the source tab.
-  _pendingManagerTabDragStart = {
-    label: title,
-    screenX: e.screenX,
-    screenY: e.screenY,
-    tabId,
-    winId,
-    width: tabEl.offsetWidth,
-    height: tabEl.offsetHeight,
-    offsetX,
-    offsetY,
-    captureRect: {
-      x: rect.x + TAB_GHOST_CAPTURE_INSET,
-      y: rect.y + TAB_GHOST_CAPTURE_INSET,
-      width: Math.max(1, rect.width - TAB_GHOST_CAPTURE_INSET * 2),
-      height: Math.max(1, rect.height - TAB_GHOST_CAPTURE_INSET * 2),
-    },
-  };
-}
-
 // ─── Dummy drag source for cross-window ghost preview ────────────────────
 
 /**
@@ -718,11 +599,9 @@ export function initDragSystem(): () => void {
 
   // ── Mousedown: initiate tab drags ────────────────────────────────────
   //
-  // Found through the event's composed path: a grid may be inside shadow roots
-  // (the manager window's is), where `e.target` is the outermost host. A
-  // window that drags its own tabs (the Logs window) marks its host
-  // `data-own-tab-drags` and is left alone. Only a tab in a tab bar is a
-  // drag: a tab's content pane carries its tab id too, and a press there
+  // Found through the event's composed path: a grid may be inside shadow
+  // roots, where `e.target` is the outermost host. Only a tab in a tab bar is
+  // a drag: a tab's content pane carries its tab id too, and a press there
   // must keep its default (focusing an input, selecting text).
   const onMouseDown = (e: MouseEvent) => {
     const path = e.composedPath().filter((el): el is HTMLElement => el instanceof HTMLElement);
@@ -731,7 +610,6 @@ export function initDragSystem(): () => void {
     const tabBarEl = tabBtn.closest?.("tab-bar");
     if (!tabBarEl) return;
     if (path.some((el) => el.classList.contains("tab-close"))) return;
-    if (path.some((el) => el.hasAttribute("data-own-tab-drags"))) return;
 
     e.preventDefault();
 
@@ -792,10 +670,6 @@ export function initDragSystem(): () => void {
   document.addEventListener("mousedown", onLogStreamMouseDown);
   cleanups.push(() => document.removeEventListener("mousedown", onLogStreamMouseDown));
 
-  // ── Mousedown: initiate manager-tab (Application Management bar) drags ──
-  document.addEventListener("mousedown", onManagerTabMouseDown);
-  cleanups.push(() => document.removeEventListener("mousedown", onManagerTabMouseDown));
-
   // ── Suppress the trailing click after a log-stream drag ──────────────
   // Once a log-stream drag engages (threshold met -> _suppressLogStreamRowClick
   // true), the browser may still synthesize a `click` on the source row if press
@@ -814,25 +688,6 @@ export function initDragSystem(): () => void {
   };
   document.addEventListener("click", onLogStreamRowClickSuppress, true);
   cleanups.push(() => document.removeEventListener("click", onLogStreamRowClickSuppress, true));
-
-  // ── Suppress the trailing click after a manager-tab drag ──────────────
-  // The management window's tab bar @click activates the tab. A drag that
-  // releases within the click slop would be seen as a click and activate the
-  // tab as if it had never been dragged. Capture phase runs before the shadow
-  // host's bubble-phase handler, so stopImmediatePropagation blocks it.
-  const onManagerTabClickSuppress = (e: MouseEvent) => {
-    if (!_suppressManagerTabClick) return;
-    _suppressManagerTabClick = false;
-    const isManagerTab = e
-      .composedPath()
-      .some((el) => el instanceof HTMLElement && el.hasAttribute("data-manager-tab"));
-    if (isManagerTab) {
-      e.preventDefault();
-      e.stopImmediatePropagation();
-    }
-  };
-  document.addEventListener("click", onManagerTabClickSuppress, true);
-  cleanups.push(() => document.removeEventListener("click", onManagerTabClickSuppress, true));
 
   // ── Mousedown: initiate sidebar tab drags ────────────────────────────
   const onSidebarTabMouseDown = (e: MouseEvent) => {
@@ -958,7 +813,6 @@ export function initDragSystem(): () => void {
     _pendingPayloadDragStart = null;
     _pendingSidebarDragStart = null;
     _pendingLogStreamDragStart = null;
-    _pendingManagerTabDragStart = null;
     if (_localDragActive) {
       clearGridGhost();
 
@@ -1020,9 +874,6 @@ export function initDragSystem(): () => void {
         // And for log-stream rows: releasing back over the Logs sidebar must not
         // re-open the stream as if it were a plain click.
         _suppressLogStreamRowClick = !!_pendingLogStreamDragStart;
-        // And for manager tabs: releasing back over the tab bar must not
-        // activate the source tab as if it were a plain click.
-        _suppressManagerTabClick = !!_pendingManagerTabDragStart;
 
         // First POSITION event fires after the drag threshold is met — now
         // it's safe to show the main-process BrowserWindow ghost and broadcast
@@ -1146,35 +997,6 @@ export function initDragSystem(): () => void {
             { appType: "log-viewer", tabConfig: { system: p.system } },
           );
           _pendingLogStreamDragStart = null;
-        } else if (_pendingManagerTabDragStart) {
-          const p = _pendingManagerTabDragStart;
-          // Manager-tab ghost: identical pixel-accurate bitmap treatment to grid
-          // tabs — the main process captures the source tab (captureRect) and
-          // renders it in the DragGhostManager window at the tab's exact size.
-          // Hide any drop indicator before the async capture so the frame is a
-          // clean tab (no blue insert line); the orchestrator re-shows it on the
-          // next mousemove's onHover.
-          document
-            .querySelectorAll(".wm-tab-drop-indicator")
-            .forEach((el) => ((el as HTMLElement).style.display = "none"));
-          window.openp41ge.drag.start(
-            p.label,
-            p.screenX,
-            p.screenY,
-            undefined,
-            p.tabId,
-            p.winId,
-            undefined,
-            p.width,
-            p.height,
-            p.offsetX,
-            p.offsetY,
-            "manager-tab",
-            undefined,
-            p.captureRect,
-            TAB_GHOST_CAPTURE_INSET,
-          );
-          _pendingManagerTabDragStart = null;
         }
         window.openp41ge.drag.activate();
       }
@@ -1199,7 +1021,6 @@ export function initDragSystem(): () => void {
     _dropHandled = false;
     _pendingSidebarDragStart = null;
     _pendingLogStreamDragStart = null;
-    _pendingManagerTabDragStart = null;
     _suppressLogStreamRowClick = false;
     _pendingPayloadDragStart = null;
     _currentSource = null;
@@ -1226,11 +1047,6 @@ export function initDragSystem(): () => void {
       // Interrupted (no pending drop resolve) — clear the remembered side so it
       // can't leak into a subsequent drag.
       _sidebarTabDragSide = null;
-      // Same for the manager-tab drag flag + click suppression: an interrupted
-      // gesture has no final resolve and no follow-up click to suppress.
-      _managerTabDragActive = false;
-      _suppressManagerTabClick = false;
-      _managerBarDropTarget?.onLeave();
     }
   };
   document.addEventListener("mousedown", onInterruptMousedown, true);
@@ -1261,22 +1077,6 @@ export function initDragSystem(): () => void {
   document.addEventListener("click", onPayloadRowClickSuppress, true);
   cleanups.push(() => document.removeEventListener("click", onPayloadRowClickSuppress, true));
 
-  // ── Manager-tab drag flag reset (capture phase) ────────────────────────
-  // After a manager-tab drag ends, _managerTabDragActive stays set so the
-  // orchestrator's FINAL mouseup resolve can still see it was a manager-tab
-  // drag before the drop target is resolved. A new gesture must clear it unless
-  // it is itself a manager-tab drag — otherwise the stale flag would make the
-  // next (non-manager) drag's final resolve read as a manager-tab drag.
-  const onManagerTabFlagReset = (e: MouseEvent) => {
-    if (!_managerTabDragActive) return;
-    const isManagerTab = e
-      .composedPath()
-      .some((el) => el instanceof HTMLElement && el.hasAttribute("data-manager-tab"));
-    if (!isManagerTab) _managerTabDragActive = false;
-  };
-  document.addEventListener("mousedown", onManagerTabFlagReset, true);
-  cleanups.push(() => document.removeEventListener("mousedown", onManagerTabFlagReset, true));
-
   // ── Orchestrator detach event → check cross-window, then create window ──
   const onDetach = async (e: Event) => {
     const detail = (e as CustomEvent).detail as {
@@ -1291,50 +1091,6 @@ export function initDragSystem(): () => void {
 
     const screenX = detail.screenX ?? detail.bounds.x + 50;
     const screenY = detail.screenY ?? detail.bounds.y + 55;
-
-    // A manager grid tab is not a workspace tab: dropped outside its window it
-    // is not detached or moved to another window (cancelled).
-    if (detail.winId === MANAGER_GRID_WIN_ID) return;
-
-    // ── Manager-tab detach: only manager windows are valid destinations. ──
-    if (_managerTabDragActive) {
-      _managerTabDragActive = false;
-      const managerDragData = JSON.stringify({
-        tabId: detail.tabId,
-        winId: detail.winId,
-        type: "manager-tab",
-      });
-      try {
-        const check = await window.openp41ge.drag
-          .check(screenX, screenY, managerDragData)
-          .catch(() => null);
-        if (check?.target?.type === "manager-tab-bar") {
-          const target = check.target as { dropIndex?: number };
-          const targetWinId = (check as { windowId?: string }).windowId ?? detail.winId;
-          window.openp41ge.windowManager.moveTab(
-            detail.winId,
-            targetWinId,
-            detail.tabId,
-            Math.max(0, target.dropIndex ?? 0),
-          );
-          return;
-        }
-        // `check === null` means the cursor is over NO openp41ge window — a
-        // drag-out onto the desktop (or another app). Open a new management
-        // window with the tab. If `check` resolved but found no manager bar
-        // (e.g. cursor over a workspace window, or the non-bar part of another
-        // manager window), the drop is a cancel — manager tabs can only land on
-        // other management tab bars.
-        if (!check) {
-          window.openp41ge.windowManager.openWithTab(detail.winId, detail.tabId, screenX, screenY);
-        }
-      } catch (err) {
-        // On any error, conservatively treat the release as a drag-out.
-        log.debug("drag release probe failed; treating as drag-out:", err);
-        window.openp41ge.windowManager.openWithTab(detail.winId, detail.tabId, screenX, screenY);
-      }
-      return;
-    }
 
     const dragData = JSON.stringify({
       tabId: detail.tabId,
@@ -1538,17 +1294,6 @@ async function _handleCrossWindowDrop(
       tabId: (data as { tabId?: string }).tabId,
       dragType: data.type,
     });
-
-    // ── Manager-tab drop: only another management window's tab bar is valid. ──
-    if (data.type === "manager-tab") {
-      const tabId = (data as { tabId?: string }).tabId;
-      if (tabId && _isOverManagerBar(clientX, clientY) && _managerBarEl && _managerBarDropTarget) {
-        const dropIndex = managerDropIndex(_managerBarEl, clientX, clientY);
-        window.openp41ge.windowManager.moveTab(sourceWinId, _resolveMyWinId(), tabId, dropIndex);
-      }
-      window.openp41ge.drag.endSession();
-      return;
-    }
 
     // Open-tab drops (log streams) open their pane in the target
     // window/grid; a boundary drop splits a new column.
@@ -1852,20 +1597,10 @@ if (typeof window !== "undefined") {
       _pendingDragStart = null;
       _pendingSidebarDragStart = null;
       _pendingLogStreamDragStart = null;
-      _pendingManagerTabDragStart = null;
       _suppressLogStreamRowClick = false;
-      _suppressManagerTabClick = false;
       _localDragActive = false;
       _sidebarTabDragSide = null;
-      _managerTabDragActive = false;
-      _managerBarDropTarget?.onLeave();
     },
-    getManagerTabPendingStart: () => _pendingManagerTabDragStart,
-    getManagerTabBarDropTarget: () => _managerBarDropTarget,
-    isManagerTabDragActive: () => _managerTabDragActive,
-    registerManagerTabBarForTest: (barEl: HTMLElement) =>
-      registerManagerTabBar(barEl, _resolveMyWinId()),
-    callUpdateManagerBarGhost: (cx: number, cy: number) => _updateManagerBarGhost(cx, cy),
   };
 }
 
@@ -1896,19 +1631,10 @@ let _crossWindowGridCols = 1;
  */
 function _updateCrossWindowGhost(clientX: number, clientY: number): void {
   // Sidebar-tab drags are sidebar-only, and workspace-skeleton drags open a
-  // workspace window on drop — neither may light up a central grid as a drop
-  // zone, so skip the grid ghost preview entirely. Manager-tab drags may only
-  // land on another management window's tab bar, never on a central grid.
+  // window on drop — neither may light up a central grid as a drop zone, so
+  // skip the grid ghost preview entirely.
   if (_remoteDragType === "sidebar-tab" || _remoteDragType === "workspace") {
     _hideCrossWindowGhost();
-    return;
-  }
-
-  // Manager-tab drag: show the blue insertion line on this window's management
-  // tab bar when the cursor is over it (this is the only valid target). A
-  // workspace window has no manager bar, so the indicator never appears there.
-  if (_remoteDragType === "manager-tab") {
-    _updateManagerBarGhost(clientX, clientY);
     return;
   }
 
@@ -1982,16 +1708,6 @@ function _hideCrossWindowGhost(): void {
     _crossGhostGrid = null;
   }
   _crossWindowGrid = null;
-  _managerBarDropTarget?.onLeave();
-}
-
-/** Show/hide the management tab-bar insertion line for a cross-window drag. */
-function _updateManagerBarGhost(clientX: number, clientY: number): void {
-  if (_isOverManagerBar(clientX, clientY) && _managerBarDropTarget) {
-    _managerBarDropTarget.showIndicator(clientX, clientY);
-  } else {
-    _managerBarDropTarget?.onLeave();
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2091,66 +1807,16 @@ function _clearSidebarDropTargetCache(): void {
   _closedSidebarEdgeTargetRight = null;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Application Management tab bar registration
-// ═══════════════════════════════════════════════════════════════════════════
-
-/**
- * Register the Application Management window's tab bar (`.wm-tabbar`) with the
- * drag system so manager-tab drags can resolve it as a drop target and
- * cross-window drops can land on it. Called by <openp41ge-window-manager>
- * after its first render. Returns an unregister function.
- */
-export function registerManagerTabBar(barEl: HTMLElement, _winId: string): () => void {
-  // A new registration replaces an old one (e.g. a re-render, or a second
-  // window-manager window in the unlikely event of more than one per process).
-  _managerBarDropTarget?.onLeave();
-  _managerBarEl = barEl;
-  _managerBarDropTarget = new ManagerTabBarDropTarget(barEl);
-  return () => {
-    if (_managerBarEl === barEl) {
-      _managerBarDropTarget?.onLeave();
-      _managerBarDropTarget = null;
-      _managerBarEl = null;
-    }
-  };
-}
-
-/** Resolve to the manager tab-bar target when the cursor is over the bar. */
-function _getManagerTabBarTarget(clientX: number, clientY: number): IDropTarget | null {
-  if (!_managerBarDropTarget || !_managerBarEl) return null;
-  const rect = _managerBarEl.getBoundingClientRect();
-  if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
-    return null;
-  }
-  return _managerBarDropTarget;
-}
-
-/** Internal: whether the cursor is over the registered manager bar. */
-function _isOverManagerBar(clientX: number, clientY: number): boolean {
-  return _getManagerTabBarTarget(clientX, clientY) !== null;
-}
-
 export function openp41geTargetResolver(clientX: number, clientY: number): IDropTarget | null {
-  // Manager-tab drags may ONLY land on the Application Management tab bar. The
-  // bar is inside a shadow root so document.elementFromPoint below can't see
-  // it — resolve via the registered singleton (the manager bar's rect), and
-  // never fall through to grid/sidebar surfaces. `_managerTabDragActive` lets
-  // the final mouseup resolve still recognize a manager-tab drag after the
-  // host nulls `_currentSource` (the orchestrator fires END before resolving).
-  if (_currentSource?.type === "manager-tab" || _managerTabDragActive) {
-    return _getManagerTabBarTarget(clientX, clientY);
-  }
-
   // Accept any Element (including SVG): the tab icon is an inline <svg>, and
   // elementFromPoint returns the SVG element (not an HTMLElement), which would
   // otherwise fail the instanceof guard and break target resolution — hiding
   // every drop indicator when the cursor crosses a tab icon. Element.closest
   // works on SVG too, and every selector below resolves to an HTMLElement.
   //
-  // Descend into shadow roots: the manager window's grid is inside two
-  // (<openp41ge-window-manager> → <openp41ge-manager-grid> → <tab-grid>), where
-  // document.elementFromPoint only sees the outermost host. Then look up with
+  // Descend into shadow roots (a grid inside a component's shadow root is not
+  // seen by document.elementFromPoint, which stops at the outermost host).
+  // Then look up with
   // _closestComposed, which climbs back out of any shadow root the cursor's
   // element is in.
   const el = _deepElementFromPoint(clientX, clientY);

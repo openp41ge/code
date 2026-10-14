@@ -52,7 +52,7 @@ export interface RendererSurfaceHostDeps {
   /** Open an editor/panel tab (platform action). `from` names the calling
    *  grid tab, for `placement: "next-column"`. */
   readonly openTab: (request: OpenTabRequest, from?: { readonly tabId: string }) => void;
-  /** Open the Logs window on an error (`SurfaceHost.openLog`). Inert when absent. */
+  /** Open an error's log entry (`SurfaceHost.openLog`). Inert when absent. */
   readonly openLog?: (errorId: string) => void;
   /**
    * The extension's config (merged values, change notification, the editor).
@@ -405,7 +405,7 @@ export function mountRendererSurface<S extends Record<string, unknown> = Record<
 
   if (deps.buildContext) {
     // Defer the first render until the live context resolves. Registration can
-    // run before a workspace window binds its workspace file (bootstrap step
+    // run before the window binds its workspace file (bootstrap step
     // ordering), so a baked context would be empty; resolving at mount and
     // re-rendering picks up the actual workspace roots instead of flashing
     // "No repositories".

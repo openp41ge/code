@@ -1,5 +1,5 @@
 /**
- * <openp41ge-grid-demo> — an animated mock of a workspace window's grid: a
+ * <openp41ge-grid-demo> — an animated mock of a window's grid: a
  * small sidebar element is dragged into the grid and creates a new cell, on a
  * loop. Used in the Welcome intro to illustrate that the grid is column-based
  * and that dragging a sidebar element in makes a cell. The sidebar here is

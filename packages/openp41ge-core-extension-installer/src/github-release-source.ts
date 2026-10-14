@@ -87,7 +87,7 @@ export class GithubReleaseSource implements ExtensionSource {
       createLogger("openp41ge-extension-installer", "github-release-source");
   }
 
-  /** Fetch the official catalog (for the management window). */
+  /** Fetch the official catalog. */
   list(): Promise<ExtensionCatalog> {
     return fetchCatalog(this._catalogUrl, this._fetchJson);
   }

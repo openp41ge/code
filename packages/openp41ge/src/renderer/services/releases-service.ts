@@ -1,5 +1,5 @@
 /**
- * Renderer-side helpers for the manager window's Releases tab.
+ * Renderer-side helpers for the Releases tab.
  *
  * The release list itself comes from the main process (`window.openp41ge.
  * releases`, checked in the background). These pure helpers pick what each

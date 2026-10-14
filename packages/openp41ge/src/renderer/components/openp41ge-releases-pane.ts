@@ -1,5 +1,5 @@
 /**
- * openp41ge-releases-pane — the manager window's Releases sidebar tab.
+ * openp41ge-releases-pane — the Releases sidebar tab.
  *
  * The app's published releases, one row each (tag, channel, a Current pill
  * on the installed one, date):

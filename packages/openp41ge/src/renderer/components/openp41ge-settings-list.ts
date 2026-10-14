@@ -1,5 +1,5 @@
 /**
- * <openp41ge-settings-list> — the manager window's Settings sidebar tab: every
+ * <openp41ge-settings-list> — the Settings sidebar tab: every
  * settings schema there is, each described by its schema's `description`. The
  * platform's own settings ("Platform") come first, then each active extension
  * that registered a schema, by name. A click

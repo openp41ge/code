@@ -31,9 +31,6 @@ export class RegisterTabActivationRecorderStep implements IStartupStep {
   private _initialised = false;
 
   async run(context: StartupContext): Promise<void> {
-    // Window-manager windows have no grid tabs to activate.
-    if (context.windowType === "manager") return;
-
     context.workspaceState.subscribe((ws) => {
       this._observe(context, ws);
     });

@@ -72,7 +72,7 @@ import {
   installExtensionProtocolHandler,
 } from "../src/main/services/extension-protocol.js";
 
-// ─── Window manager ──────────────────────────────────────────────────────
+// ─── Windows ─────────────────────────────────────────────────────────────
 import {
   openp41geWindows,
   openp41geWindowMeta,
@@ -81,8 +81,9 @@ import {
   setTabNames,
   createOpenp41geWindow,
   promptQuit,
-  openWindowManager,
-  openLogsWindow,
+  openNewWindow,
+  openLogs,
+  openSidebarTab,
   setOpenWorkspaceWindowHandler,
   setAppQuitting,
   setAppDataDir,
@@ -93,7 +94,6 @@ import {
   windowIdForSender,
   windowIdOf,
   rebindWindow,
-  type Openp41geWindowType,
 } from "./window-manager.js";
 import { planWorkspaceSwitch } from "./workspace-switch.js";
 
@@ -108,8 +108,6 @@ import { registerTerminalHandlers } from "./ipc-handlers/terminal-handlers.js";
 import { registerWorkspaceHandlers } from "./ipc-handlers/workspace-handlers.js";
 import { registerConfigHandlers } from "./ipc-handlers/config-handlers.js";
 import { registerExtensionConfigHandlers } from "./ipc-handlers/extension-config-handlers.js";
-import { registerWelcomeHandlers } from "./ipc-handlers/welcome-handlers.js";
-import { registerManagerGridHandlers } from "./ipc-handlers/manager-grid-handlers.js";
 import { registerLogHandlers } from "./ipc-handlers/log-handlers.js";
 import { registerUpdaterHandlers } from "./ipc-handlers/updater-handlers.js";
 import { registerReleasesHandlers } from "./ipc-handlers/releases-handlers.js";
@@ -782,7 +780,7 @@ export class Openp41geApplication {
     setRegistry(this.registry);
     setTabNames(this.tabNames);
 
-    // Window-manager workspace windows are opened with a workspace binding. Bind
+    // A workspace's windows are opened with its binding. Bind
     // the store to that path so mutations save to its file, and restore the
     // workspace's saved session (windows/grids/sidebars) when it has one.
     setOpenWorkspaceWindowHandler((workspacePath, source) => {
@@ -855,8 +853,6 @@ export class Openp41geApplication {
     );
     registerConfigHandlers(this.configService);
     registerExtensionConfigHandlers(this.extensionConfig);
-    registerWelcomeHandlers(this.openp41geDir, !app.isPackaged);
-    registerManagerGridHandlers(this.openp41geDir);
     registerLogHandlers(this.logStore);
     registerUpdaterHandlers(this.autoUpdater);
     registerReleasesHandlers(this.releasesFeed);
@@ -912,12 +908,12 @@ export class Openp41geApplication {
   /**
    * Open a workspace: load its session (windows/grids/sidebars) into the
    * dispatcher and create a bound window for each restored window. Falls back
-   * to a single fresh workspace window when the file has no session.
+   * to a single fresh window when the file has no session.
    */
   private _openWorkspaceSession(workspacePath: string, source?: BrowserWindow): void {
     this.workspaceSessionStore.setCurrentWorkspacePath(workspacePath);
     void this.extensionManager.setWorkspacePath(workspacePath);
-    // If a workspace window for this path is already open, focus it rather than
+    // If a window of this workspace is already open, focus it rather than
     // re-creating every window in the file. Unconditional re-creation produced
     // duplicate BrowserWindows (same id, map overwrite) and left stale windows
     // in the file desynced from the live set — e.g. a window id shared across
@@ -934,19 +930,17 @@ export class Openp41geApplication {
       dispatcher.broadcast();
       for (const win of restored.windows) {
         createOpenp41geWindow(win.id, false, undefined, undefined, undefined, {
-          windowType: "workspace",
           workspacePath,
         });
       }
     } else {
-      // Fresh workspace window bound to the path.
+      // A fresh window bound to the path.
       dispatcher.apply("newWindow", []);
       const ws = dispatcher.getWorkspace();
       const newWin = ws.windows[ws.windows.length - 1];
       if (newWin) {
         dispatcher.broadcast();
         createOpenp41geWindow(newWin.id, false, source, undefined, undefined, {
-          windowType: "workspace",
           workspacePath,
         });
       }
@@ -962,13 +956,13 @@ export class Openp41geApplication {
   private _switchWorkspace(win: BrowserWindow, newPath: string | null): boolean {
     const windowId = windowIdOf(win);
     const meta = windowId ? openp41geWindowMeta.get(windowId) : undefined;
-    if (!windowId || meta?.windowType !== "workspace") return false;
+    if (!windowId || !meta) return false;
     const oldPath = meta.workspacePath ?? null;
     const live = [...openp41geWindows].filter(([, bw]) => !bw.isDestroyed()).map(([id]) => id);
     const liveOf = (p: string | null): string[] =>
       live.filter((id) => {
         const m = openp41geWindowMeta.get(id);
-        return m?.windowType === "workspace" && (m.workspacePath ?? null) === p;
+        return !!m && (m.workspacePath ?? null) === p;
       });
     const newOpen = newPath !== null && liveOf(newPath).length > 0;
     const restored = newPath !== null && !newOpen ? this.workspaceSessionStore.load(newPath) : null;
@@ -1006,7 +1000,7 @@ export class Openp41geApplication {
     }
     this.workspaceSessionStore.setCurrentWorkspacePath(newPath);
     void this.extensionManager.setWorkspacePath(newPath);
-    rebindWindow(win, newId, { windowType: "workspace", workspacePath: newPath });
+    rebindWindow(win, newId, { workspacePath: newPath });
     dispatcher.broadcast();
     switchLog.info("switched", { from: oldPath, to: newPath, window: newId, plan });
     return true;
@@ -1017,9 +1011,9 @@ export class Openp41geApplication {
     if (workspaceArg) {
       this._openWorkspaceSession(workspaceArg);
     } else {
-      // No workspace argument — start at the Window Manager so the user picks
-      // or creates a workspace.
-      openWindowManager();
+      // No workspace argument — start in a window with no workspace open (the
+      // Workspaces tab and the title bar's picker open one).
+      openNewWindow();
     }
   }
 
@@ -1038,10 +1032,9 @@ export class Openp41geApplication {
       );
       return;
     }
-    // The menu varies with the focused window: the compact Window Manager
-    // has no workspace to add a window to and no Logs tab, so those entries
-    // are omitted while it is focused.
-    const isWindowManager = this._focusedWindowType() === "manager";
+    // The menu varies with the focused window: one with no workspace has no
+    // workspace to add a window to.
+    const focusedHasWorkspace = this._focusedWorkspacePath() !== null;
     const template: Electron.MenuItemConstructorOptions[] = [
       // Application menu — this is the macOS app menu labelled app.name
       // (without it, Electron shows a default "Electron" app menu). Settings
@@ -1051,17 +1044,17 @@ export class Openp41geApplication {
         submenu: [
           { role: "about" },
           { type: "separator" },
-          // The compact Window Manager doubles as an app-level Management hub
-          // (workspaces, releases, global settings), so one item opens it.
+          // Settings and Logs open as tabs in the focused window.
           {
-            label: "Management",
+            label: "Settings",
             accelerator: "CmdOrCtrl+,",
-            click: () => openWindowManager(BrowserWindow.getFocusedWindow() ?? undefined),
+            click: () =>
+              openSidebarTab("settings", "Settings", BrowserWindow.getFocusedWindow() ?? undefined),
           },
           {
             label: "Logs",
             accelerator: "CmdOrCtrl+Shift+L",
-            click: () => openLogsWindow(BrowserWindow.getFocusedWindow() ?? undefined),
+            click: () => openLogs(BrowserWindow.getFocusedWindow() ?? undefined),
           },
           { type: "separator" },
           { role: "services" },
@@ -1112,10 +1105,9 @@ export class Openp41geApplication {
     ];
 
     // Window menu — includes dev items (Reload, Devtools) only in dev mode.
-    // "New Window" (no workspace) and "Add Workspace Window" are pinned at the
-    // TOP of this menu with a separator below them. It binds the new window to the focused window's workspace — the
-    // Window Manager has no workspace to add a window to, so it (and its
-    // separator) are omitted there.
+    // "New Window" (no workspace) and "Add Workspace Window" (another window
+    // of the focused window's workspace; omitted when it has none) are pinned
+    // at the TOP of this menu with a separator below them.
     template.push({
       label: "Window",
       submenu: [
@@ -1125,7 +1117,7 @@ export class Openp41geApplication {
           accelerator: "CmdOrCtrl+Shift+N",
           click: () => this._newWindow(),
         },
-        ...(isWindowManager
+        ...(!focusedHasWorkspace
           ? []
           : [
               {
@@ -1162,12 +1154,12 @@ export class Openp41geApplication {
     Menu.setApplicationMenu(menu);
   }
 
-  /** The type of the currently focused window, or null if none is focused. */
-  private _focusedWindowType(): Openp41geWindowType | null {
+  /** The workspace the focused window shows (null: none, or no window focused). */
+  private _focusedWorkspacePath(): string | null {
     const bw = BrowserWindow.getFocusedWindow();
     if (!bw || bw.isDestroyed()) return null;
     for (const [id, win] of openp41geWindows) {
-      if (win === bw) return openp41geWindowMeta.get(id)?.windowType ?? null;
+      if (win === bw) return openp41geWindowMeta.get(id)?.workspacePath ?? null;
     }
     return null;
   }
@@ -1175,23 +1167,14 @@ export class Openp41geApplication {
   /** Window menu > New Window — a window with no workspace open (its tabs live
    *  in memory, in the default dispatcher). */
   private _newWindow(): void {
-    const src = BrowserWindow.getFocusedWindow() ?? undefined;
-    this.dispatcher.apply("newWindow", []);
-    const ws = this.dispatcher.getWorkspace();
-    const newWin = ws.windows[ws.windows.length - 1];
-    if (!newWin) return;
-    this.dispatcher.broadcast();
-    createOpenp41geWindow(newWin.id, false, src, undefined, undefined, {
-      windowType: "workspace",
-      workspacePath: null,
-    });
+    openNewWindow(BrowserWindow.getFocusedWindow() ?? undefined);
   }
 
   /** Window menu > Add Workspace Window — bind a new window to the focused workspace. */
   private _addWorkspaceWindow(): void {
     const src = BrowserWindow.getFocusedWindow() ?? undefined;
     // Bind the new window to the focused window's workspace binding
-    // (fresh central grid — a workspace window of the same workspace).
+    // (fresh central grid — another window of the same workspace).
     let workspacePath: string | null = null;
     if (src) {
       for (const [id, bw] of openp41geWindows) {
@@ -1211,29 +1194,18 @@ export class Openp41geApplication {
       if (newWin) {
         dispatcher.broadcast();
         createOpenp41geWindow(newWin.id, false, src, undefined, undefined, {
-          windowType: "workspace",
           workspacePath,
         });
       }
     } else {
-      // Unbound (window-manager / logs) — fall back to the default dispatcher.
-      this.dispatcher.apply("newWindow", []);
-      const ws = this.dispatcher.getWorkspace();
-      const newWin = ws.windows[ws.windows.length - 1];
-      if (newWin) {
-        this.dispatcher.broadcast();
-        createOpenp41geWindow(newWin.id, false, src, undefined, undefined, {
-          windowType: "workspace",
-          workspacePath: null,
-        });
-      }
+      this._newWindow();
     }
   }
 
   // ── Step 9: App events ────────────────────────────────────────────────
 
   private _registerAppEvents(): void {
-    // Preserve open workspace windows across a full app quit so reopening the
+    // Preserve a workspace's open windows across a full app quit so reopening the
     // workspace restores them (see setAppQuitting). Persist the layout (with all
     // live windows) so closing every window at once saves the full multi-window
     // state for the skeleton to render on relaunch.
@@ -1253,16 +1225,16 @@ export class Openp41geApplication {
 
     app.on("window-all-closed", () => {
       // macOS: keep the app resident in the dock when the last window closes,
-      // so clicking the dock icon (the 'activate' handler) reopens the Window
-      // Manager. On other platforms, exit when the last window closes.
+      // so clicking the dock icon (the 'activate' handler) opens a window. On
+      // other platforms, exit when the last window closes.
       if (process.platform !== "darwin") {
         app.quit();
       }
     });
 
     // Rebuild the application menu when the focused window changes so it
-    // reflects the focused window's type (e.g. the Window Manager omits
-    // "Add Workspace Window" and "Logs…").
+    // reflects the focused window (one with no workspace omits "Add
+    // Workspace Window").
     app.on("browser-window-focus", () => this._setupMenu());
     app.on("browser-window-blur", () => this._setupMenu());
 
@@ -1276,7 +1248,7 @@ export class Openp41geApplication {
       if (workspaceArg) {
         this._openWorkspaceSession(workspaceArg);
       } else {
-        openWindowManager();
+        openNewWindow();
       }
     });
   }

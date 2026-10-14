@@ -42,9 +42,6 @@ import { initRendererLogTransport } from "../services/renderer-log-transport";
 
 import type { Workspace } from "../../layout/types";
 
-/** Kinds of window the renderer can boot as. Mirrors `Openp41geWindowType`. */
-export type RendererWindowType = "workspace" | "manager" | "logs";
-
 export class StartupContext {
   // ── Injected services ──────────────────────────────────────────────
   readonly commandBus: ICommandBus;
@@ -76,15 +73,8 @@ export class StartupContext {
   windowId: string | null = null;
 
   /**
-   * The kind of window this renderer is hosting. Workspace windows run the full
-   * app; window-manager windows run a thin workspace-picker view. Populated by
-   * the `resolve-window-kind` bootstrap step (defaults to "workspace").
-   */
-  windowType: RendererWindowType = "workspace";
-
-  /**
-   * The `.openp41ge-workspace` path this window is bound to, or null when the
-   * window has no workspace binding (e.g. a window-manager window).
+   * The `.openp41ge-workspace` path of the workspace this window shows, or
+   * null when it has none open. Set by the `resolve-window-workspace` step.
    */
   workspacePath: string | null = null;
 
@@ -129,31 +119,22 @@ export class StartupContext {
     this.fileOpenHandler.init(this.commandBus, this.workspaceState, this.tabMountManager);
     this.fileDropHandler.init(this.commandBus);
 
-    // The workshops tab system (event handler + drag orchestrator) is bound to
-    // the workspace state. The Logs window owns its grid locally in
-    // <openp41ge-logs-window>, so both are skipped there — otherwise the
-    // workspace handler would intercept the logs grid's events and dispatch
-    // workspace commands, and initDragSystem would register a competing drag
-    // pipeline for the same tab buttons.
-    if (this.windowType !== "logs") {
-      // Initialize Openp41geTabsEventHandler to handle tab-grid custom events
-      this.openp41geTabsEventHandler.init(this.commandBus, this.tabMountManager, {
-        getWorkspace: () => this.workspaceState.getWorkspace(),
-      });
+    // The tab system (event handler + drag orchestrator), bound to the
+    // workspace state.
+    this.openp41geTabsEventHandler.init(this.commandBus, this.tabMountManager, {
+      getWorkspace: () => this.workspaceState.getWorkspace(),
+    });
+    initDragSystem();
 
-      // Initialize tab drag-and-drop system
-      initDragSystem();
-
-      // Extension drag & drop: this window's context, the payload pipeline,
-      // and the grid's kind → consumer resolver (extensions loaded earlier, in
-      // RegisterAppTypesStep, before the window kind was known).
-      extensionDrag.init({
-        windowContext: this.windowType,
-        pipeline: { startPayloadDrag, engageDrag },
-        getOverrides: () =>
-          (this.configService.get("dragConsumers") as Record<string, string> | undefined) ?? {},
-      });
-    }
+    // Extension drag & drop: this window's context, the payload pipeline,
+    // and the grid's kind → consumer resolver (extensions loaded earlier, in
+    // RegisterAppTypesStep).
+    extensionDrag.init({
+      windowContext: "workspace",
+      pipeline: { startPayloadDrag, engageDrag },
+      getOverrides: () =>
+        (this.configService.get("dragConsumers") as Record<string, string> | undefined) ?? {},
+    });
 
     // Forward renderer log bus to the main process (<dataDir>/logs).
     initRendererLogTransport();

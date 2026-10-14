@@ -182,7 +182,7 @@ function deriveSharedSidebars(ws: Workspace): SharedSidebars {
 }
 
 /**
- * A workspace file's layout session fields (saved by its workspace windows).
+ * A workspace file's layout session fields (saved by its windows).
  * Every other field is its manifest (identity, name, repos, data folder, …).
  */
 export const WORKSPACE_SESSION_FIELDS: readonly string[] = [

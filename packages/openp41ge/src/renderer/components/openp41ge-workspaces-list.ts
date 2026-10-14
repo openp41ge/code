@@ -4,7 +4,7 @@
  *
  * A row click opens that workspace's editor (`onOpen(ws, false)`), a
  * double-click pins it (`onOpen(ws, true)`). Where the editor opens is the
- * host's business: the management window's grid, or a workspace window's.
+ * host's business (the window's grid).
  *
  * Rows carry `data-workspace-path` / `data-workspace-name`; with
  * `dragSourceId` set they are also tagged `data-drag-source-id` (outside

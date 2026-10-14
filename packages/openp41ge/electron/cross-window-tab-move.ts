@@ -1,7 +1,6 @@
 /**
- * Moving a grid tab to another window (plans/2026-10-14-one-window.md, step
- * 5). Windows of the same workspace share its state, so the tab moves within
- * it. Between windows of different workspaces (or none) only a tab that needs
+ * Moving a grid tab to another window. Windows of the same workspace share
+ * its state, so the tab moves within it. Between windows of different workspaces (or none) only a tab that needs
  * no workspace moves: it opens in the target window's state and closes in the
  * source's. The renderer, which knows the tab types, says which those are.
  */

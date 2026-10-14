@@ -1,7 +1,7 @@
 /**
  * window-view.ts — what the user is shown about the data updates: the
  * migration window's phase and how many are done of how many, and the
- * manager window's Migrations tab summary. The updates' descriptions, what
+ * Migrations tab's summary. The updates' descriptions, what
  * they did and their errors are not shown; they stay in the journal and the
  * logs.
  */

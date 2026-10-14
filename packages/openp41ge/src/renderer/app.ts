@@ -19,8 +19,6 @@ const log = createLogger("openp41ge", "app");
 
 // ─── Component registration (side-effect imports — must be at module level) ──
 import "./components/openp41ge-windowview";
-import "./components/openp41ge-window-manager";
-import "./components/openp41ge-logs-window";
 import "./components/openp41ge-releases-pane";
 import { provideReleasesConfig } from "./services/releases-deps";
 import "./components/openp41ge-cleanup-pane";
@@ -64,7 +62,7 @@ import {
   SignalReadyStep,
 } from "./bootstrap/index";
 import { InitEventControllerStep } from "./bootstrap/steps/init-event-controller.step";
-import { ResolveWindowKindStep } from "./bootstrap/steps/resolve-window-kind.step";
+import { ResolveWindowWorkspaceStep } from "./bootstrap/steps/resolve-window-workspace.step";
 
 import type { Workspace } from "../layout/types";
 import type { EventRouter } from "./services/event-router";
@@ -81,7 +79,7 @@ const steps = [
   new ExposeTestModelsStep(), // 1: Expose test models for test injection
   new InitEventControllerStep(), // 2: Initialize event controller (graph + router)
   new RegisterAppTypesStep(), // 3: Register app types
-  new ResolveWindowKindStep(), // 4: Resolve window kind + workspace binding
+  new ResolveWindowWorkspaceStep(), // 4: Resolve the window's workspace
   new InitServicesStep(), // 5: Wire cross-service dependencies
   new SubscribeStateUpdatesStep(), // 6: ** Register render subscriber BEFORE any async **
   new RegisterTabActivationRecorderStep(), // 6b: Record tab activations into TabActivationHistory
@@ -224,12 +222,12 @@ export const renderer = {
     log.info("starting renderer");
 
     // Seed a debug session when OPENP41GE_DEBUG=1 (build) or
-    // localStorage["openp41ge-debug"]="1": capture DEBUG, open the Logs window.
+    // localStorage["openp41ge-debug"]="1": capture DEBUG, open a Logs tab.
     if (isDebugSeed()) {
       log.info("debug session seeded by environment flag");
       setMinLevel(LogLevel.DEBUG);
       window.openp41ge?.logs?.setDebug?.(true);
-      window.openp41ge?.windowManager?.openLogsWindow?.();
+      window.openp41ge?.windowManager?.openLogs?.();
     }
 
     // Inject global Tailwind utility classes before any UI renders

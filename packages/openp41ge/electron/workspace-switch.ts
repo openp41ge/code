@@ -1,8 +1,8 @@
 /**
- * Switching the workspace a window shows (plans/2026-10-14-one-window.md,
- * step 4): the window replaces its workspace, it does not open another one.
- * This decides what happens to its old state and which window of the new
- * workspace's state it becomes; the application carries it out.
+ * Switching the workspace a window shows: the window replaces its workspace,
+ * it does not open another one. This decides what happens to its old state
+ * and which window of the new workspace's state it becomes; the application
+ * carries it out.
  */
 
 /** What a window switching from `oldPath` to `newPath` (null: no workspace) does. */

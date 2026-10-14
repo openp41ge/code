@@ -65,7 +65,8 @@ export function runExtensionGit(
   scope: ExtensionGitScope | null,
   request: GitRequest,
 ): Promise<GitResult> {
-  if (!scope) return Promise.resolve(refuse("git runs only for a call from a workspace window"));
+  if (!scope)
+    return Promise.resolve(refuse("git runs only for a call from a window with a workspace open"));
   const { repo, args, worktree } = request;
   const validName =
     typeof repo === "string" &&

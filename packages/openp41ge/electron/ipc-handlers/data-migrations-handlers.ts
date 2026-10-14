@@ -1,5 +1,5 @@
 /**
- * Data-migrations IPC — the manager window's Migrations tab reads a summary
+ * Data-migrations IPC — the Migrations tab reads a summary
  * of the data updates: the app's version, the data version, how many ran and
  * when, and whether the last run failed (not the journal's details).
  */

@@ -11,7 +11,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { createLogger } from "openp41ge-core-logger";
 import { showsState } from "./window-binding.js";
-import { logsOpenInPlace } from "./logs-routing.js";
 import { showConfirm } from "./confirm-dialog-manager.js";
 import type { TabNameGenerator } from "../src/main/index.js";
 import type { OperationDispatcher } from "../src/main/index.js";
@@ -36,30 +35,17 @@ export function setAppQuitting(value: boolean): void {
   _appQuitting = value;
 }
 
-// ─── Window type / binding ───────────────────────────────────────────────
+// ─── Window binding ──────────────────────────────────────────────────────
 
-/**
- * Kinds of window the app can host. `workspace` windows are bound to a
- * `.openp41ge-workspace` file; `manager` windows list/open workspaces.
- * Not exhaustive — future window types register via a factory (see plan).
- */
-export type Openp41geWindowType = "workspace" | "manager" | "logs";
-
-/** Metadata describing a created window (its kind + workspace binding). */
+/** What a window shows: the workspace it has open (one at most). */
 export interface Openp41geWindowMeta {
-  windowType: Openp41geWindowType;
-  /** `.openp41ge-workspace` path the window is bound to (null for window-manager). */
+  /** `.openp41ge-workspace` path of the workspace it shows (null: none). */
   workspacePath: string | null;
-  /** Initial tab to open in a window-manager window ("workspaces" | "settings"). */
-  initialTab?: WindowManagerTab;
-  /** A logs window's error to open on launch (an entry's `errorId`). */
-  revealErrorId?: string;
+  /** Logs to open once it has loaded (opening logs with no window open). */
+  launchLogs?: { readonly errorId?: string };
 }
 
-/** Tabs the compact Window Manager window can open with. */
-export type WindowManagerTab = "workspaces" | "settings" | "welcome" | "releases" | "cleanup";
-
-/** Tracks the type/binding of every open window, keyed by window id. */
+/** Tracks the binding of every open window, keyed by window id. */
 export const openp41geWindowMeta = new Map<string, Openp41geWindowMeta>();
 
 /** Read the metadata for an open window id, or null if it isn't tracked. */
@@ -94,19 +80,15 @@ export function windowIdOf(win: BrowserWindow): string | null {
 export function rebindWindow(
   win: BrowserWindow,
   newId: string,
-  meta: Pick<Openp41geWindowMeta, "windowType" | "workspacePath">,
+  meta: Pick<Openp41geWindowMeta, "workspacePath">,
 ): void {
   const oldId = windowIdOf(win);
   if (oldId === null) return;
   openp41geWindows.delete(oldId);
   openp41geWindowMeta.delete(oldId);
   openp41geWindows.set(newId, win);
-  openp41geWindowMeta.set(newId, {
-    windowType: meta.windowType,
-    workspacePath: meta.workspacePath,
-  });
+  openp41geWindowMeta.set(newId, { workspacePath: meta.workspacePath });
   log.info("window-rebind", { from: oldId, to: newId, workspacePath: meta.workspacePath });
-  notifyOpenWindowsChanged();
   win.webContents.reload();
 }
 
@@ -174,15 +156,6 @@ export function setAppDataDir(dir: string): void {
 
 // ─── Window creation ─────────────────────────────────────────────────────
 
-/** True if `source` is the compact Window-Manager picker window. */
-function sourceIsWindowManager(source?: BrowserWindow): boolean {
-  if (!source || source.isDestroyed()) return false;
-  for (const [id, bw] of openp41geWindows) {
-    if (bw === source) return openp41geWindowMeta.get(id)?.windowType === "manager";
-  }
-  return false;
-}
-
 export function createOpenp41geWindow(
   openp41geWinId: string,
   isMaster: boolean,
@@ -192,35 +165,17 @@ export function createOpenp41geWindow(
   meta?: Partial<Openp41geWindowMeta>,
 ): void {
   const windowMeta: Openp41geWindowMeta = {
-    windowType: meta?.windowType ?? "workspace",
     workspacePath: meta?.workspacePath ?? null,
-    initialTab: meta?.initialTab,
-    revealErrorId: meta?.revealErrorId,
+    ...(meta?.launchLogs ? { launchLogs: meta.launchLogs } : {}),
   };
-
-  // The Window Manager is a full-sized window (sidebar + main grid): it is
-  // freely resizable and inherits the source window's size rather than being
-  // capped to a compact picker width.
-  const isWindowManager = windowMeta.windowType === "manager";
-  // A workspace window opened from the Window Manager must not inherit the
-  // picker's (possibly narrow) size — open it large, clamped to the work area.
-  const fromWindowManager = !isWindowManager && sourceIsWindowManager(sourceWindow);
 
   // Inherit size from the source window, falling back to defaults.
   let width = 1280;
   let height = 860;
-  if (sourceWindow && !sourceWindow.isDestroyed() && !fromWindowManager) {
+  if (sourceWindow && !sourceWindow.isDestroyed()) {
     const bounds = sourceWindow.getBounds();
     width = bounds.width;
     height = bounds.height;
-  }
-
-  let display: ReturnType<typeof screen.getDisplayMatching> | undefined;
-  if (fromWindowManager) {
-    display = screen.getDisplayMatching(sourceWindow!.getBounds());
-    const workArea = display.workArea;
-    width = Math.min(1280, workArea.width);
-    height = Math.min(860, workArea.height);
   }
 
   let x: number | undefined;
@@ -238,11 +193,6 @@ export function createOpenp41geWindow(
 
     x = Math.max(workArea.x, Math.min(candidateX, workArea.x + workArea.width - width));
     y = Math.max(workArea.y, Math.min(candidateY, workArea.y + workArea.height - height));
-  } else if (fromWindowManager && display) {
-    // Centre the freshly-opened workspace window on the Window Manager's display.
-    const workArea = display.workArea;
-    x = workArea.x + Math.round((workArea.width - width) / 2);
-    y = workArea.y + Math.round((workArea.height - height) / 2);
   } else if (sourceWindow && !sourceWindow.isDestroyed()) {
     const bounds = sourceWindow.getBounds();
     x = bounds.x + 30;
@@ -262,12 +212,8 @@ export function createOpenp41geWindow(
     height,
     minWidth: 600,
     minHeight: 200,
-    // The Window Manager has no native window chrome: it renders its own
-    // close / minimize / fullscreen traffic lights. It is freely resizable
-    // (no maxWidth cap) and can go fullscreen.
-    ...(isWindowManager ? { frame: false } : {}),
     title: appTitle(app.isPackaged),
-    ...(!isWindowManager ? { titleBarStyle: "hiddenInset" } : {}),
+    titleBarStyle: "hiddenInset",
     // Match the app's dark surface so the areas exposed while the window
     // grows (native maximize animation, resize) never flash white.
     backgroundColor: "#161616",
@@ -288,32 +234,28 @@ export function createOpenp41geWindow(
 
   log.info("window-create", {
     windowId: openp41geWinId,
-    type: windowMeta.windowType,
     workspacePath: windowMeta.workspacePath,
     isDev,
   });
-
-  // Tell any open Window Manager to refresh its "open windows" column.
-  notifyOpenWindowsChanged();
 
   // The window's id and binding can change (switching its workspace), so the
   // handlers below read them when they run.
   win.webContents.on("did-finish-load", () => {
     const windowId = windowIdOf(win) ?? openp41geWinId;
     const meta = openp41geWindowMeta.get(windowId) ?? windowMeta;
-    log.info("window-loaded", { windowId, type: meta.windowType });
+    log.info("window-loaded", { windowId });
     const d = resolveDispatcherFor(meta.workspacePath);
     if (d) {
       win.webContents.send("openp41ge:init", {
         windowId,
         workspace: JSON.stringify(d.getWorkspace()),
         isDev,
-        windowType: meta.windowType,
         workspacePath: meta.workspacePath,
-        initialTab: meta.initialTab,
-        revealErrorId: meta.revealErrorId,
+        launchLogs: meta.launchLogs ?? null,
         dataDir: _appDataDir,
       });
+      // Logs to open are opened once (not again on a reload).
+      if (meta.launchLogs) delete meta.launchLogs;
     }
   });
 
@@ -324,14 +266,9 @@ export function createOpenp41geWindow(
   win.on("closed", () => {
     const openp41geWinId = windowIdOf(win) ?? openp41geWinIdAtCreate;
     const meta = openp41geWindowMeta.get(openp41geWinId);
-    log.info("window-close", {
-      windowId: openp41geWinId,
-      type: meta?.windowType ?? "unknown",
-    });
+    log.info("window-close", { windowId: openp41geWinId });
     openp41geWindows.delete(openp41geWinId);
     openp41geWindowMeta.delete(openp41geWinId);
-    // Tell any open Window Manager to drop the closed window immediately.
-    notifyOpenWindowsChanged();
     // Don't mutate workspace state during a full app quit — the whole session
     // (all open windows) is preserved so reopening the workspace restores them.
     if (!isMaster && !_appQuitting) {
@@ -340,11 +277,10 @@ export function createOpenp41geWindow(
       // window closes the workspace itself — persist the layout (keep every
       // window, including this one, in the file) so the skeleton keeps
       // rendering the right grid and reopening restores it.
-      const isWorkspace = meta?.windowType === "workspace";
       const wsPath = meta?.workspacePath;
       // A window with no workspace keeps its tabs in memory only: closing it
       // drops them.
-      if (isWorkspace && !wsPath) {
+      if (meta && !wsPath) {
         const d = resolveDispatcherFor(null);
         if (d?.getWorkspace().windows.some((w) => w.id === openp41geWinId)) {
           d.apply("closeWindow", [openp41geWinId]);
@@ -352,14 +288,14 @@ export function createOpenp41geWindow(
         }
         return;
       }
-      if (isWorkspace && wsPath) {
+      if (wsPath) {
         const d = resolveDispatcherFor(wsPath);
         if (!d) return;
         let otherLive = 0;
         for (const [id, bw] of openp41geWindows) {
           if (bw.isDestroyed()) continue;
           const otherMeta = openp41geWindowMeta.get(id);
-          if (otherMeta?.windowType === "workspace" && otherMeta.workspacePath === wsPath) {
+          if (otherMeta?.workspacePath === wsPath) {
             otherLive++;
           }
         }
@@ -385,149 +321,115 @@ export function createOpenp41geWindow(
   // (unpackaged) builds it is available from the Window menu → Devtools.
 }
 
-// ─── Window-manager window ────────────────────────────────────────────────
+// ─── Opening windows ─────────────────────────────────────────────────────
 
-/** Callback invoked when a workspace window should be opened for `workspacePath`. */
+/** Callback invoked when a window of `workspacePath` should be opened. */
 export type OpenWorkspaceWindowHandler = (workspacePath: string, source?: BrowserWindow) => void;
 
 let _openWorkspaceWindow: OpenWorkspaceWindowHandler | null = null;
 
-/** Wire the handler the window-manager uses to open a workspace-bound window. */
+/** Wire the handler that opens a window of a workspace. */
 export function setOpenWorkspaceWindowHandler(fn: OpenWorkspaceWindowHandler): void {
   _openWorkspaceWindow = fn;
 }
 
 /**
- * Create a new thin window-manager window (not bound to any workspace layout
- * Window). Returns the window id. When `dropScreenX`/`dropScreenY` are given
- * the window is opened near that point (a dragged-out tab's release point).
+ * Open a window with no workspace (its tabs live in memory, in the default
+ * dispatcher), with the Workspaces tab open on the left. With `launchLogs`, it
+ * opens those logs once loaded. Returns its id.
  */
-export function createWindowManagerWindow(
+export function openNewWindow(
   sourceWindow?: BrowserWindow,
-  tab?: WindowManagerTab,
-  dropScreenX?: number,
-  dropScreenY?: number,
-): string {
-  const winId = `wm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-  createOpenp41geWindow(winId, false, sourceWindow, dropScreenX, dropScreenY, {
-    windowType: "manager",
-    workspacePath: null,
-    initialTab: tab,
-  });
-  return winId;
-}
-
-/**
- * Open (or focus) a window-manager window. When a window already exists and
- * `tab` is given, the tab is activated in it and the window brought to front.
- */
-export function openWindowManager(sourceWindow?: BrowserWindow, tab?: WindowManagerTab): void {
-  for (const [id, bw] of openp41geWindows) {
-    if (openp41geWindowMeta.get(id)?.windowType !== "manager") continue;
-    if (bw.isDestroyed()) continue;
-    // Activate the requested tab in the already-open window.
-    if (tab) {
-      bw.webContents.send("window-manager:activate-tab", tab);
-    }
-    if (bw.isMinimized()) bw.restore();
-    bw.focus();
-    return;
-  }
-  createWindowManagerWindow(sourceWindow, tab);
-}
-
-/**
- * Create a new resizable logs window (not bound to any workspace layout
- * Window), opening the error `revealErrorId` if given. Returns the window id.
- */
-export function createLogsWindow(sourceWindow?: BrowserWindow, revealErrorId?: string): string {
-  const winId = `logs-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  launchLogs?: { readonly errorId?: string },
+): string | null {
+  const d = _dispatcher;
+  if (!d) return null;
+  d.apply("newWindow", []);
+  const ws = d.getWorkspace();
+  const winId = ws.windows[ws.windows.length - 1]?.id;
+  if (!winId) return null;
+  d.apply("openSystemTab", [winId, "left", "workspaces", "Workspaces"]);
+  d.broadcast();
   createOpenp41geWindow(winId, false, sourceWindow, undefined, undefined, {
-    windowType: "logs",
     workspacePath: null,
-    revealErrorId,
+    ...(launchLogs ? { launchLogs } : {}),
   });
   return winId;
 }
 
-/**
- * Open logs: in the requesting window when it is a workspace window (a Logs
- * tab in its grid), else in the logs window — reusing an existing one, so a
- * second "Logs" action brings it to the front instead of stacking. With
- * `revealErrorId`, that error's log entry is opened.
- */
-export function openLogsWindow(sourceWindow?: BrowserWindow, revealErrorId?: string): void {
-  // A workspace window shows its logs in its own grid.
-  if (sourceWindow && !sourceWindow.isDestroyed()) {
-    const sourceId = [...openp41geWindows].find(([, bw]) => bw === sourceWindow)?.[0];
-    const sourceType = sourceId ? (openp41geWindowMeta.get(sourceId)?.windowType ?? null) : null;
-    if (logsOpenInPlace(sourceType)) {
-      sourceWindow.webContents.send("logs:open-in-window", revealErrorId ?? null);
-      sourceWindow.focus();
-      return;
-    }
-  }
-  for (const [id, bw] of openp41geWindows) {
-    if (openp41geWindowMeta.get(id)?.windowType !== "logs") continue;
-    if (bw.isDestroyed()) continue;
-    if (revealErrorId) bw.webContents.send("logs-window:reveal-error", revealErrorId);
-    if (bw.isMinimized()) bw.restore();
-    bw.focus();
-    return;
-  }
-  createLogsWindow(sourceWindow, revealErrorId);
+/** The window an app-level action (a menu item, a toast) acts on: `source`,
+ *  else the focused window, else any open one. */
+function actionWindow(source?: BrowserWindow): BrowserWindow | null {
+  const live = [...openp41geWindows.values()].filter((bw) => !bw.isDestroyed());
+  if (source && live.includes(source)) return source;
+  const focused = BrowserWindow.getFocusedWindow();
+  if (focused && live.includes(focused)) return focused;
+  return live[0] ?? null;
 }
 
-/** Summaries of every open window (id, kind, workspace binding). */
+/**
+ * Open logs (a Logs tab in a window's grid): in `sourceWindow`, else the
+ * focused or any window, else a new window. With `revealErrorId`, that
+ * error's entry is opened.
+ */
+export function openLogs(sourceWindow?: BrowserWindow, revealErrorId?: string): void {
+  const win = actionWindow(sourceWindow);
+  if (!win) {
+    openNewWindow(undefined, revealErrorId ? { errorId: revealErrorId } : {});
+    return;
+  }
+  win.webContents.send("logs:open-in-window", revealErrorId ?? null);
+  if (win.isMinimized()) win.restore();
+  win.focus();
+}
+
+/** Open (or show) a sidebar tab — e.g. Settings — in the focused (or any, or
+ *  a new) window. */
+export function openSidebarTab(appType: string, title: string, sourceWindow?: BrowserWindow): void {
+  const win = actionWindow(sourceWindow);
+  const winId = win ? windowIdOf(win) : openNewWindow();
+  if (!winId) return;
+  const d = resolveDispatcherFor(openp41geWindowMeta.get(winId)?.workspacePath);
+  if (!d) return;
+  d.apply("openSystemTab", [winId, "left", appType, title]);
+  d.broadcast();
+  if (win) {
+    if (win.isMinimized()) win.restore();
+    win.focus();
+  }
+}
+
+/** Summaries of every open window (id, workspace). */
 export interface OpenWindowSummary {
   windowId: string;
-  windowType: Openp41geWindowType;
   workspacePath: string | null;
 }
 
-/** List open windows for the window-manager's "open windows" column. */
+/** Every open window and the workspace it shows. */
 export function getOpenWindowSummaries(): OpenWindowSummary[] {
   return Array.from(openp41geWindows.keys()).map((id) => ({
     windowId: id,
-    windowType: openp41geWindowMeta.get(id)?.windowType ?? "workspace",
     workspacePath: openp41geWindowMeta.get(id)?.workspacePath ?? null,
   }));
 }
 
-/**
- * Notify every live window-manager window that the set of open windows
- * changed, so it refreshes its "open windows" column immediately (instead of
- * waiting for the window to regain focus).
- */
-export function notifyOpenWindowsChanged(): void {
-  for (const [id, bw] of openp41geWindows) {
-    if (bw.isDestroyed()) continue;
-    if (openp41geWindowMeta.get(id)?.windowType !== "manager") continue;
-    bw.webContents.send("window-manager:open-windows-changed");
-  }
-}
-
-/** Open a workspace window bound to `workspacePath` (delegates to the app). */
+/** Open a window of the workspace `workspacePath` (delegates to the app). */
 export function openWorkspaceWindow(workspacePath: string, sourceWindow?: BrowserWindow): void {
   if (_openWorkspaceWindow) {
     _openWorkspaceWindow(workspacePath, sourceWindow);
   } else {
-    // Fallback: a plain workspace window with no binding.
+    // Fallback: a plain window bound to the path.
     const ws = _dispatcher?.getWorkspace();
     const id = ws?.windows[0]?.id ?? `win-${Date.now()}-0`;
-    createOpenp41geWindow(id, false, sourceWindow, undefined, undefined, {
-      windowType: "workspace",
-      workspacePath,
-    });
+    createOpenp41geWindow(id, false, sourceWindow, undefined, undefined, { workspacePath });
   }
 }
 
-/** Focus the first live workspace window bound to `workspacePath`, if any. */
+/** Focus the first live window of `workspacePath`, if any. */
 export function focusWorkspaceWindow(workspacePath: string): boolean {
   for (const [id, bw] of openp41geWindows) {
     if (bw.isDestroyed()) continue;
-    const meta = openp41geWindowMeta.get(id);
-    if (meta?.windowType !== "workspace" || meta.workspacePath !== workspacePath) continue;
+    if (openp41geWindowMeta.get(id)?.workspacePath !== workspacePath) continue;
     if (bw.isMinimized()) bw.restore();
     bw.focus();
     return true;
@@ -537,6 +439,8 @@ export function focusWorkspaceWindow(workspacePath: string): boolean {
 
 // ─── Window lifecycle helpers ────────────────────────────────────────────
 
+/** Close the live windows of `workspacePath`'s state (null: no workspace)
+ *  that its layout no longer has. */
 export function closeOrphanedWindows(workspacePath?: string | null): void {
   const d = resolveDispatcherFor(workspacePath);
   if (!d) return;
@@ -544,13 +448,8 @@ export function closeOrphanedWindows(workspacePath?: string | null): void {
   const activeIds = new Set(ws.windows.map((w) => w.id as string));
   for (const [openp41geWinId, bw] of openp41geWindows) {
     if (bw.isDestroyed()) continue;
-    // Only workspace-layout windows are bound to a layout window; any other
-    // window type (window-manager, logs) is never "orphaned" by the workspace
-    // layout and must NOT be closed by a layout dispatch (e.g. a workspace
-    // shortcut accidentally fired from the standalone Logs window).
     const meta = openp41geWindowMeta.get(openp41geWinId);
-    if (meta?.windowType !== "workspace") continue;
-    if (workspacePath && meta.workspacePath !== workspacePath) continue;
+    if (!meta || meta.workspacePath !== (workspacePath ?? null)) continue;
     if (!activeIds.has(openp41geWinId)) {
       bw.close();
     }

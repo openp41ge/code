@@ -16,7 +16,7 @@ import { Openp41geTabsEventHandler } from "./openp41ge-tabs-event-handler";
 export type CmdWTarget = { kind: "close-tab"; tabId: string } | { kind: "close-window" };
 
 /**
- * Resolve the Cmd+W action for a workspace window.
+ * Resolve the Cmd+W action for a window.
  *
  * Closes the grid's ACTIVE tab in the focused column (defaulting to col 0,
  * then the first placement), so Cmd+W honours where the user is actually

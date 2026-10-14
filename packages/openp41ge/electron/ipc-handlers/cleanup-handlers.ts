@@ -1,5 +1,5 @@
 /**
- * Cleanup IPC — the manager window's Cleanup tab.
+ * Cleanup IPC — the Cleanup tab.
  *
  * The platform's repository cleanup deletes what no workspace uses and keeps
  * (lists) what holds work; the tab shows that list and lets the user delete

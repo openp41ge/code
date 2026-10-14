@@ -598,7 +598,7 @@ export class LogFileStore {
 
   /**
    * The persisted entry with this `errorId` (newest file first), or null. Used
-   * to open an error in the Logs window from a link elsewhere in the app.
+   * to open an error in a Logs tab from a link elsewhere in the app.
    */
   findError(errorId: string): PersistedLogEntry | null {
     const needle = JSON.stringify(errorId);

@@ -272,7 +272,7 @@ export class ExtensionHost {
               exitCode: null,
               stdout: "",
               stderr: "",
-              error: "git runs only for a call from a workspace window",
+              error: "git runs only for a call from a window with a workspace open",
             }),
       config: { get: () => this._config.get(extId) },
       workspace: caller?.workspace

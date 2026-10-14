@@ -4,7 +4,7 @@ export type { IStartupStep } from "./startup-step";
 
 // Steps — each is a class implementing IStartupStep
 export { ExposeTestModelsStep } from "./steps/expose-test-models.step";
-export { ResolveWindowKindStep } from "./steps/resolve-window-kind.step";
+export { ResolveWindowWorkspaceStep } from "./steps/resolve-window-workspace.step";
 export { RegisterAppTypesStep } from "./steps/register-app-types.step";
 export { InitServicesStep } from "./steps/init-services.step";
 export { LoadConfigStep } from "./steps/load-config.step";

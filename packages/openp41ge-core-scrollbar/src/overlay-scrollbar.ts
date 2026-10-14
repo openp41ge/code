@@ -5,7 +5,7 @@
  * `::-webkit-scrollbar` styling and occupies layout space), this scrollbar
  * overlays the scroll target with absolutely-positioned track/thumb elements
  * that can follow the cursor outside the window (via the DragGhostManager) and
- * support auto-hide. Used by the file editor, window manager, and agents chat.
+ * support auto-hide. Used by the file editor, the Workspaces list, and agents chat.
  *
  * Kept in its own module so each file contains a single class (oxlint
  * `max-classes-per-file`).

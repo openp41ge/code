@@ -44,7 +44,7 @@ export interface ChatPaneHost {
     subscribe(fn: (config: Readonly<Record<string, unknown>>) => void): () => void;
   };
   readonly log: { error(...args: unknown[]): void };
-  /** Open the Logs window on an error (`SurfaceHost.openLog`). */
+  /** Open an error's log entry (`SurfaceHost.openLog`). */
   openLog(errorId: string): void;
 }
 
@@ -178,7 +178,7 @@ export class ChatPane {
     void this._call("abort", { id: this.chatId });
   }
 
-  /** Open an error's log entry in the Logs window (an error block's link). */
+  /** Open an error's log entry in a Logs tab (an error block's link). */
   openLog(errorId: string): void {
     this._host.openLog(errorId);
   }

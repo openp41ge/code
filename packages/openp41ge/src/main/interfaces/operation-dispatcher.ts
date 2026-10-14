@@ -15,7 +15,7 @@ export interface IOperationDispatcher {
 
   /**
    * Persist the current workspace layout without mutating it (used when the
-   * last workspace window closes, or on app quit, so the file keeps all
+   * workspace's last window closes, or on app quit, so the file keeps all
    * windows instead of the default behaviour of removing the closed one).
    */
   persist(): void;

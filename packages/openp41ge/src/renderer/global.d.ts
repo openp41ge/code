@@ -12,8 +12,6 @@ interface CleanupItem {
 
 export {};
 
-/** Tabs the Window Manager window can show. */
-type WindowManagerTabId = "workspaces" | "settings" | "welcome" | "releases" | "cleanup";
 
 declare global {
   interface Window {
@@ -27,8 +25,6 @@ declare global {
       window: {
         minimize: () => void;
         maximize: () => void;
-        /** Enter / leave fullscreen (the management window's green light). */
-        toggleFullScreen: () => void;
         maximizeAnimated: () => void;
         startDrag: () => void;
         dragMove: (x: number, y: number) => void;
@@ -39,47 +35,24 @@ declare global {
         openDevTools: () => void;
       };
       windowManager: {
-        open: () => void;
-        /** With `{ errorId }`, the window opens that error's log entry. */
-        openLogsWindow: (target?: { errorId: string }) => void;
+        /** Open logs in this window's grid; with `{ errorId }`, that error's entry. */
+        openLogs: (target?: { errorId: string }) => void;
         /** Replace the workspace this window shows (null: none); the window reloads. */
         switchWorkspace?: (workspacePath: string | null) => Promise<boolean>;
-        /** A workspace window asked to open logs in its grid (the error to reveal, or null). */
+        /** This window is asked to open logs in its grid (the error to reveal, or null). */
         onOpenLogsInWindow?: (callback: (errorId: string | null) => void) => () => void;
-        openWindowSummaries: () => Promise<Array<{ windowId: string; windowType: "workspace" | "manager" | "logs"; workspacePath: string | null }>>;
+        openWindowSummaries: () => Promise<Array<{ windowId: string; workspacePath: string | null }>>;
         openWorkspaceWindow: (workspacePath: string) => void;
         focusWorkspaceWindow: (workspacePath: string) => Promise<boolean>;
-        onOpenWindowsChanged: (callback: () => void) => () => void;
-        onActivateTab: (callback: (tab: WindowManagerTabId) => void) => () => void;
-        /** Move a management tab from one manager window to another / reorder. */
-        moveTab: (sourceWinId: string, targetWinId: string, tabId: string, dropIndex: number) => void;
-        /** Open a new management window containing `tab` (drag-out) and remove
-         *  it from `sourceWinId`. */
-        openWithTab: (
-          sourceWinId: string,
-          tabId: string,
-          dropScreenX?: number,
-          dropScreenY?: number,
-        ) => void;
-        /** Fired on a target window when a tab moves onto it. */
-        onReceiveTab: (
-          callback: (payload: { tabId: string; index: number }) => void,
-        ) => () => void;
-        /** Fired on a source window when its tab was moved away. */
-        onRemoveTab: (callback: (payload: { tabId: string }) => void) => () => void;
-        /** The manager grid's saved tabs (`<app-data>/manager-grid.json`), or null. */
-        loadGrid: () => Promise<unknown>;
-        /** Save the manager grid's tabs. */
-        saveGrid: (grid: unknown) => Promise<void>;
       };
       workspace: {
         getState: () => Promise<string>;
         dispatch: (fn: string, ...args: unknown[]) => void;
         onStateUpdate: (callback: (stateJson: string) => void) => () => void;
         getWindowId: () => string | null;
-        getWindowType: () => "workspace" | "manager" | "logs";
         getWorkspacePath: () => string | null;
-        getLaunchTab: () => WindowManagerTabId | null;
+        /** Logs to open once loaded (a window opened for them), or null. */
+        getLaunchLogs?: () => { errorId?: string } | null;
         waitForInit: () => Promise<void>;
         detachPane: (windowId: string, paneId: string, bounds?: { x: number; y: number; width: number; height: number }) => void;
         /** Move a grid tab to another window; across workspaces only the given app types move. */
@@ -323,10 +296,6 @@ declare global {
         ) => Promise<LogBackPageShape>;
         /** The persisted entry with this errorId, or null. */
         findError: (errorId: string) => Promise<PersistedLogEntryShape | null>;
-        /** The error a logs window was opened for (its launch), or null. */
-        getLaunchErrorId: () => string | null;
-        /** Fired when an open logs window is asked to open an error. */
-        onRevealError: (callback: (errorId: string) => void) => () => void;
       };
 
       onZoomIn: (callback: () => void) => () => void;
@@ -369,13 +338,7 @@ declare global {
         onChange: (callback: (snapshot: ReleasesSnapshot) => void) => () => void;
       };
 
-      /** Welcome intro dismissal — backed by a marker file in the app-data dir. */
-      welcome: {
-        isDismissed: () => Promise<boolean>;
-        setDismissed: (dismissed: boolean) => Promise<boolean>;
-      };
-
-      /** What the data migrations did (manager window's Migrations tab). */
+      /** What the data migrations did (the Migrations tab). */
       dataMigrations: {
         status: () => Promise<{
           appVersion: string;
@@ -388,7 +351,7 @@ declare global {
         }>;
       };
 
-      /** The repository cleanup (manager window's Cleanup tab). */
+      /** The repository cleanup (the Cleanup tab). */
       cleanup: {
         list: () => Promise<CleanupItem[]>;
         run: () => Promise<CleanupItem[]>;

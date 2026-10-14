@@ -15,7 +15,7 @@ import { compareVersions } from "./versions.js";
 import { verifySignature } from "./signature.js";
 import type { SourcedSet } from "./pending-migrations.js";
 
-/** The app's releases (as the manager window's Releases tab). */
+/** The app's releases (as the Releases tab). */
 const RELEASES_REPO = "openp41ge/code";
 const MIGRATIONS_ASSET = "migrations.json";
 

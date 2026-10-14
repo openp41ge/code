@@ -1,6 +1,6 @@
 /**
  * <openp41ge-workspace-label> — the title bar's workspace name, a button that
- * opens the workspace picker (plans/2026-10-14-one-window.md, step 4).
+ * opens the workspace picker.
  *
  * The picker lists every workspace (the window's own marked), filtered as you
  * type, and "No workspace" when the window has one. Picking one replaces the

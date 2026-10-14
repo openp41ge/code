@@ -123,7 +123,7 @@ export function workspaceDisplayName(data: WorkspaceFileData, filePath: string):
   return base.replace(/\.openp41ge-workspace$/i, "").trim() || "Unnamed";
 }
 
-/** The layout session's fields (saved by workspace windows, never edited here). */
+/** The layout session's fields (saved by the workspace's windows, never edited here). */
 const SESSION_FIELDS: readonly string[] = [
   "systemTabs",
   "editorTabs",
@@ -135,7 +135,7 @@ const SESSION_FIELDS: readonly string[] = [
 
 /**
  * `data` with the layout session of `onDisk` (the file as it is now): the
- * editor writes the manifest, never the session a workspace window saved.
+ * editor writes the manifest, never the session the workspace's windows saved.
  */
 export function withSessionOf(
   data: WorkspaceFileData,

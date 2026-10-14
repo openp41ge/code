@@ -1,7 +1,7 @@
 /**
  * Whether this window has a workspace open, and so which tab types it can
  * host: a window with no workspace hosts only those that need none
- * (`workspace: "none"`; plans/2026-10-14-one-window.md, step 3).
+ * (`workspace: "none"`).
  */
 
 import type { SurfaceWorkspace } from "openp41ge-sdk";

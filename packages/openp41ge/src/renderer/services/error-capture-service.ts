@@ -4,10 +4,8 @@
  * surfaces them via a NON-BLOCKING persistent error toast.
  *
  * The old full-screen blocking overlay and the toast-click modal are gone.
- * Instead, captured errors are held in a reactive list that any UI (e.g. the
- * manager window's "Logs" tab badge + error-detail drawer) can subscribe to.
- * Clicking an error toast switches the manager window to its Logs tab via the
- * "openp41ge:open-logs-tab" document event.
+ * Instead, captured errors are held in a reactive list that any UI can
+ * subscribe to. Clicking an error toast opens the log in a Logs tab.
  *
  * Renderer errors: window.onerror, unhandledrejection, console.error
  * Main process errors: forwarded via IPC channel "openp41ge:error"
@@ -185,9 +183,9 @@ function showErrorToast(err: CapturedError): void {
 
   const preview = full.length > 180 ? `${full.slice(0, 180)}…` : full;
   // Errors never auto-dismiss (duration 0) — the user must dismiss them, or
-  // click the toast to open the dedicated Logs window (where the row lives).
+  // click the toast to open the log in a Logs tab.
   toastService.show(`Error: ${preview}`, "error", 0, () => {
-    window.openp41ge?.windowManager.openLogsWindow();
+    window.openp41ge?.windowManager.openLogs();
   });
 }
 
@@ -373,7 +371,7 @@ export function installErrorCapture(): void {
   };
 
   // Restore any errors stored from a previous page load — surface a single
-  // summary toast (never a blocking screen). Clicking it opens the Logs window.
+  // summary toast (never a blocking screen). Clicking it opens a Logs tab.
   // The summary toast follows the same global toast policy.
   try {
     const stored = sessionStorage.getItem(STORAGE_KEY);
@@ -386,7 +384,7 @@ export function installErrorCapture(): void {
             "error",
             0,
             () => {
-              window.openp41ge?.windowManager.openLogsWindow();
+              window.openp41ge?.windowManager.openLogs();
             },
           );
         }

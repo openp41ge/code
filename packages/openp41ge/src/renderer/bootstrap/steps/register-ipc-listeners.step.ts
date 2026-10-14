@@ -4,7 +4,7 @@
  * These handle:
  *   - Zoom in/out/reset (triggered by the Electron menu bar)
  *   - Confirm modal (triggered by the main process for quit/close confirmations)
- *   - Open logs in this (workspace) window's grid
+ *   - Open logs in this window's grid
  */
 
 import type { IStartupStep } from "../startup-step";
@@ -15,6 +15,8 @@ const log = createLogger("openp41ge", "register-ipc-listeners");
 
 import { wireResetListener } from "../../app";
 import { openLogsInWindow } from "../../apps/log-viewer/open-logs";
+import { openWorkspaceEditor } from "../../apps/management/index";
+import { workspaceFileService } from "../../services/workspace-file-service";
 
 export class RegisterIpcListenersStep implements IStartupStep {
   readonly name = "register-ipc-listeners";
@@ -49,27 +51,21 @@ export class RegisterIpcListenersStep implements IStartupStep {
     // Wire the app reset listener so window.openp41ge.workspace.reset() works
     wireResetListener();
 
-    // ── Logs open in a workspace window's own grid ─────────────────────────
-    if (context.windowType === "workspace") {
-      window.openp41ge.windowManager.onOpenLogsInWindow?.((errorId) => {
-        void openLogsInWindow(errorId ? { errorId } : undefined);
-      });
-    }
+    // ── Logs open in this window's grid ─────────────────────────────────────
+    window.openp41ge.windowManager.onOpenLogsInWindow?.((errorId) => {
+      void openLogsInWindow(errorId ? { errorId } : undefined);
+    });
+    // A window opened to show logs (no window was open) opens them now.
+    const launchLogs = window.openp41ge.workspace.getLaunchLogs?.();
+    if (launchLogs) void openLogsInWindow(launchLogs);
 
-    // ── In-window workspace switching is removed from workspace windows ─────
-    // Workspace windows are bound to a fixed workspace; workspace actions live
-    // in the Window Manager instead. A non-window-manager window routes to it.
-    const routeToWindowManager = (): void => {
-      window.openp41ge.windowManager.open();
-    };
-
-    // ── Explorer worktree warning icon → Window Manager at that repo ──
-    // The workspaces overlay is gone; every window routes to the Window
-    // Manager, which owns workspace + repo status.
+    // ── Explorer worktree warning icon → the workspace's editor ──
+    // The editor shows the workspace's repositories and worktrees.
     document.addEventListener("openp41ge:focus-workspace-repo", ((e: Event) => {
       const repoName = (e as CustomEvent<{ repoName?: string }>).detail?.repoName;
-      if (!repoName) return;
-      routeToWindowManager();
+      const path = context.workspacePath;
+      if (!repoName || !path) return;
+      openWorkspaceEditor(path, workspaceFileService.openWorkspaceName, true);
     }) as EventListener);
 
     log.info("IPC listeners registered");

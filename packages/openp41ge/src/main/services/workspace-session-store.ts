@@ -25,9 +25,9 @@ import type { Workspace } from "../../layout/types.js";
 const log = createLogger("openp41ge", "workspace-session-store");
 
 export interface WorkspaceSessionStore {
-  /** A path was bound to a workspace window (so saves go to that file). */
+  /** A path was bound to a window (so saves go to that file). */
   setCurrentWorkspacePath(workspacePath: string | null): void;
-  /** The path currently bound, or null when no workspace window is open. */
+  /** The path currently bound, or null when no window shows a workspace. */
   getCurrentWorkspacePath(): string | null;
   /** Save the layout session into a specific workspace's file. */
   save(workspacePath: string, workspace: Workspace): void;

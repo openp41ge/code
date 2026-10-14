@@ -1,5 +1,5 @@
 /**
- * <openp41ge-stack-demo> — a static mock of the workspace window skeleton
+ * <openp41ge-stack-demo> — a static mock of the window skeleton
  * with its left explorer sidebar open. The sidebar shows the two-level model
  * (Repository → Worktree): several repositories at the top level, each with
  * 1+ worktrees indented beneath. Used on the "levels" Welcome slide.
@@ -181,7 +181,7 @@ export class Openp41geStackDemo extends LitElement {
           margin-bottom: 6px;
         }
       </style>
-      <div class="demo-caption">Workspace window</div>
+      <div class="demo-caption">Window</div>
       <div class="demo">
         <div class="chrome">
           <span class="dot"></span><span class="dot"></span><span class="dot"></span>

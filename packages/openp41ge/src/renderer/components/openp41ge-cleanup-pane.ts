@@ -1,5 +1,5 @@
 /**
- * openp41ge-cleanup-pane — the manager window's Cleanup tab.
+ * openp41ge-cleanup-pane — the Cleanup sidebar tab.
  *
  * The platform's repository cleanup deletes what no workspace uses on its own;
  * what it cannot safely delete — a clone, or a deleted workspace's data

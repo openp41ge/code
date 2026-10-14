@@ -7,7 +7,7 @@
  * stay out of the import graph of `src/main/services/*` so unit tests
  * (which run without Electron) never load it.
  *
- * The manager / workspace windows (renderers) forward their errors to the main
+ * The windows (renderers) forward their errors to the main
  * process over Sentry's IPC (see `@sentry/electron`), so this single
  * main-process init is the one place with the real DSN. The renderer SDK only
  * needs a bare `Sentry.init()`; the DSN and environment are propagated by

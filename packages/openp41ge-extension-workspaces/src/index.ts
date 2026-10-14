@@ -129,7 +129,7 @@ export async function writeWorkspaceProcess(payload: HandlerPayload): Promise<Wo
   if (!target) return { ok: false, error: "Path is outside the workspaces directory" };
   try {
     await fs.mkdir(path.dirname(target), { recursive: true });
-    // The layout session is the workspace window's: keep what is on disk.
+    // The layout session is the workspace's windows': keep what is on disk.
     let data = raw;
     try {
       const onDisk = migrateWorkspaceFileData(JSON.parse(await fs.readFile(target, "utf-8")));

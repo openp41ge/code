@@ -1,5 +1,5 @@
 /**
- * <openp41ge-window-intro-demo> — an animated mock of the workspace window
+ * <openp41ge-window-intro-demo> — an animated mock of the window
  * "opening": the window fades and slides in on a loop, revealing a sidebar and
  * a grid cell. Used on the first Welcome slide.
  */

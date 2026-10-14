@@ -169,7 +169,7 @@ export interface SurfaceHost<S = Readonly<Record<string, unknown>>> {
   /** Open an editor/panel tab (platform action). */
   openTab(request: OpenTabRequest): void;
   /**
-   * Open the Logs window on an error's log entry: `errorId` is what
+   * Open an error's log entry in a Logs tab: `errorId` is what
    * `log.error(...)` returned (in the view or the backend). The window shows
    * the entry with its details open.
    */

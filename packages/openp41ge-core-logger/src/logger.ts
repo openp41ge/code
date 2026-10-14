@@ -32,7 +32,7 @@ export interface ILogger {
   info(...args: unknown[]): void;
   warn(...args: unknown[]): void;
   /** Logs an error and returns its entry's `errorId` (undefined when nothing
-   *  was logged), so a UI can link to it, e.g. open it in the Logs window. */
+   *  was logged), so a UI can link to it, e.g. open it in a Logs tab. */
   error(...args: unknown[]): string | undefined;
 }
 

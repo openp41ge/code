@@ -71,8 +71,8 @@ function _startCursorPoll(): void {
     // (it initiated the drag and holds focus), so no other window should paint
     // a cross-window drop indicator. An overlaid window's grid bounds can
     // overlap the cursor even when the source is the window actually under the
-    // pointer — e.g. dragging a workspace skeleton over the Workspace Manager
-    // while it covers a workspace window. Only when the cursor leaves the
+    // pointer — e.g. a source window overlapping another one. Only when the
+    // cursor leaves the
     // source do we forward its position to a target window; every other window
     // gets an explicit clear so a stale indicator is never left showing.
     const sourceBw = _activeSession ? openp41geWindows.get(_activeSession.sourceWinId) : undefined;
@@ -510,28 +510,6 @@ async function _resolveDropInWindow(
     (() => {
       const el = document.elementFromPoint(${clientX}, ${clientY});
       if (!el || !(el instanceof HTMLElement)) return null;
-
-      // Application Management window: its tab bar lives in a shadow root, so
-      // document.elementFromPoint sees the <openp41ge-window-manager> host, not
-      // the .wm-tabbar inside it. Query the shadow root directly.
-      const wmHost = document.querySelector('openp41ge-window-manager');
-      if (wmHost && wmHost.shadowRoot) {
-        const srEl = wmHost.shadowRoot.elementFromPoint(${clientX}, ${clientY});
-        const barEl =
-          srEl && typeof srEl.closest === 'function' ? srEl.closest('.wm-tabbar') : null;
-        if (barEl) {
-          const barRect = barEl.getBoundingClientRect();
-          const relX = ${clientX} - barRect.left;
-          const tabButtons = barEl.querySelectorAll('.wm-tab');
-          let dropIndex = tabButtons.length;
-          for (let i = 0; i < tabButtons.length; i++) {
-            const btnRect = tabButtons[i].getBoundingClientRect();
-            const btnMid = btnRect.left - barRect.left + btnRect.width / 2;
-            if (relX < btnMid) { dropIndex = i; break; }
-          }
-          return { type: 'manager-tab-bar', dropIndex };
-        }
-      }
 
       const tabBar = el.closest('tab-bar');
       if (tabBar && tabBar.dropTarget && tabBar.winId) {

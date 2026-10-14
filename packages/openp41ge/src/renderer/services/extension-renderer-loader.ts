@@ -73,7 +73,7 @@ export interface WorkspaceWorktreeInfo {
 /**
  * Wait (bounded) for the workspace file service to have loaded its data.
  *
- * A renderer surface can mount before the resolve-window-kind step binds the
+ * A renderer surface can mount before the resolve-window-workspace step binds the
  * workspace, so reading `openData` immediately would bake in an empty repo
  * list. In a workspace-bound window we first await the preload init signal,
  * then poll briefly until the workspace file is loaded. Windows without a
@@ -279,7 +279,7 @@ export function createRendererSurfaceDeps(
       );
     },
     openLog(errorId) {
-      window.openp41ge?.windowManager?.openLogsWindow?.({ errorId });
+      window.openp41ge?.windowManager?.openLogs?.({ errorId });
     },
     config: extensionConfigs().hostFor(extId, () =>
       deps.openTab({ appType: CONFIG_EDITOR_APP_TYPE, params: { extensionId: extId } }),

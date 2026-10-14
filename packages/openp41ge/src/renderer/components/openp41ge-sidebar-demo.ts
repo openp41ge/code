@@ -1,5 +1,5 @@
 /**
- * <openp41ge-sidebar-demo> — an animated mock of a workspace window showing
+ * <openp41ge-sidebar-demo> — an animated mock of a window showing
  * the sidebars sliding out and back in, on a loop.
  *
  * The loop walks through these stages:

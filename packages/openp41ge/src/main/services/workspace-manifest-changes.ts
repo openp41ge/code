@@ -3,7 +3,7 @@
  * about (`workspace-files:changed`).
  *
  * A workspace file holds its manifest (name, repos, data folder, …) and its
- * layout session (windows, tabs, sidebars), which a workspace window saves
+ * layout session (windows, tabs, sidebars), which the workspace's windows save
  * constantly. Only a manifest change is reported: a touched file is read once
  * it settles and compared with the last manifest seen. A half-written file is
  * skipped (its completed write touches it again); a new or deleted file is a

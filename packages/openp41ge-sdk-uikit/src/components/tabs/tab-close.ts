@@ -1,10 +1,9 @@
 /**
  * <tab-close> — the close button of a tab handle. Every tab bar uses it (the
- * grid's tab bars, the workspace sidebars, the manager window's tab bar and
- * the Logs window's sidebar), so they all look the same.
+ * grid's tab bars and the sidebars), so they all look the same.
  *
  * A full-height, square button (34px, the tab's height) with the ✕ drawn in
- * the UI font: an inherited font (e.g. the Logs window's monospace) would
+ * the UI font: an inherited font (e.g. a log view's monospace) would
  * change its size and stroke weight, and an italic title (a preview tab)
  * would slant it. The glyph sits low in its line box, so it is lifted 1px.
  * It greys on hover, brighter on the active tab (`active`).

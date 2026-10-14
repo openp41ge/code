@@ -8,9 +8,9 @@
  * to a `grid-open-tab` for the target window. The existing tabs event handler
  * then dispatches the workspace operation with the target window id.
  *
- * Only another workspace window of the SAME workspace qualifies (the source's
- * dispatcher owns that layout), and only when its window type is in the
- * source's `contexts`.
+ * Only another window showing the SAME workspace (or, like the source, none)
+ * qualifies — the source's dispatcher owns that layout — and only when the
+ * source's `contexts` allow a window.
  */
 
 import type { PayloadDragData, PayloadOpen } from "../openp41ge-tabs-adapter";
@@ -18,7 +18,6 @@ import type { PayloadDragData, PayloadOpen } from "../openp41ge-tabs-adapter";
 /** One open window, as listed by `windowManager.openWindowSummaries()`. */
 export interface WindowSummary {
   readonly windowId: string;
-  readonly windowType: string;
   readonly workspacePath: string | null;
 }
 
@@ -73,8 +72,8 @@ export function resolveCrossWindowPayloadDrop(
 
   const mine = windows.find((w) => w.windowId === myWinId);
   const theirs = windows.find((w) => w.windowId === check.windowId);
-  if (!mine?.workspacePath || !theirs || theirs.workspacePath !== mine.workspacePath) return NONE;
-  if (theirs.windowType !== "workspace" || !data.contexts.includes(theirs.windowType)) return NONE;
+  if (!mine || !theirs || theirs.workspacePath !== mine.workspacePath) return NONE;
+  if (!data.contexts.includes("workspace")) return NONE;
 
   const target = check.target;
   if (!target) return NONE;

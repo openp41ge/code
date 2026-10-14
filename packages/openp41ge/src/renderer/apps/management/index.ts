@@ -1,9 +1,9 @@
 /**
  * The management sidebar tabs — Workspaces, Settings, Releases, Cleanup,
- * Migrations — as platform sidebar tabs a workspace window opens on either
- * side, like any extension's sidebar tab (plans/2026-10-14-one-window.md).
+ * Migrations — as platform sidebar tabs a window opens on either side, like
+ * any extension's sidebar tab.
  *
- * Each mounts the pane the management window shows for it. What a pane opens
+ * Each mounts its pane. What a pane opens
  * (a workspace's editor, a settings schema's editor, a release) goes into the
  * window's grid through its `grid-open-tab` open path, in the last focused
  * column. Workspace and settings rows also drag onto the grid, as the
@@ -55,15 +55,15 @@ export const MANAGEMENT_DRAG_SOURCES: readonly DragSourceDecl[] = [
   },
 ];
 
+/** Open a workspace's editor in this window's grid. */
+export function openWorkspaceEditor(path: string, name: string, pinned: boolean): void {
+  openInGrid(WORKSPACE_EDITOR_APP_TYPE, { path, name, dir: dataDirWorkspaces() }, pinned);
+}
+
 function workspacesPane(): HTMLElement {
   const list = document.createElement("openp41ge-workspaces-list") as Openp41geWorkspacesList;
   list.dragSourceId = WORKSPACE_ROW_SOURCE;
-  list.onOpen = (ws, pinned) =>
-    openInGrid(
-      WORKSPACE_EDITOR_APP_TYPE,
-      { path: ws.filePath, name: workspaceName(ws), dir: dataDirWorkspaces() },
-      pinned,
-    );
+  list.onOpen = (ws, pinned) => openWorkspaceEditor(ws.filePath, workspaceName(ws), pinned);
   return list;
 }
 

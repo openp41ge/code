@@ -27,8 +27,8 @@ export function containsPoint(rect: Rect, pos: { x: number; y: number }): boolea
  * While the cursor is still over the SOURCE window — the window that initiated
  * the drag — no other window may paint an indicator: an overlaid window's grid
  * bounds can overlap the cursor even though the source is the window actually
- * under the pointer (e.g. dragging a workspace skeleton over the Workspace
- * Manager while it covers a workspace window). Only once the cursor leaves the
+ * under the pointer (e.g. a source window overlapping another one). Only once
+ * the cursor leaves the
  * source do we allow the windows actually under it to show an indicator.
  */
 export function computeGhostShowWindows(

@@ -1,7 +1,7 @@
 /**
  * ReleasesFeed — which releases of the app exist, checked in the background.
  *
- * The manager window's Releases tab shows this list. It fetches only the
+ * The Releases tab shows this list. It fetches only the
  * GitHub release list (metadata), never a file: downloading an update stays
  * the updater's job, on the user's request.
  *

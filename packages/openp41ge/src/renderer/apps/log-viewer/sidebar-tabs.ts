@@ -1,6 +1,5 @@
 /**
- * The Log Streams and Log Search sidebar tabs (the logs window's Streams and
- * Search, in a workspace window: plans/2026-10-14-one-window.md, step 2).
+ * The Log Streams and Log Search sidebar tabs.
  * They open streams into the window's grid; stream rows drag as the
  * platform's `openp41ge/log-stream` payloads.
  */
