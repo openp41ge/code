@@ -199,6 +199,14 @@ export type WorkspaceEditorHost = SurfaceHost<WorkspaceEditorState>;
 export interface WorkspaceEditorContext {
   readonly path?: string;
   readonly dir?: string;
+  /** The platform's workspaces directory, for a tab opened without a `dir`
+   *  (a dropped `openp41ge/workspace-config` carries only the path). */
+  readonly workspacesDir?: string;
+}
+
+/** The directory the edited file lives in. */
+function contextDir(ctx: WorkspaceEditorContext): string | undefined {
+  return ctx.dir ?? ctx.workspacesDir;
 }
 
 /** Read the workspace file and set it as the surface state. */
@@ -251,7 +259,7 @@ export async function loadEditorState(
 export async function reloadEditorFromDisk(host: WorkspaceEditorHost): Promise<void> {
   const ctx = host.context as WorkspaceEditorContext;
   const path = host.state.path ?? ctx.path;
-  const dir = host.state.dir ?? ctx.dir;
+  const dir = host.state.dir ?? contextDir(ctx);
   if (!path || !dir) return;
   const result = (await host.dispatch("read", { dir, path })) as {
     ok?: boolean;
@@ -320,7 +328,7 @@ function droppedRepos(before: WorkspaceFileData | undefined, after: WorkspaceFil
 export async function saveEditorState(host: WorkspaceEditorHost): Promise<void> {
   const ctx = host.context as WorkspaceEditorContext;
   const { path, data, savedData } = host.state;
-  const dir = host.state.dir ?? ctx.dir ?? "";
+  const dir = host.state.dir ?? contextDir(ctx) ?? "";
   if (!data || !path || !dir) return;
   try {
     const result = (await host.dispatch("write", { dir, path, data })) as {
@@ -481,7 +489,7 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
   const uninitialized = !("loading" in host.state);
   if (uninitialized) {
     const path = ctx.path ?? "";
-    const dir = ctx.dir ?? "";
+    const dir = contextDir(ctx) ?? "";
     // Kick off the async read once. setState during render is unsafe, so we
     // defer via microtask; the host repaints with the loaded state.
     queueMicrotask(() => loadEditorState(host, path, dir));

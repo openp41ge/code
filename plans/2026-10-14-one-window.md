@@ -1,0 +1,99 @@
+2026-10-14
+
+# One window: one kind of window hosts everything
+
+The app opens three kinds of window: workspace, management and logs
+(`Openp41geWindowType` in `electron/window-manager.ts`). Each has its own top
+bar, its own sidebar and its own grid model. Goal: one kind of window — the
+workspace window — that hosts every sidebar tab and every grid tab.
+
+## Decisions (from the user, 2026-10-14)
+
+- **One window kind.** The workspace window's top bar, both sidebars and its
+  grid. The management and logs windows go away.
+- **A window has at most one workspace.** Opening a workspace in a window
+  **replaces** the one it has.
+- **Choosing a workspace moves to the top bar.** The workspace name on the
+  right of the top bar (`openp41ge-workspace-label`, plain text today)
+  becomes a button that opens an overlay to pick a workspace. The management
+  tabs stay (Workspaces still lists and edits workspaces).
+- **Sidebar tabs open on either side.** The management and logs sidebar tabs
+  were on a fixed side because those windows had one sidebar; now the user
+  picks the side, like any sidebar tab.
+- **Each workspace remembers its own layout**, including the tabs that do not
+  need a workspace (settings, releases, logs, …). They are saved in the
+  workspace file with the rest.
+- **No workspace open:** workspace-free tabs can still be opened. Their layout
+  lives in memory only and is dropped when a workspace is opened.
+- **Dragging between windows.** Same workspace: any sidebar or grid tab, as
+  now. Different workspaces: only workspace-free grid tabs (sidebar tabs are
+  in every window already).
+- The release app and a dev build are separate apps, so each still has its
+  own window.
+
+## What exists
+
+- Sidebar tabs are system tab types (`SystemTabRegistration`,
+  `registerSystemTabType`); only extensions register them today
+  (`extension-renderer-loader.ts`). Their set and side are per workspace
+  (`Workspace.sidebar`, `Workspace.systemTabs`).
+- The management grid (`openp41ge-manager-grid.ts`) opens app types through
+  the same registry as the workspace grid (config editor, release, the
+  workspaces extension's workspace editor). Its layout is
+  `<app-data>/manager-grid.json`.
+- The management sidebar content: Workspaces is inline in
+  `openp41ge-window-manager.ts` (~2900 lines); Settings, Releases, Cleanup and
+  Migrations are their own elements.
+- The logs window (`openp41ge-logs-window.ts`) has its own grid and drag
+  orchestrator; log streams already have a payload kind
+  (`openp41ge/log-stream`) and a `log-viewer` app type.
+- The main process keeps one state per workspace path (`WorkspaceRegistry`)
+  plus an unbound default for windows with no workspace.
+
+## Steps
+
+Each step ships on its own; the old windows keep working until step 5.
+
+1. **Done (2026-10-14).** **Management sidebar tabs in the workspace window.** Register Workspaces,
+   Settings, Releases, Cleanup and Migrations as platform system tab types;
+   extract the Workspaces list out of `openp41ge-window-manager.ts` into its
+   own element shared by both windows. Their grid tabs (config editor,
+   release, workspace editor) open in the workspace grid.
+   As built: `apps/management` registers the tabs; the Workspaces list is
+   `<openp41ge-workspaces-list>`; its and the Settings rows drag as the
+   platform's `workspace-config` / `config-overrides` payloads (platform drag
+   sources), and the workspaces extension consumes `workspace-config` (its
+   editor falls back to `workspacesDir` and titles tabs by `name`).
+2. **Logs in the workspace window.** Streams and Search as sidebar tabs, a log
+   stream as a `log-viewer` grid tab. "Open logs" (and the debug seed, and
+   `host.openLog(errorId)`) opens or focuses a Logs tab instead of a window.
+3. **Workspace-free tabs.** An app type says whether it needs a workspace.
+   A window with no workspace gets an in-memory state; it can host
+   workspace-free grid and sidebar tabs only.
+4. **Top-bar workspace picker; replacing a window's workspace.** The label
+   becomes a button + overlay. Picking a workspace rebinds the window in the
+   main process (its meta, its dispatcher), unmounts the old layout and loads
+   the new workspace's layout.
+5. **Cross-workspace drags; remove the old windows.** A workspace-free grid
+   tab dropped on a window of another workspace moves between the two
+   dispatchers. Then drop the `manager` and `logs` window types, the Window
+   menu items that open them, `manager-grid.json`, and update AGENTS.md.
+   With one kind left, it is no longer a "workspace window": drop
+   `Openp41geWindowType` / `windowType` (not persisted, so no migration) and
+   the branching on it, and call it "the window" in code, comments and docs
+   (`openp41ge-windowview` is already neutral). Until then, "workspace
+   window" in this plan means today's workspace window.
+
+Every step: regression/behaviour tests in code-tests first (§5.6), verified in
+the running dev app.
+
+## Open questions
+
+- **Which tabs are workspace-free** — the step 3 flag. Platform apps (config
+  editor, release, log viewer) are clear. For extension surfaces it is a
+  contract addition in `openp41ge-sdk` (e.g. a `workspace: "required" |
+"none"` on a surface registration); confirm the name before adding it.
+- **The workspace editor** (workspaces extension) edits a workspace by path,
+  so it does not need one open; it should be workspace-free.
+- **Saved management layout** (`manager-grid.json`): carry it into the
+  first workspace opened after the update, or drop it.

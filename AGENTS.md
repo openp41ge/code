@@ -249,6 +249,10 @@ collide:
   kinds (`openp41ge-extension-agents/chat-thread`,
   `openp41ge-extension-git/commit`, …).
 
+The platform's own sidebar panes (the Workspaces and Settings rows) tag
+sources the same way, registered under the `openp41ge` namespace
+(`extensionDrag.registerPlatformSources`).
+
 A source emits a platform kind or one its own extension declares. Every
 payload is validated against its kind's schema; an unknown kind is refused.
 Matching is **kind-driven**: a consumer/target lists the kinds it accepts —

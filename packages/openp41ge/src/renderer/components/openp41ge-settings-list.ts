@@ -9,7 +9,7 @@
  * The list follows the active extensions (as they load and reload).
  */
 
-import { LitElement, html, type TemplateResult } from "lit";
+import { LitElement, html, nothing, type TemplateResult } from "lit";
 import type { ActiveExtensionSummary } from "openp41ge-sdk";
 import { configEditorTitle } from "../apps/config-editor/title";
 import { getActiveExtensions, onExtensionsChanged } from "../services/extension-contributions";
@@ -63,6 +63,8 @@ export class Openp41geSettingsList extends LitElement {
 
   /** Open a settings schema's editor (`pinned`: a double-click). */
   onOpen: ((id: string, pinned: boolean) => void) | null = null;
+  /** When set, rows are platform drag sources with this id. */
+  dragSourceId: string | null = null;
   /** Injectable for tests. */
   deps: SettingsListDeps = DEFAULT_DEPS;
 
@@ -149,6 +151,7 @@ export class Openp41geSettingsList extends LitElement {
             html`<li
               class="sl-row"
               data-settings-id=${entry.id}
+              data-drag-source-id=${this.dragSourceId ?? nothing}
               title=${`Open ${entry.name} settings`}
               @click=${() => this.onOpen?.(entry.id, false)}
               @dblclick=${() => this.onOpen?.(entry.id, true)}

@@ -19,6 +19,7 @@ import { logViewerAppRegistration } from "../../apps/log-viewer/index";
 import { configEditorAppRegistration } from "../../apps/config-editor/index";
 import { releaseAppRegistration } from "../../apps/release/index";
 import { registerExtensionsWithRefresh } from "../../apps/extension/index";
+import { registerManagementSidebarTabs } from "../../apps/management/index";
 import { workspaceData } from "../../services/workspace-data";
 
 // ─── Log viewer component (auto-registers <openp41ge-log-viewer>) ──────────
@@ -34,12 +35,8 @@ export class RegisterAppTypesStep implements IStartupStep {
     registerAppType(configEditorAppRegistration);
     registerAppType(releaseAppRegistration);
 
-    // Register editor system tab types (override the grid)
-    // The workspace manager is no longer an in-window surface: a workspace window
-    // is bound to a fixed workspace (no in-window switching), and the Window
-    // Manager window uses its own <openp41ge-window-manager> component rather than
-    // a workspace overlay tab. So no "workspace-manager" editor system tab type
-    // nor a "workspaces" system-overlay tab is registered here.
+    // The management sidebar tabs (Settings, Releases, Cleanup, Migrations).
+    registerManagementSidebarTabs();
 
     // ── Load the extensions' renderer entries ───────────────────────────
     // Each self-registers its surfaces; the set is fetched from main and

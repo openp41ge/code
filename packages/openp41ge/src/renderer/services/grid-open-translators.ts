@@ -55,6 +55,13 @@ const TRANSLATORS: Readonly<Record<string, Translator>> = {
       config: { extensionId },
     };
   },
+
+  // One tab per release (the file-path slot is its identity).
+  release: (c) => {
+    const tag = str(c.tag);
+    if (!tag) return null;
+    return { title: tag, filePath: `release:${tag}`, config: { tag, path: `release:${tag}` } };
+  },
 };
 
 /**

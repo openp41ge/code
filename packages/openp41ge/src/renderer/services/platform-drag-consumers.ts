@@ -11,8 +11,8 @@
  * `config-overrides` opens the JSON config editor for the extension named by
  * `settingsId`.
  *
- * Not yet registered: `workspace-config` (the workspace editor is an extension
- * surface; the Workspaces extension registers it when it migrates).
+ * `workspace-config` has no platform consumer: the workspace editor is the
+ * Workspaces extension's surface, and that extension registers it.
  */
 
 import type { DragPayload, PlatformDragKind, PlatformDragPayload } from "openp41ge-sdk";

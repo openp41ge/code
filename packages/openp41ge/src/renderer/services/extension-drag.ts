@@ -13,11 +13,14 @@
 import { createLogger, type ILogger } from "openp41ge-core-logger";
 import {
   assertNoConsumerDropTargetConflicts,
+  parseDragRegistrations,
+  PLATFORM_DRAG_NAMESPACE,
   qualifyName,
   validateDragDeclSurfaces,
   type DragContext,
   type DragDecls,
   type DragPayload,
+  type DragSourceDecl,
   type DropTargetDecl,
 } from "openp41ge-sdk";
 import type { PayloadDragData, PayloadOpen } from "../openp41ge-tabs-adapter";
@@ -116,6 +119,23 @@ export function createExtensionDragRuntime(opts: ExtensionDragRuntimeOptions) {
     },
 
     unregisterExtension,
+
+    /**
+     * Register the platform's own drag sources (rows of its sidebar panes),
+     * under the platform namespace: they emit platform kinds. Throws on a
+     * non-conforming source.
+     */
+    registerPlatformSources(sources: readonly DragSourceDecl[]): void {
+      service.registerDecls(
+        PLATFORM_DRAG_NAMESPACE,
+        parseDragRegistrations({ sources }, PLATFORM_DRAG_NAMESPACE),
+      );
+    },
+
+    /** The binder for the platform's own panes (their tagged rows drag). */
+    platformBinder(): SurfaceDragBinder {
+      return service.forExtension(PLATFORM_DRAG_NAMESPACE);
+    },
 
     /** The per-extension binder for `RendererSurfaceHostDeps.drag`. */
     binderFor(extensionId: string): SurfaceDragBinder {

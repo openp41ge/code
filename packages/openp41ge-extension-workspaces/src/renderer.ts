@@ -7,15 +7,16 @@
  *
  *   - a **grid** surface `workspace-editor` — edits a workspace config.
  *
- * There is no workspaces list surface: the platform's manager window lists
- * workspaces (and drags a row into its grid as this editor).
+ * There is no workspaces list surface: the platform's Workspaces tab lists
+ * workspaces; a row dropped on a grid (`openp41ge/workspace-config`) opens
+ * here, the platform's workspaces directory standing in for `dir`.
  *
  * The directory the surfaces operate on (`dir`) is platform-injected via
  * `host.context.dir`; the editor's target file is carried per-tab as
  * `host.context.path` (set by the platform from the tab's config).
  */
 
-import { registerRenderers } from "openp41ge-sdk";
+import { registerDragDecls, registerRenderers } from "openp41ge-sdk";
 import { renderWorkspaceEditor, type WorkspaceEditorHost } from "./workspace-editor.js";
 
 /** Workspaces glyph (material account-tree), as SVG markup for the grid tab handle. */
@@ -29,9 +30,25 @@ registerRenderers([
     title: "Workspace editor",
     icon: WORKSPACE_ICON,
     description: "Edit a workspace's `.openp41ge-workspace` config (JSON / UI).",
+    // Titled by the workspace's name (a Workspaces row's, or a dropped one's).
+    tabLabel: (params) => ({
+      title: typeof params.name === "string" && params.name ? params.name : "Workspace editor",
+    }),
     render: (host) => renderWorkspaceEditor(host as unknown as WorkspaceEditorHost),
   },
 ]);
+
+// A dropped workspace (a Workspaces row) opens as its editor.
+registerDragDecls({
+  consumers: [
+    {
+      id: "workspace-editor",
+      accepts: ["openp41ge/workspace-config"],
+      placement: ["grid"],
+      open: { kind: "renderer-surface", surface: "grid:workspace-editor" },
+    },
+  ],
+});
 
 // Re-export the state/host types so tests/consumers can reach them without
 // reaching into the view implementations.

@@ -12,7 +12,6 @@ import { html, nothing, type TemplateResult } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { LitElement } from "lit";
 import { state } from "lit/decorators.js";
-import { REGEX_ICON, CASE_ON_ICON } from "./search-icons";
 import "openp41ge-sdk-uikit";
 import {
   tooltipController,
@@ -26,19 +25,23 @@ import {
   focusLineLayer,
   syncFocusLine,
 } from "openp41ge-sdk-uikit";
-import type { WorkspaceFileData } from "../../layout/types";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 import "./openp41ge-settings-list";
 import { settingsIcon } from "../icons";
 import { CONFIG_EDITOR_APP_TYPE, configEditorTitle } from "../apps/config-editor/title";
 import { openReleaseTab } from "../apps/release/index";
-import { workspaceFileService } from "../services/workspace-file-service";
 import { dataDirWorkspaces } from "../services/extension-renderer-loader";
 import { WorkspaceRowDragSource } from "../services/drag-sources/workspace-row-drag-source";
+import { CLEANUP_ICON, RELEASES_ICON, WORKSPACES_ICON } from "../apps/management/icons";
 
 /** Inset that trims the capturePage bitmap edge so the ghost isn't boxed (px). */
 const ROW_GHOST_CAPTURE_INSET = 2;
 import "./openp41ge-manager-grid";
+import {
+  workspaceName,
+  type Openp41geWorkspacesList,
+  type WorkspaceListEntry,
+} from "./openp41ge-workspaces-list";
 import type { Openp41geManagerGrid } from "./openp41ge-manager-grid";
 
 /** The namespaced app type id of the workspaces extension's editor surface. */
@@ -46,7 +49,6 @@ const WORKSPACE_EDITOR_APP_TYPE = "ext:openp41ge-extension-workspaces:workspace-
 import { registerManagerTabBar } from "../services/init-drag-system";
 import { MANAGER_TAB_REORDER_EVENT } from "../services/drop-targets/manager-tab-bar-drop-target";
 import { welcomePages } from "../content/welcome";
-import { createLogger } from "openp41ge-core-logger";
 import {
   MIN_SIDEBAR_WIDTH,
   MAX_SIDEBAR_WIDTH,
@@ -54,28 +56,11 @@ import {
   NOTCH_OVERFLOW,
 } from "openp41ge-core-constants";
 
-const log = createLogger("openp41ge", "window-manager");
-
 /** Default sidebar width for the manager window (matches the old fixed width). */
 const DEFAULT_SIDEBAR_WIDTH = 300;
 const SIDEBAR_WIDTH_STORAGE_KEY = "openp41ge:manager-sidebar-width";
 /** The sidebar's open tabs and the active one, kept across reloads. */
 const SIDEBAR_TABS_STORAGE_KEY = "openp41ge:manager-sidebar-tabs";
-
-/** Hold a skeleton this long before the drag element appears (long-press pickup). */
-const HOLD_MS = 350;
-/** Pointer travel past this many px starts an immediate drag (below the long-press hold). */
-const DRAG_THRESHOLD = 4;
-
-/** Mini workspace-window skeleton: width/height (at half the old carousel size). */
-const THUMB_W = 66;
-const THUMB_H = 42;
-
-interface OpenWindowSummary {
-  windowId: string;
-  windowType: "workspace" | "manager" | "logs";
-  workspacePath: string | null;
-}
 
 /** Tabs available in the manager window's tab bar. */
 type ManagerTabId = "workspaces" | "settings" | "welcome" | "releases" | "cleanup" | "migrations";
@@ -90,20 +75,6 @@ const MANAGER_TAB_LABELS: Record<ManagerTabId, string> = {
   migrations: "Migrations",
 };
 
-/** Workspaces glyph (material account-tree), as SVG markup for the Workspaces
- *  sidebar tab handle (`fill=currentColor` so it follows the tab's text colour). */
-const WORKSPACES_ICON =
-  '<svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M120-80v-280h120v-160h200v-80H320v-280h320v280H520v80h200v160h120v280H520v-280h120v-80H320v80h120v280H120Zm280-600h160v-120H400v120ZM200-160h160v-120H200v120Zm400 0h160v-120H600v120ZM480-680ZM360-280Zm240 0Z"/></svg>';
-
-/** Cleanup glyph (user-provided), as SVG markup for the Cleanup tab handle
- *  (`fill=currentColor` so it follows the tab's text colour). */
-const CLEANUP_ICON =
-  '<svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="M420-280h120v-100h100v-120H540v-100H420v100H320v120h100v100ZM160-120v-480l320-240 320 240v480H160Zm80-80h480v-360L480-740 240-560v360Zm240-270Z"/></svg>';
-
-/** Releases tab icon (Material Symbols "deployed_code_update"). */
-const RELEASES_ICON =
-  '<svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="m720-80 120-120-28-28-72 72v-164h-40v164l-72-72-28 28L720-80ZM480-800 243-663l237 137 237-137-237-137ZM120-321v-318q0-22 10.5-40t29.5-29l280-161q10-5 19.5-8t20.5-3q11 0 21 3t19 8l280 161q19 11 29.5 29t10.5 40v159h-80v-116L479-434 200-596v274l240 139v92L160-252q-19-11-29.5-29T120-321ZM578.5-58.5Q520-117 520-200t58.5-141.5Q637-400 720-400t141.5 58.5Q920-283 920-200T861.5-58.5Q803 0 720 0T578.5-58.5ZM480-491Z"/></svg>';
-
 /** Tab handle icons, for the tabs that have one. */
 const MANAGER_TAB_ICONS: Partial<Record<ManagerTabId, string>> = {
   workspaces: WORKSPACES_ICON,
@@ -113,8 +84,6 @@ const MANAGER_TAB_ICONS: Partial<Record<ManagerTabId, string>> = {
 };
 
 export class Openp41geWindowManager extends LitElement {
-  @state() private _workspaces: Array<{ filePath: string; data: WorkspaceFileData }> = [];
-  @state() private _openWindows: OpenWindowSummary[] = [];
   /** Open tabs in the bar; the welcome intro tab is removed for now, so the
    *  window lands on Workspaces. */
   @state() private _openTabs: ManagerTabId[] = ["workspaces"];
@@ -153,39 +122,6 @@ export class Openp41geWindowManager extends LitElement {
   @state() private _welcomeDismissed = false;
   /** Slide-transition phase for the welcome page (out-* / in-* / "" = idle). */
   /** Prevents overlapping navigations while a slide is playing. */
-  @state() private _loaded = false;
-  @state() private _addingWorkspace = false;
-  @state() private _workspaceDeleteMode = false;
-  /** Paths of workspaces selected in the list's delete mode. */
-  @state() private _selectedWorkspaces: Set<string> = new Set();
-  @state() private _listOverflows = false;
-  /** The header is expanded into the workspace search bar. */
-  @state() private _searchOpen = false;
-  /** Raw text in the header search input. */
-  @state() private _searchQuery = "";
-  /** Match case in the header search. */
-  @state() private _caseSensitive = false;
-  /** Treat the header search query as a regular expression. */
-  @state() private _useRegex = false;
-  private _drag: {
-    startX: number;
-    startY: number;
-    startScreenX: number;
-    startScreenY: number;
-    /** Cursor offset within the skeleton element (grab point), so the drag
-     * element hangs from where the user actually grabbed it, not centred. */
-    offsetX: number;
-    offsetY: number;
-    captureRect: { x: number; y: number; width: number; height: number } | null;
-    path: string;
-    label: string;
-    active: boolean;
-    mode: "open" | null;
-  } | null = null;
-  private _holdTimer: number | null = null;
-  private _offEndSession: (() => void) | null = null;
-  private _offOpenWindowsChanged: (() => void) | null = null;
-  private _offWorkspaceFileChanged: (() => void) | null = null;
   private _offActivateTab: (() => void) | null = null;
   /** Subscription for a tab moved onto this window from another manager window. */
   private _offReceiveTab: (() => void) | null = null;
@@ -238,12 +174,9 @@ export class Openp41geWindowManager extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
-    window.addEventListener("focus", this._onFocus);
     window.addEventListener("focus", this._onWindowFocusLine);
     window.addEventListener("blur", this._onWindowBlurLine);
     this.shadowRoot?.addEventListener("mousedown", this._onFocusZoneMouseDown, true);
-    window.addEventListener("resize", this._measureListOverflow);
-    document.addEventListener("keydown", this._onKeydown);
     // Welcome intro action buttons live inside the shadow DOM, so clicks are
     // delegated at the shadow root (they're retargeted to the host by the time
     // they reach a document listener).
@@ -254,23 +187,6 @@ export class Openp41geWindowManager extends LitElement {
     // only follow a drag within the same gesture (no pointerdown between), so a
     // fresh press always means the previous drag's follow-up click is moot.
     document.addEventListener("pointerdown", this._onPointerDown);
-    // When a drag-out opens a workspace window in the main process (cursor left
-    // the window), the main process ends the session and notifies us to clear
-    // the in-flight drag state.
-    // Keep the Logs tab badge in sync with captured errors, and switch to the
-    // Logs tab when an error toast is clicked (event from error-capture).
-    // Keep the Logs tab badge in sync with captured errors, and switch to the
-    // Logs tab when an error toast is clicked (event from error-capture).
-    this._offEndSession = window.openp41ge.drag.onEndSession(() => this._teardownDrag());
-    // Refresh the open-windows column immediately when any window opens/closes,
-    // rather than waiting for this window to regain focus.
-    this._offOpenWindowsChanged = window.openp41ge.windowManager.onOpenWindowsChanged(() => {
-      void this._load();
-    });
-    // A workspace file changed (renamed, repos edited — in any window).
-    this._offWorkspaceFileChanged =
-      window.openp41ge.workspaceController?.onWorkspaceFileChanged?.(() => void this._load()) ??
-      null;
     // A menu item may request a specific tab when the manager window is already
     // open; activate it and bring the window to front (done in main).
     // Whether the Cleanup tab has something to review (a dot in the + menu).
@@ -322,7 +238,6 @@ export class Openp41geWindowManager extends LitElement {
     } else {
       this._restoreTabs();
     }
-    void this._load();
     // If the user opted out of the welcome intro, don't land on it (or open it)
     // on future launches. Dismissal is a marker file in the app-data dir.
     void window.openp41ge.welcome.isDismissed().then((dismissed) => {
@@ -383,20 +298,12 @@ export class Openp41geWindowManager extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    window.removeEventListener("focus", this._onFocus);
     window.removeEventListener("focus", this._onWindowFocusLine);
     window.removeEventListener("blur", this._onWindowBlurLine);
     this.shadowRoot?.removeEventListener("mousedown", this._onFocusZoneMouseDown, true);
     focusLineLayer().hide(this);
-    window.removeEventListener("resize", this._measureListOverflow);
-    document.removeEventListener("keydown", this._onKeydown);
     this.shadowRoot?.removeEventListener("click", this._onShadowClick);
     document.removeEventListener("pointerdown", this._onPointerDown);
-    this._offEndSession?.();
-    this._offOpenWindowsChanged?.();
-    this._offOpenWindowsChanged = null;
-    this._offWorkspaceFileChanged?.();
-    this._offWorkspaceFileChanged = null;
     this._offActivateTab?.();
     this._offActivateTab = null;
     this._offCleanupChanged?.();
@@ -425,11 +332,8 @@ export class Openp41geWindowManager extends LitElement {
     if (this._keepsTabs && (changed.has("_openTabs") || changed.has("_activeTab"))) {
       this._saveTabs();
     }
-    this._measureListOverflow();
     this._measureTabbarFade();
-    const btns = this.shadowRoot?.querySelectorAll<HTMLElement>(
-      ".dw-search, .wm-search-toggle, .wm-search-clear, .dw-add, .dw-delete, .dw-delete-cancel, .dw-delete-confirm, .wm-tab-close, .wm-tabbar-add",
-    );
+    const btns = this.shadowRoot?.querySelectorAll<HTMLElement>(".wm-tab-close, .wm-tabbar-add");
     const live = new Set<Element>();
     if (btns) {
       for (const btn of btns) {
@@ -483,13 +387,6 @@ export class Openp41geWindowManager extends LitElement {
     if (right !== this._tabbarFadeRight) this._tabbarFadeRight = right;
     const overflow = el.scrollWidth > el.clientWidth;
     if (overflow !== this._tabbarOverflow) this._tabbarOverflow = overflow;
-  };
-
-  private _measureListOverflow = (): void => {
-    const body = this.shadowRoot?.querySelector(".wm-body");
-    if (!body) return;
-    const overflow = body.scrollHeight > body.clientHeight + 1;
-    if (overflow !== this._listOverflows) this._listOverflows = overflow;
   };
 
   // ═══ Sidebar resize (drag bar) ────────────────────────────────────────
@@ -563,178 +460,6 @@ export class Openp41geWindowManager extends LitElement {
       this._activateTab(tab);
     }
   };
-
-  /** Hover a workspace skeleton: pre-capture its bitmap so the drag ghost has
-   * the real skeleton ready at drag.start even for a fast grab-and-drag. The
-   * pointer-down re-request reuses this cache (see the prepare-bitmap handler). */
-  private _onThumbPointerEnter(e: PointerEvent, path: string, isOpen: boolean): void {
-    if (isOpen) return;
-    const thumb = e.currentTarget as HTMLElement;
-    const rect = thumb.getBoundingClientRect();
-    window.openp41ge.drag.prepareBitmap({
-      x: Math.round(rect.left),
-      y: Math.round(rect.top),
-      width: Math.round(rect.width),
-      height: Math.round(rect.height),
-    });
-  }
-
-  /** Begin a pointer press on a workspace skeleton (drag-out). */
-  private _onThumbPointerDown(e: PointerEvent, path: string, isOpen: boolean): void {
-    if (e.button !== 0) return;
-    // An already-open workspace isn't an interactive drag handle — avoid a second
-    // open affordance on top of the already-open window.
-    if (isOpen) return;
-    this._teardownDrag();
-    const ws = this._workspaces.find((w) => w.filePath === path);
-    const thumb = e.currentTarget as HTMLElement;
-    const rect = thumb.getBoundingClientRect();
-    const captureRect = {
-      x: Math.round(rect.left),
-      y: Math.round(rect.top),
-      width: Math.round(rect.width),
-      height: Math.round(rect.height),
-    };
-    // Pre-capture the skeleton bitmap now so the ghost can pop with the real
-    // skeleton the instant the drag starts, rather than waiting for the async
-    // capture that runs after drag.start.
-    window.openp41ge.drag.prepareBitmap(captureRect);
-    this._drag = {
-      startX: e.clientX,
-      startY: e.clientY,
-      startScreenX: e.screenX,
-      startScreenY: e.screenY,
-      offsetX: e.clientX - rect.left,
-      offsetY: e.clientY - rect.top,
-      captureRect,
-      path,
-      label: ws?.data.name?.trim() || "Unnamed",
-      active: false,
-      mode: null,
-    };
-    try {
-      thumb.setPointerCapture?.(e.pointerId);
-    } catch (err) {
-      log.debug("window-manager thumb setPointerCapture failed (synthetic pointer):", err);
-    }
-    // A short hold shows the drag element without any pointer movement (long-press
-    // pickup). A quick drag that crosses the threshold clears this timer and starts
-    // the drag from the move handler instead.
-    this._clearHoldTimer();
-    this._holdTimer = window.setTimeout(() => this._beginOpenDrag(), HOLD_MS);
-  }
-
-  /** Long-press fired: show the drag element (open mode) at the press point. */
-  private _beginOpenDrag(): void {
-    this._holdTimer = null;
-    const drag = this._drag;
-    if (!drag || drag.active) return;
-    drag.active = true;
-    this._suppressClick = true;
-    this._startOpenDrag(drag.startScreenX, drag.startScreenY);
-    window.openp41ge.drag.move(drag.startScreenX, drag.startScreenY);
-  }
-
-  /**
-   * Put the in-flight gesture into open mode: start a real (native) drag so the
-   * ghost can leave the window. Passes the skeleton's capture rect so the main
-   * process swaps in a bitmap of the actual skeleton (not just a label). The
-   * window opens on the drop, only if the cursor is outside this window at
-   * release. Called from the long-press and from the first move past the
-   * threshold.
-   */
-  private _startOpenDrag(screenX: number, screenY: number): void {
-    const drag = this._drag;
-    if (!drag) return;
-    drag.mode = "open";
-    window.openp41ge.drag.start(
-      drag.label,
-      screenX,
-      screenY,
-      "🗂",
-      undefined,
-      undefined,
-      undefined,
-      THUMB_W,
-      THUMB_H,
-      drag.offsetX,
-      drag.offsetY,
-      "workspace",
-      drag.path,
-      drag.captureRect ?? undefined,
-      0,
-    );
-    window.openp41ge.drag.activate();
-  }
-
-  private _clearHoldTimer(): void {
-    if (this._holdTimer !== null) {
-      window.clearTimeout(this._holdTimer);
-      this._holdTimer = null;
-    }
-  }
-
-  /**
-   * Once the drag passes the threshold it is always a drag-out (the carousel is
-   * gone, so there is no swipe gesture to disambiguate). A drag means the
-   * following row click is not a navigation — suppress it so the workspace
-   * doesn't open over the drag. Cleared by the next pointerdown (see
-   * _onPointerDown) or by the row click itself.
-   */
-  private _onThumbPointerMove(e: PointerEvent): void {
-    const drag = this._drag;
-    if (!drag) return;
-    const dx = e.clientX - drag.startX;
-    const dy = e.clientY - drag.startY;
-    if (drag.active) {
-      if (drag.mode === "open") window.openp41ge.drag.move(e.screenX, e.screenY);
-      return;
-    }
-    // A small movement kickstarts the drag immediately — the long-press hold
-    // delay is only for grab-and-hold with no movement, not for a quick drag.
-    if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
-    // A real drag beat the long-press timer — cancel the pending pickup.
-    this._clearHoldTimer();
-    drag.active = true;
-    this._suppressClick = true;
-    this._startOpenDrag(e.screenX, e.screenY);
-  }
-
-  /** Release: open the workspace only if the cursor was outside this window at the drop. */
-  private _onThumbPointerUp(e: PointerEvent): void {
-    this._clearHoldTimer();
-    const drag = this._drag;
-    if (!drag) return;
-    const { mode, path } = drag;
-    this._teardownDrag();
-    if (mode === null) return;
-    // Compute outside synchronously (window.screenX/screenY match the main
-    // process window bounds) and end the drag in the same tick. Awaiting an
-    // IPC before drag.end() left a window in which a second drag could start
-    // and have its session/ghost clobbered by the delayed drag.end().
-    const outside =
-      e.screenX < window.screenX ||
-      e.screenX > window.screenX + window.outerWidth ||
-      e.screenY < window.screenY ||
-      e.screenY > window.screenY + window.outerHeight;
-    // Only an open drag has a ghost session to tear down.
-    if (mode === "open") window.openp41ge.drag.end();
-    // A release outside this window opens the workspace.
-    if (outside) this._openWorkspaceWindow(path);
-  }
-
-  private _onThumbPointerCancel(): void {
-    this._clearHoldTimer();
-    const drag = this._drag;
-    if (!drag) return;
-    if (drag.mode === "open") window.openp41ge.drag.end();
-    this._teardownDrag();
-  }
-
-  private _teardownDrag(): void {
-    this._clearHoldTimer();
-    this._drag = null;
-  }
 
   // ── Workspace-row drag setup ────────────────────────────────────────
 
@@ -817,15 +542,15 @@ export class Openp41geWindowManager extends LitElement {
         tabConfig: { extensionId: settingsId, path: `config:${settingsId}` },
       };
     }
-    if (target?.closest?.(".ws-del")) return null;
     const row = target?.closest?.(".ws-row") as HTMLElement | null;
-    if (!row || this._workspaceDeleteMode) return null;
+    const list = this._workspacesList();
+    if (!row || !list || list.deleteMode) return null;
     const path = row.getAttribute("data-workspace-path") ?? "";
-    const ws = path ? this._workspaces.find((w) => w.filePath === path) : undefined;
+    const ws = path ? list.workspaces.find((w) => w.filePath === path) : undefined;
     if (!ws) return null;
     return {
       row,
-      title: ws.data.name?.trim() || "Unnamed",
+      title: workspaceName(ws),
       appType: WORKSPACE_EDITOR_APP_TYPE,
       tabConfig: { path: ws.filePath, dir: dataDirWorkspaces() },
     };
@@ -1030,14 +755,6 @@ export class Openp41geWindowManager extends LitElement {
     this._suppressClick = false;
   };
 
-  /** Escape closes the inline new-workspace card or leaves workspace delete mode. */
-  private _onKeydown = (e: KeyboardEvent): void => {
-    if (e.key !== "Escape") return;
-    if (this._addingWorkspace) {
-      this._addingWorkspace = false;
-    } else if (this._workspaceDeleteMode) this._cancelWorkspaceDeleteMode();
-  };
-
   /** Toggle + persist the "never show the welcome intro again" choice. */
   private _onWelcomeDismissToggle = (e: Event): void => {
     const on = (e as CustomEvent<{ checked: boolean }>).detail.checked;
@@ -1045,50 +762,33 @@ export class Openp41geWindowManager extends LitElement {
     void window.openp41ge.welcome.setDismissed(on);
   };
 
-  private _onFocus = (): void => {
-    void this._load();
-  };
-
-  private async _load(): Promise<void> {
-    try {
-      this._workspaces = await workspaceFileService.listWorkspaces();
-    } catch (err) {
-      log.error("window-manager listWorkspaces failed:", err, { skipToast: true });
-      this._workspaces = [];
-    }
-    try {
-      this._openWindows = await window.openp41ge.windowManager.openWindowSummaries();
-    } catch (err) {
-      log.error("window-manager openWindowSummaries failed:", err, { skipToast: true });
-      this._openWindows = [];
-    }
-    this._loaded = true;
-  }
-
-  /** Open (or re-focus) a workspace-bound window; refresh open-state pills. */
-  private _openWorkspaceWindow(path: string): void {
-    window.openp41ge.windowManager.openWorkspaceWindow(path);
-    window.setTimeout(() => void this._load(), 350);
-  }
-
   /** Open a workspace's config in the grid's workspace-editor cell. When
    *  `pinned` is set (row double-tap / drop), the cell opens pinned. */
-  private _openWorkspaceEditor(
-    ws: { filePath: string; data: WorkspaceFileData },
-    pinned = false,
-  ): void {
+  private _openWorkspaceEditor(ws: WorkspaceListEntry, pinned = false): void {
     const grid = this.renderRoot?.querySelector(
       "openp41ge-manager-grid",
     ) as Openp41geManagerGrid | null;
     if (!grid) return;
     grid.openApp(
       WORKSPACE_EDITOR_APP_TYPE,
-      ws.data.name?.trim() || "Unnamed",
+      workspaceName(ws),
       { path: ws.filePath, dir: dataDirWorkspaces() },
       undefined,
       pinned,
     );
   }
+
+  /** The Workspaces tab's list, when that tab is showing. */
+  private _workspacesList(): Openp41geWorkspacesList | null {
+    return this.renderRoot?.querySelector("openp41ge-workspaces-list") ?? null;
+  }
+
+  /** The click that ends a row drag is not an open: swallow it once. */
+  private readonly _consumeSuppressedClick = (): boolean => {
+    if (!this._suppressClick) return false;
+    this._suppressClick = false;
+    return true;
+  };
 
   /** Open a settings schema's editor (the platform's, or an extension's) in
    *  the grid: one tab per schema; `pinned` from a double-click. */
@@ -1114,228 +814,6 @@ export class Openp41geWindowManager extends LitElement {
     if (grid) openReleaseTab(grid, tag, pinned);
   }
 
-  /** Search bar row shown above the workspace-list footer while search is open.
-   *  Belongs to the Workspaces tab pane (it is toggled by that tab's footer). */
-  private _workspaceSearchBar(): TemplateResult {
-    return html`
-      <div class="wm-search-bar">
-        <div class="wm-search">
-          <input
-            class="wm-search-input"
-            placeholder="Search workspaces…"
-            spellcheck="false"
-            .value=${this._searchQuery}
-            @input=${this._onSearchInput}
-            @keydown=${this._onSearchKeydown}
-          />
-          <button
-            class="wm-search-toggle ${this._useRegex ? "wm-search-toggle--on" : ""}"
-            aria-label="Regex search"
-            aria-pressed=${this._useRegex}
-            data-tip="Regex search"
-            @click=${() => {
-              this._useRegex = !this._useRegex;
-            }}
-          >
-            ${unsafeHTML(REGEX_ICON)}
-          </button>
-          <button
-            class="wm-search-toggle ${this._caseSensitive ? "wm-search-toggle--on" : ""}"
-            aria-label="Match case"
-            aria-pressed=${this._caseSensitive}
-            data-tip=${this._caseSensitive ? "Match case (on)" : "Match case (off)"}
-            @click=${() => {
-              this._caseSensitive = !this._caseSensitive;
-            }}
-          >
-            ${unsafeHTML(CASE_ON_ICON)}
-          </button>
-          <button
-            class="wm-search-clear"
-            aria-label="Clear search"
-            data-tip="Close search"
-            @click=${this._exitSearch}
-          >
-            ✕
-          </button>
-        </div>
-      </div>
-    `;
-  }
-
-  /** Footer for the top-level workspace list (+ / trashcan, delete mode). */
-  private _workspaceListFooter(): TemplateResult {
-    return html`
-      <div class="ws-list-footer">
-        <button
-          class="dw-search"
-          aria-label="Search workspaces"
-          aria-pressed=${this._searchOpen}
-          data-tip="Search workspaces"
-          @click=${(e: Event) => {
-            e.stopPropagation();
-            if (this._searchOpen) {
-              this._exitSearch();
-            } else {
-              this._startSearch();
-            }
-          }}
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="M21 21l-4.35-4.35" />
-          </svg>
-        </button>
-        <span class="wm-footer-spacer"></span>
-        ${
-          this._workspaceDeleteMode
-            ? html`
-                <button
-                  class="dw-delete-cancel"
-                  @click=${(e: Event) => {
-                    e.stopPropagation();
-                    this._cancelWorkspaceDeleteMode();
-                  }}
-                  data-tip="Cancel"
-                >
-                  Cancel
-                </button>
-                <button
-                  class="dw-delete-confirm"
-                  @click=${(e: Event) => {
-                    e.stopPropagation();
-                    void this._deleteSelectedWorkspaces();
-                  }}
-                  data-tip="Delete selected workspaces"
-                  ?disabled=${this._selectedWorkspaces.size === 0}
-                >
-                  Delete
-                </button>
-              `
-            : html`
-                <button
-                  class="dw-add"
-                  @click=${(e: Event) => {
-                    e.stopPropagation();
-                    this._toggleAddWorkspace();
-                  }}
-                  aria-label="New workspace"
-                  data-tip="New workspace"
-                >
-                  ＋
-                </button>
-                <button
-                  class="dw-delete"
-                  @click=${(e: Event) => {
-                    e.stopPropagation();
-                    this._activateWorkspaceDeleteMode();
-                  }}
-                  aria-label="Delete workspaces"
-                  data-tip="Delete workspaces"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    height="18px"
-                    viewBox="0 -960 960 960"
-                    width="18px"
-                    fill="currentColor"
-                  >
-                    <path
-                      d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"
-                    />
-                  </svg>
-                </button>
-              `
-        }
-      </div>
-    `;
-  }
-
-  /** Toggle the inline "new workspace" name row on the top-level list. */
-  private _toggleAddWorkspace(): void {
-    this._workspaceDeleteMode = false;
-    this._addingWorkspace = !this._addingWorkspace;
-    if (this._addingWorkspace) {
-      void this.updateComplete.then(() => {
-        this.shadowRoot?.querySelector<HTMLInputElement>(".wm-new-ws-input")?.focus();
-      });
-    }
-  }
-
-  /** Enter commits, Escape cancels the new-workspace name row. */
-  private _onNewWorkspaceKeydown(e: KeyboardEvent): void {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      void this._createWorkspaceFromInput();
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      this._addingWorkspace = false;
-    }
-  }
-
-  /** Create a workspace from the inline name input, then refresh the list. */
-  private async _createWorkspaceFromInput(): Promise<void> {
-    const input = this.shadowRoot?.querySelector<HTMLInputElement>(".wm-new-ws-input");
-    const name = input?.value.trim() ?? "";
-    this._addingWorkspace = false;
-    if (!name) return;
-    try {
-      await workspaceFileService.createWorkspace(name);
-    } catch (err) {
-      log.error("window-manager createWorkspace failed:", name, err, { skipToast: true });
-      return;
-    }
-    await this._load();
-  }
-
-  /** Whether a workspace matches the header search query (name / repo URL / worktree). */
-  private _matchesQuery(
-    ws: { data: WorkspaceFileData },
-    query: string,
-    caseSensitive: boolean,
-    useRegex: boolean,
-  ): boolean {
-    if (!query) return true;
-    const name = ws.data.name?.trim() || "Unnamed";
-    const haystacks = [
-      name,
-      ...(ws.data.repos ?? []).map((r) => r.url),
-      ...(ws.data.repos ?? []).flatMap((r) => r.worktrees ?? []),
-    ];
-    if (useRegex) {
-      try {
-        const re = new RegExp(query, caseSensitive ? "" : "i");
-        return haystacks.some((h) => re.test(h));
-      } catch (err) {
-        log.debug("window-manager filter regex invalid:", query, err);
-        return false;
-      }
-    }
-    const needle = caseSensitive ? query : query.toLowerCase();
-    return haystacks.some((h) =>
-      caseSensitive ? h.includes(query) : h.toLowerCase().includes(needle),
-    );
-  }
-
-  /** Workspaces shown in the list, honouring the header search query + toggles. */
-  private get _filteredWorkspaces(): Array<{ filePath: string; data: WorkspaceFileData }> {
-    const q = this._searchQuery;
-    if (!q.trim()) return this._workspaces;
-    return this._workspaces.filter((w) =>
-      this._matchesQuery(w, q, this._caseSensitive, this._useRegex),
-    );
-  }
-
-  /** Expand the header into the search bar and focus the input. */
   /** Activate a tab, opening it in the bar first if needed. */
   private _activateTab(id: ManagerTabId): void {
     if (!this._openTabs.includes(id)) this._openTabs = [...this._openTabs, id];
@@ -1425,100 +903,7 @@ export class Openp41geWindowManager extends LitElement {
     document.body.appendChild(menu);
   }
 
-  private _startSearch(): void {
-    this._searchOpen = true;
-    void this.updateComplete.then(() => {
-      this.shadowRoot?.querySelector<HTMLInputElement>(".wm-search-input")?.focus();
-    });
-  }
-
-  /** Collapse the search bar, clear the query, and reset the toggles. */
-  private _exitSearch(): void {
-    this._searchOpen = false;
-    this._searchQuery = "";
-    this._caseSensitive = false;
-    this._useRegex = false;
-  }
-
-  private _onSearchInput(e: Event): void {
-    this._searchQuery = (e.target as HTMLInputElement).value;
-  }
-
-  private _onSearchKeydown(e: KeyboardEvent): void {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      this._exitSearch();
-    }
-  }
-
-  /** Enter workspace delete mode: cards become checkbox-selectable. */
-  private _activateWorkspaceDeleteMode(): void {
-    this._addingWorkspace = false;
-    this._workspaceDeleteMode = true;
-    this._selectedWorkspaces = new Set();
-  }
-
-  /** Leave workspace delete mode and clear the selection. */
-  private _cancelWorkspaceDeleteMode(): void {
-    this._workspaceDeleteMode = false;
-    this._selectedWorkspaces = new Set();
-  }
-
-  /** Toggle whether a workspace card is selected for deletion. */
-  private _toggleWorkspaceSelection(filePath: string): void {
-    const next = new Set(this._selectedWorkspaces);
-    if (next.has(filePath)) next.delete(filePath);
-    else next.add(filePath);
-    this._selectedWorkspaces = next;
-  }
-
-  /** Delete the selected workspace files (keeping their data dirs), then refresh. */
-  private async _deleteSelectedWorkspaces(): Promise<void> {
-    const selected = this._selectedWorkspaces;
-    this._workspaceDeleteMode = false;
-    this._selectedWorkspaces = new Set();
-    if (selected.size === 0) return;
-    for (const path of selected) {
-      try {
-        await window.openp41ge.dialog.deleteWorkspaceFile(path, false);
-      } catch (err) {
-        log.error("window-manager delete workspace file failed:", path, err, { skipToast: true });
-        // ignore individual failures
-      }
-    }
-    await this._load();
-  }
-
-  /** "2 repos" / "1 repo" style label. */
-  private _countLabel(n: number, singular: string): string {
-    return `${n} ${n === 1 ? singular : singular + "s"}`;
-  }
-
-  /** Number of vertical columns/cells to draw for a window in the skeleton.
-   *  The workspace grid only splits horizontally, so cells are one per column. */
-  private _skeletonCells(
-    win: { grid?: { placements?: unknown[]; cols?: number } } | undefined,
-  ): number {
-    const g = win?.grid;
-    if (!g) return 1;
-    return g.placements?.length || g.cols || 1;
-  }
-
-  /** Workspace paths that already have at least one live workspace window. */
-  private get _openPaths(): Set<string> {
-    return new Set(
-      this._openWindows
-        .filter((w) => w.windowType === "workspace" && w.workspacePath)
-        .map((w) => w.workspacePath as string),
-    );
-  }
-
   render(): TemplateResult {
-    // Workspaces that already have at least one live workspace window.
-    const openPaths = this._openPaths;
-    // Rows shown in the list — filtered by the header search when it is active.
-    const filtered = this._searchQuery.trim() ? this._filteredWorkspaces : this._workspaces;
-
     return html`
       <style>
         *,
@@ -1748,109 +1133,6 @@ export class Openp41geWindowManager extends LitElement {
              leaving the hover fill square in place. */
           transform: translateY(-2px);
         }
-        /* Search toggle: full-height square icon button on the far left of
-           the persistent bottom bar; toggles the search bar that slides up
-           above the footer. */
-        .dw-search {
-          flex: none;
-          border: none;
-          background: transparent;
-          color: var(--text-secondary, #999);
-          border-radius: 0;
-          height: 100%;
-          aspect-ratio: 1 / 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          padding: 0;
-          /* Right-side separator between the search utility and the
-             right-aligned add/delete action group. */
-          border-right: 1px solid var(--divider, #333);
-          /* Flush against the window's rounded bottom-left corner:
-             content-box keeps the icon centred in the square content
-             (like .wt-refresh-btn) while the 8px left padding grows the
-             tile outward over the bar's removed left padding, insetting
-             the icon from the corner while the hover fill touches the
-             window edge. */
-          box-sizing: content-box;
-          padding-left: 8px;
-          user-select: none;
-        }
-        .dw-search:hover,
-        .dw-search[aria-pressed="true"] {
-          background: var(--bg-active, #37373d);
-          color: var(--text-primary, #ddd);
-        }
-        .wm-footer-spacer {
-          flex: 1;
-        }
-        /* Search bar: a row that appears just above the workspace-list footer,
-           inside the Workspaces tab pane. Toggled by the footer search button. */
-        .wm-search-bar {
-          display: flex;
-          align-items: stretch;
-          height: 34px;
-          padding: 0;
-          box-sizing: border-box;
-          background: var(--bg-secondary, #161616);
-          border-top: 1px solid var(--divider, #333);
-        }
-        .wm-search {
-          display: flex;
-          align-items: stretch;
-          flex: 1;
-          min-width: 0;
-          height: 100%;
-        }
-        .wm-search-input {
-          flex: 1;
-          min-width: 0;
-          height: 100%;
-          background: transparent;
-          color: var(--text-primary, #ddd);
-          border: none;
-          padding: 0 10px 0 14px;
-          font-size: 13px;
-          outline: none;
-          caret-color: var(--text-primary, #ddd);
-        }
-        .wm-search-input::placeholder {
-          color: var(--text-secondary, #777);
-          font-weight: 400;
-        }
-        /* Full-height square action buttons (regex, case, clear) separated by
-           border-left — mirrors the bottom bar's .p41ge-icon-btn look. */
-        .wm-search-toggle,
-        .wm-search-clear {
-          flex: none;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 100%;
-          aspect-ratio: 1 / 1;
-          padding: 0;
-          border: none;
-          border-left: 1px solid var(--divider, #333);
-          border-radius: 0;
-          background: transparent;
-          color: var(--text-secondary, #999);
-          cursor: pointer;
-          transition:
-            color 0.1s ease,
-            background 0.1s ease;
-        }
-        .wm-search-toggle:hover,
-        .wm-search-clear:hover {
-          color: var(--text-primary, #ddd);
-          background: var(--bg-hover, #2a2d2e);
-        }
-        .wm-search-toggle--on {
-          color: var(--text-primary, #ddd);
-        }
-        .wm-search-toggle--on:hover {
-          color: var(--text-primary, #ddd);
-        }
         .wm-drawer-layer {
           position: relative;
           flex: 1;
@@ -1927,279 +1209,7 @@ export class Openp41geWindowManager extends LitElement {
           /* The welcome slideshow controls are its own bottom bar. */
           padding-bottom: 0;
         }
-        /* The workspaces list scrolls under the pinned footer; no drawer overlay. */
-        ul {
-          list-style: none;
-          margin: 0;
-          padding: 0;
-        }
-        li.ws-row {
-          position: relative;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          /* As the Releases tab's rows. */
-          padding: 7px 10px;
-          cursor: pointer;
-          border-bottom: 1px solid var(--divider, #2f3031);
-          transition: background 0.1s ease;
-        }
-        /* Hover background on the row: a click opens the workspace-editor
-           cell in the grid (and a double-click pins it). Uses the same grey
-           as the active manager tab (--border-divider). */
-        li.ws-row:hover {
-          background: var(--border-divider, #2d2d2d);
-        }
-        /* The last row's trailing separator only renders when the list fits the
-           viewport (not below the fold), so a folded last row never shows a
-           second bottom border when it scrolls into view. */
-        li.ws-row--last:not(.ws-row--last-visible) {
-          border-bottom: none;
-        }
-        .ws-info {
-          flex: 1;
-          min-width: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-        }
-        .ws-name {
-          min-width: 0;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          font-size: 14px;
-          font-weight: 600;
-        }
-        .ws-meta {
-          color: var(--text-secondary, #999);
-          font-size: 12px;
-        }
 
-        /* Inline row of mini workspace-window skeletons (up to 3) sitting at the
-           row's right edge, just before the edit button. */
-        .ws-thumbs {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          flex-shrink: 0;
-        }
-        .ws-more {
-          color: var(--text-secondary, #999);
-          font-size: 11px;
-          line-height: 1.25;
-          user-select: none;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          text-align: center;
-          gap: 1px;
-        }
-
-        /* Mini workspace-window skeleton: title bar + window layout, half the
-           old carousel height. */
-        .ws-thumb {
-          position: relative;
-          width: 66px;
-          height: 42px;
-          flex-shrink: 0;
-          border-radius: 6px;
-          background: var(--bg, #1e1e1e);
-          border: 1px solid var(--divider, #444);
-          overflow: hidden;
-          display: flex;
-          flex-direction: column;
-          cursor: grab;
-        }
-        .ws-thumb:active {
-          cursor: grabbing;
-        }
-        .ws-row--open .ws-thumb {
-          cursor: default;
-        }
-        .ws-thumb-chrome {
-          height: 7px;
-          flex-shrink: 0;
-          background: var(--bg-secondary, #161616);
-          border-bottom: 1px solid var(--divider, #333);
-          display: flex;
-          align-items: center;
-          gap: 2px;
-          padding: 0 4px;
-        }
-        .ws-thumb-dot {
-          width: 3px;
-          height: 3px;
-          border-radius: 50%;
-          background: var(--text-secondary, #999);
-          opacity: 0.55;
-        }
-        .ws-win-body {
-          flex: 1;
-          min-height: 0;
-          display: flex;
-          gap: 2px;
-          padding: 3px;
-          min-width: 0;
-        }
-        .ws-win-side {
-          width: 12px;
-          flex-shrink: 0;
-          background: var(--bg-secondary, #161616);
-          border-radius: 2px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 1px;
-          padding: 2px 0;
-        }
-        .ws-thumb-side-row {
-          width: 8px;
-          height: 2px;
-          border-radius: 1px;
-          background: var(--bg-active, #37373d);
-        }
-        .ws-win-grid {
-          flex: 1;
-          display: flex;
-          gap: 2px;
-          min-width: 0;
-        }
-        .ws-thumb-cell {
-          flex: 1 1 0;
-          min-width: 0;
-          background: var(--bg-active, #37373d);
-          border-radius: 2px;
-        }
-
-        /* Edit (pencil) button: square corners, full border. */
-        .ws-edit {
-          flex-shrink: 0;
-          align-self: center;
-          width: 28px;
-          height: 28px;
-          padding: 0;
-          box-sizing: border-box;
-          border: 1px solid var(--divider, #333);
-          border-radius: 0;
-          background: transparent;
-          color: var(--text-secondary, #999);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          transition:
-            background 0.1s ease,
-            color 0.1s ease;
-        }
-        .ws-edit:hover {
-          background: var(--bg-active, #37373d);
-          color: var(--text-primary, #ddd);
-        }
-        .ws-edit svg {
-          display: block;
-        }
-        /* Confirm / cancel buttons on the inline "new workspace" row, sitting at
-           the row's right edge (where the thumbs + edit button live on normal
-           rows). Same rounded + hover treatment as the edit button. */
-        .ws-new-actions {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          flex-shrink: 0;
-        }
-        .ws-action {
-          flex-shrink: 0;
-          align-self: center;
-          width: 28px;
-          height: 28px;
-          padding: 0;
-          border: none;
-          border-radius: 6px;
-          background: transparent;
-          color: var(--text-secondary, #999);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          transition:
-            background 0.1s ease,
-            color 0.1s ease;
-        }
-        .ws-action:hover {
-          background: var(--bg-active, #37373d);
-          color: var(--text-primary, #ddd);
-        }
-        .ws-action svg {
-          display: block;
-        }
-        /* Workspace-list delete mode + inline "new workspace" row. */
-        .ws-row--select {
-          cursor: pointer;
-        }
-        /* The inline "new workspace" row uses the standard solid separator; the
-           dashed outline distinguishes it from a normal workspace row. */
-        .ws-row--new {
-          cursor: default;
-        }
-        .ws-row--new:hover {
-          background: var(--bg-hover, #2a2d2e);
-        }
-        .wm-new-ws-input {
-          min-width: 0;
-          background: transparent;
-          border: none;
-          outline: none;
-          color: var(--text-primary, #ddd);
-          font-size: 14px;
-          font-family: inherit;
-          font-weight: 600;
-          padding: 0;
-          /* Align the placeholder with the workspace name in the other rows. */
-          height: auto;
-          align-self: flex-start;
-        }
-        .wm-new-ws-input::placeholder {
-          color: var(--text-secondary, #777);
-          font-weight: 400;
-        }
-        /* Skeleton placeholders for the inline "new workspace" card. */
-        @keyframes ws-skeleton-pulse {
-          0%,
-          100% {
-            opacity: 0.45;
-          }
-          50% {
-            opacity: 1;
-          }
-        }
-        .ws-skeleton {
-          display: inline-block;
-          border-radius: 4px;
-          background: var(--bg-active, #37373d);
-          animation: ws-skeleton-pulse 1.3s ease-in-out infinite;
-        }
-        .ws-skeleton--num {
-          width: 118px;
-          height: 12px;
-          vertical-align: middle;
-          margin-top: 4px;
-        }
-        .empty {
-          color: var(--text-secondary, #777);
-          font-size: 13px;
-          padding: 0 16px;
-          text-align: center;
-        }
-        /* The workspace-list empty state is centred both horizontally and
-           vertically within the space above the tab's bottom bar. */
-        .wm-workspaces-pane > .empty {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex: 1;
-          min-height: 0;
-        }
         /* Application-level tab panes (Welcome / Releases placeholders). */
         .wm-tab-pane {
           padding: 16px 14px;
@@ -2270,21 +1280,6 @@ export class Openp41geWindowManager extends LitElement {
         .wm-settings-pane {
           height: 100%;
           box-sizing: border-box;
-        }
-        /* Workspaces tab: a full-height flex column whose bottom group (search
-           bar + footer) sticks to the bottom of the pane as the list scrolls. */
-        .wm-workspaces-pane {
-          display: flex;
-          flex-direction: column;
-          min-height: 100%;
-          box-sizing: border-box;
-        }
-        .wm-workspaces-bottom {
-          margin-top: auto;
-          position: sticky;
-          bottom: 0;
-          /* Paint above the scrolling list rows. */
-          z-index: 1;
         }
         /* Welcome slideshow pane: a flex column so the page content scrolls
            (in .wm-body) while the nav bar stays pinned to the bottom. */
@@ -2472,119 +1467,6 @@ export class Openp41geWindowManager extends LitElement {
           line-height: 1;
           white-space: nowrap;
         }
-        /* Workspace-list footer bar: pinned at the bottom of the list pane. */
-        .ws-list-footer {
-          display: flex;
-          align-items: center;
-          justify-content: flex-end;
-          flex-shrink: 0;
-          height: 34px;
-          padding: 0;
-          border-top: 1px solid var(--divider, #333);
-          background: var(--bg-secondary, #161616);
-        }
-        .dw-add {
-          border: none;
-          background: transparent;
-          color: var(--text-secondary, #999);
-          font-size: 20px;
-          border-radius: 0;
-          /* Full-height, square action button like the workspace window's
-             .p41ge-icon-btn: fills the bottom bar, square, with a cap
-             separator on the group's outer (left) edge. */
-          height: 100%;
-          aspect-ratio: 1 / 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          user-select: none;
-          border-left: 1px solid var(--divider, #333);
-        }
-        .dw-add:hover {
-          background: var(--bg-active, #37373d);
-          color: var(--text-primary, #ddd);
-        }
-        .dw-delete,
-        .dw-delete-confirm {
-          border: none;
-          border-radius: 6px;
-          padding: 4px 10px;
-          font-size: 12px;
-          font-weight: 600;
-          cursor: pointer;
-        }
-        .dw-delete {
-          border: none;
-          background: transparent;
-          color: var(--text-secondary, #999);
-          border-radius: 0;
-          /* Full-height, square action button with a separator line
-             between it and the adjacent add button. */
-          height: 100%;
-          aspect-ratio: 1 / 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          padding: 0;
-          border-left: 1px solid var(--divider, #333);
-        }
-        .dw-delete:hover {
-          background: var(--bg-active, #37373d);
-          color: var(--text-primary, #ddd);
-        }
-        .dw-delete svg {
-          fill: currentColor;
-        }
-        .dw-delete-confirm {
-          background: transparent;
-          color: var(--text-secondary, #999);
-        }
-        .dw-delete-confirm:hover {
-          background: var(--bg-active, #37373d);
-          color: var(--text-primary, #ddd);
-        }
-        .dw-delete-confirm:disabled {
-          opacity: 0.4;
-          cursor: default;
-        }
-        .dw-delete-cancel {
-          border: none;
-          background: transparent;
-          color: var(--text-secondary, #999);
-          font-size: 12px;
-          font-weight: 600;
-          padding: 4px 10px;
-          cursor: pointer;
-          border-radius: 6px;
-        }
-        .dw-delete-cancel:hover {
-          background: var(--bg-active, #37373d);
-          color: var(--text-primary, #ddd);
-        }
-        .dw-checkbox {
-          width: 14px;
-          height: 14px;
-          border: 1px solid var(--text-secondary, #999);
-          border-radius: 3px;
-          flex-shrink: 0;
-          align-self: center;
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          color: transparent;
-        }
-        .dw-checkbox--checked {
-          background: var(--accent, #569cd6);
-          border-color: var(--accent, #569cd6);
-          color: #fff;
-        }
-        .dw-checkbox--checked::after {
-          content: "✓";
-          font-size: 11px;
-          line-height: 1;
-        }
       </style>
       <div class="wm-root">
         <div class="wm-titlebar">
@@ -2725,155 +1607,12 @@ export class Openp41geWindowManager extends LitElement {
                                   ></openp41ge-settings-list>
                                 </div>`
                               : html`
-                                  <div class="wm-workspaces-pane">
-                                    ${
-                                      this._loaded &&
-                                      this._workspaces.length === 0 &&
-                                      !this._addingWorkspace
-                                        ? html`<p class="empty">No workspaces yet.</p>`
-                                        : this._searchOpen &&
-                                            this._workspaces.length > 0 &&
-                                            filtered.length === 0
-                                          ? html`<p class="empty">
-                                              No workspaces match “${this._searchQuery}”.
-                                            </p>`
-                                          : html`
-                                              <ul>
-                                                ${
-                                                  this._addingWorkspace
-                                                    ? html`
-                                                        <li class="ws-row ws-row--new">
-                                                          <div class="ws-info">
-                                                            <input
-                                                              class="wm-new-ws-input"
-                                                              placeholder="Enter workspace name"
-                                                              spellcheck="false"
-                                                              @keydown=${(e: KeyboardEvent) => this._onNewWorkspaceKeydown(e)}
-                                                              @blur=${() => {
-                                                                if (this._addingWorkspace)
-                                                                  void this._createWorkspaceFromInput();
-                                                              }}
-                                                            />
-                                                            <div class="ws-meta">
-                                                              <span
-                                                                class="ws-skeleton ws-skeleton--num"
-                                                              ></span>
-                                                            </div>
-                                                          </div>
-                                                          <div class="ws-new-actions">
-                                                            <button
-                                                              class="ws-action ws-action--confirm"
-                                                              aria-label="Create workspace"
-                                                              title="Create workspace"
-                                                              @mousedown=${(e: MouseEvent) => e.preventDefault()}
-                                                              @click=${(e: Event) => {
-                                                                e.stopPropagation();
-                                                                void this._createWorkspaceFromInput();
-                                                              }}
-                                                            >
-                                                              <svg
-                                                                xmlns="http://www.w3.org/2000/svg"
-                                                                height="24px"
-                                                                viewBox="0 -960 960 960"
-                                                                width="24px"
-                                                                fill="#e3e3e3"
-                                                              >
-                                                                <path
-                                                                  d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"
-                                                                />
-                                                              </svg>
-                                                            </button>
-                                                            <button
-                                                              class="ws-action ws-action--cancel"
-                                                              aria-label="Cancel"
-                                                              title="Cancel"
-                                                              @mousedown=${(e: MouseEvent) => e.preventDefault()}
-                                                              @click=${(e: Event) => {
-                                                                e.stopPropagation();
-                                                                this._addingWorkspace = false;
-                                                              }}
-                                                            >
-                                                              <svg
-                                                                xmlns="http://www.w3.org/2000/svg"
-                                                                height="24px"
-                                                                viewBox="0 -960 960 960"
-                                                                width="24px"
-                                                                fill="#e3e3e3"
-                                                              >
-                                                                <path
-                                                                  d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"
-                                                                />
-                                                              </svg>
-                                                            </button>
-                                                          </div>
-                                                        </li>
-                                                      `
-                                                    : nothing
-                                                }
-                                                ${filtered.map((w, i) => {
-                                                  const name = w.data.name?.trim() || "Unnamed";
-                                                  const repos = w.data.repos?.length ?? 0;
-                                                  const worktrees = (w.data.repos ?? []).reduce(
-                                                    (n, r) => n + (r.worktrees?.length ?? 0),
-                                                    0,
-                                                  );
-                                                  const isOpen = openPaths.has(w.filePath);
-                                                  const isLast = i === filtered.length - 1;
-                                                  return html`
-                                                    <li
-                                                      class="ws-row ${this._workspaceDeleteMode ? "ws-row--select" : ""} ${isOpen && !this._workspaceDeleteMode ? "ws-row--open" : ""} ${isLast ? "ws-row--last" : ""} ${isLast && !this._listOverflows ? "ws-row--last-visible" : ""}"
-                                                      data-workspace-path=${w.filePath}
-                                                      @click=${(e: Event) => {
-                                                        e.stopPropagation();
-                                                        if (this._suppressClick) {
-                                                          this._suppressClick = false;
-                                                          return;
-                                                        }
-                                                        if (this._workspaceDeleteMode) {
-                                                          this._toggleWorkspaceSelection(
-                                                            w.filePath,
-                                                          );
-                                                          return;
-                                                        }
-                                                        // Normal mode: open the workspace
-                                                        // editor as a grid cell (the edit
-                                                        // button is gone — the row itself
-                                                        // opens the editor).
-                                                        this._openWorkspaceEditor(w);
-                                                      }}
-                                                      @dblclick=${(e: Event) => {
-                                                        // Double-tap pins the workspace
-                                                        // editor tab in the grid.
-                                                        e.stopPropagation();
-                                                        if (this._workspaceDeleteMode) return;
-                                                        this._openWorkspaceEditor(w, true);
-                                                      }}
-                                                    >
-                                                      <div class="ws-info">
-                                                        <div class="ws-name">${name}</div>
-                                                        <div class="ws-meta">
-                                                          ${this._countLabel(repos, "repo")} ·
-                                                          ${this._countLabel(worktrees, "worktree")}
-                                                        </div>
-                                                      </div>
-                                                      ${
-                                                        this._workspaceDeleteMode
-                                                          ? html`<span
-                                                              class="dw-checkbox ${this._selectedWorkspaces.has(w.filePath) ? "dw-checkbox--checked" : ""}"
-                                                            ></span>`
-                                                          : nothing
-                                                      }
-                                                    </li>
-                                                  `;
-                                                })}
-                                              </ul>
-                                            `
-                                    }
-                                    <div class="wm-workspaces-bottom">
-                                      ${this._searchOpen ? this._workspaceSearchBar() : nothing}
-                                      ${this._workspaceListFooter()}
-                                    </div>
-                                  </div>
+                                  <openp41ge-workspaces-list
+                                    class="wm-workspaces-pane"
+                                    .onOpen=${(ws: WorkspaceListEntry, pinned: boolean) =>
+                                      this._openWorkspaceEditor(ws, pinned)}
+                                    .ignoreClick=${this._consumeSuppressedClick}
+                                  ></openp41ge-workspaces-list>
                                 `
                 }
               </div>
