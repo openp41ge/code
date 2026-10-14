@@ -1,6 +1,6 @@
 /**
  * <openp41ge-sidebar-tab-picker> — the sidebar's + picker: a filter field,
- * then the sidebar tabs in groups (System, Workspace, Logs; empty groups
+ * then the sidebar tabs in groups (Workspace, System, Logs; empty groups
  * hidden). A row (or Enter, for the first match) runs its action and closes
  * the picker; Escape or a click outside closes it. Styled like the title bar's
  * workspace picker.

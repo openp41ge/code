@@ -131,7 +131,7 @@ export interface SystemTabSettings {
  * They are separate from editor tab types and use a simpler lifecycle.
  */
 /** The sidebar + picker's groups, in their order. */
-export const SIDEBAR_TAB_GROUPS = ["System", "Workspace", "Logs"] as const;
+export const SIDEBAR_TAB_GROUPS = ["Workspace", "System", "Logs"] as const;
 export type SidebarTabGroup = (typeof SIDEBAR_TAB_GROUPS)[number];
 
 export interface SystemTabRegistration {
