@@ -48,6 +48,8 @@ export function createExtensionDragRuntime(opts: ExtensionDragRuntimeOptions) {
   let windowContext: DragContext = "workspace";
   let pipeline: PayloadDragPipeline | null = null;
   let getOverrides = opts.getOverrides ?? (() => ({}));
+  /** The platform's own drag sources (`registerPlatformSources`). */
+  let platformSources: DragSourceDecl[] = [];
   /** Every extension's drop targets, for the global conflict check. */
   const dropTargets = new Map<string, readonly DropTargetDecl[]>();
 
@@ -122,14 +124,21 @@ export function createExtensionDragRuntime(opts: ExtensionDragRuntimeOptions) {
 
     /**
      * Register the platform's own drag sources (rows of its sidebar panes),
-     * under the platform namespace: they emit platform kinds. Throws on a
-     * non-conforming source.
+     * under the platform namespace: they emit platform kinds. Adds to (or, by
+     * id, replaces) those registered before. Throws on a non-conforming source.
      */
     registerPlatformSources(sources: readonly DragSourceDecl[]): void {
-      service.registerDecls(
-        PLATFORM_DRAG_NAMESPACE,
-        parseDragRegistrations({ sources }, PLATFORM_DRAG_NAMESPACE),
-      );
+      const parsed = parseDragRegistrations({ sources }, PLATFORM_DRAG_NAMESPACE).sources;
+      platformSources = [
+        ...platformSources.filter((s) => !parsed.some((p) => p.id === s.id)),
+        ...parsed,
+      ];
+      service.registerDecls(PLATFORM_DRAG_NAMESPACE, {
+        kinds: [],
+        sources: platformSources,
+        consumers: [],
+        dropTargets: [],
+      });
     },
 
     /** The binder for the platform's own panes (their tagged rows drag). */

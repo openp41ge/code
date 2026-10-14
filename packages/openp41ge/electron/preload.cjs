@@ -272,10 +272,17 @@ contextBridge.exposeInMainWorld("openp41ge", {
     open: () => {
       ipcRenderer.send("window-manager:open");
     },
-    /** Open (or focus) a dedicated Logs window; with `{ errorId }`, open
-     *  that error's log entry. */
+    /** Open logs (a workspace window: a Logs tab in its grid; else the Logs
+     *  window); with `{ errorId }`, open that error's log entry. */
     openLogsWindow: (target) => {
       ipcRenderer.send("logs-window:open", target ?? null);
+    },
+    /** Fired in a workspace window asked to open logs in its grid (the error
+     *  to reveal, or null). */
+    onOpenLogsInWindow: (callback) => {
+      const handler = (_event, errorId) => callback(errorId ?? null);
+      ipcRenderer.on("logs:open-in-window", handler);
+      return () => ipcRenderer.removeListener("logs:open-in-window", handler);
     },
     /** List currently open windows (id, kind, workspace binding). */
     openWindowSummaries: () => {

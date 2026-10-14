@@ -4,6 +4,7 @@
  * These handle:
  *   - Zoom in/out/reset (triggered by the Electron menu bar)
  *   - Confirm modal (triggered by the main process for quit/close confirmations)
+ *   - Open logs in this (workspace) window's grid
  */
 
 import type { IStartupStep } from "../startup-step";
@@ -13,6 +14,7 @@ import { createLogger } from "openp41ge-core-logger";
 const log = createLogger("openp41ge", "register-ipc-listeners");
 
 import { wireResetListener } from "../../app";
+import { openLogsInWindow } from "../../apps/log-viewer/open-logs";
 
 export class RegisterIpcListenersStep implements IStartupStep {
   readonly name = "register-ipc-listeners";
@@ -46,6 +48,13 @@ export class RegisterIpcListenersStep implements IStartupStep {
 
     // Wire the app reset listener so window.openp41ge.workspace.reset() works
     wireResetListener();
+
+    // ── Logs open in a workspace window's own grid ─────────────────────────
+    if (context.windowType === "workspace") {
+      window.openp41ge.windowManager.onOpenLogsInWindow?.((errorId) => {
+        void openLogsInWindow(errorId ? { errorId } : undefined);
+      });
+    }
 
     // ── In-window workspace switching is removed from workspace windows ─────
     // Workspace windows are bound to a fixed workspace; workspace actions live

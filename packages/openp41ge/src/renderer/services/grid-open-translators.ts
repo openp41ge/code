@@ -39,10 +39,11 @@ const TRANSLATORS: Readonly<Record<string, Translator>> = {
     return { title: filePath.split("/").pop() || filePath, filePath };
   },
 
+  // One tab per stream (the file-path slot is its identity).
   "log-viewer": (c) => {
     const system = str(c.system);
     if (!system) return null;
-    return { title: system, config: { system } };
+    return { title: system, filePath: `log:${system}`, config: { system } };
   },
 
   // One editor per extension (the file-path slot is its identity).

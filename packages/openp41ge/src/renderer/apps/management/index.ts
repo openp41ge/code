@@ -12,11 +12,10 @@
  */
 
 import type { DragSourceDecl } from "openp41ge-sdk";
-import type { SystemTabController, SystemTabRegistration } from "../../controllers/types";
+import type { SystemTabRegistration } from "../../controllers/types";
 import { registerSystemTabType } from "../app-registry";
-import { Openp41geTabsEventHandler } from "../../services/openp41ge-tabs-event-handler";
+import { openInGrid, PaneTabController } from "../pane-tab";
 import { extensionDrag } from "../../services/extension-drag";
-import type { MountDragBinding } from "../../services/extension-drag-service";
 import { dataDirWorkspaces } from "../../services/extension-renderer-loader";
 import { CONFIG_EDITOR_APP_TYPE } from "../config-editor/title";
 import { RELEASE_APP_TYPE } from "../release/index";
@@ -55,52 +54,6 @@ export const MANAGEMENT_DRAG_SOURCES: readonly DragSourceDecl[] = [
     contexts: ["workspace"],
   },
 ];
-
-/** Open `appType` with `tabConfig` in this window's grid, as a drop of it would. */
-function openInGrid(appType: string, tabConfig: Record<string, unknown>, pinned: boolean): void {
-  const grid = document.querySelector("tab-grid") as (HTMLElement & { winId?: string }) | null;
-  document.dispatchEvent(
-    new CustomEvent("grid-open-tab", {
-      detail: {
-        tabType: appType,
-        tabConfig,
-        targetCol: Openp41geTabsEventHandler.getLastFocusedCol(grid?.winId ?? ""),
-        pinned,
-      },
-    }),
-  );
-}
-
-/** A sidebar tab that shows one pane element, filling the tab; its tagged
- *  rows drag through the platform pipeline. */
-class PaneTabController implements SystemTabController {
-  private _el: HTMLElement | null = null;
-  private _drag: MountDragBinding | null = null;
-
-  constructor(
-    readonly tabId: string,
-    readonly appType: string,
-    private readonly _create: () => HTMLElement,
-  ) {}
-
-  mount(container: HTMLElement): void {
-    const el = this._create();
-    el.style.display = "flex";
-    el.style.flexDirection = "column";
-    el.style.height = "100%";
-    el.style.minHeight = "0";
-    container.appendChild(el);
-    this._el = el;
-    this._drag = extensionDrag.platformBinder().attach(`sidebar:${this.appType}`, container);
-  }
-
-  unmount(): void {
-    this._drag?.dispose();
-    this._drag = null;
-    this._el?.remove();
-    this._el = null;
-  }
-}
 
 function workspacesPane(): HTMLElement {
   const list = document.createElement("openp41ge-workspaces-list") as Openp41geWorkspacesList;

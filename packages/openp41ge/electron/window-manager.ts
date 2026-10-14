@@ -10,6 +10,7 @@ import { appTitle, keepWindowTitle } from "./app-title.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createLogger } from "openp41ge-core-logger";
+import { logsOpenInPlace } from "./logs-routing.js";
 import { showConfirm } from "./confirm-dialog-manager.js";
 import type { TabNameGenerator } from "../src/main/index.js";
 import type { OperationDispatcher } from "../src/main/index.js";
@@ -402,11 +403,22 @@ export function createLogsWindow(sourceWindow?: BrowserWindow, revealErrorId?: s
 }
 
 /**
- * Open (or focus) a logs window. Reuses an existing one if present so a second
- * "Logs" action brings the existing window to the front instead of stacking.
- * With `revealErrorId`, the window opens that error's log entry.
+ * Open logs: in the requesting window when it is a workspace window (a Logs
+ * tab in its grid), else in the logs window — reusing an existing one, so a
+ * second "Logs" action brings it to the front instead of stacking. With
+ * `revealErrorId`, that error's log entry is opened.
  */
 export function openLogsWindow(sourceWindow?: BrowserWindow, revealErrorId?: string): void {
+  // A workspace window shows its logs in its own grid.
+  if (sourceWindow && !sourceWindow.isDestroyed()) {
+    const sourceId = [...openp41geWindows].find(([, bw]) => bw === sourceWindow)?.[0];
+    const sourceType = sourceId ? (openp41geWindowMeta.get(sourceId)?.windowType ?? null) : null;
+    if (logsOpenInPlace(sourceType)) {
+      sourceWindow.webContents.send("logs:open-in-window", revealErrorId ?? null);
+      sourceWindow.focus();
+      return;
+    }
+  }
   for (const [id, bw] of openp41geWindows) {
     if (openp41geWindowMeta.get(id)?.windowType !== "logs") continue;
     if (bw.isDestroyed()) continue;

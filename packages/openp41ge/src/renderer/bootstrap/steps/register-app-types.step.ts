@@ -20,6 +20,7 @@ import { configEditorAppRegistration } from "../../apps/config-editor/index";
 import { releaseAppRegistration } from "../../apps/release/index";
 import { registerExtensionsWithRefresh } from "../../apps/extension/index";
 import { registerManagementSidebarTabs } from "../../apps/management/index";
+import { registerLogSidebarTabs } from "../../apps/log-viewer/sidebar-tabs";
 import { workspaceData } from "../../services/workspace-data";
 
 // ─── Log viewer component (auto-registers <openp41ge-log-viewer>) ──────────
@@ -35,8 +36,10 @@ export class RegisterAppTypesStep implements IStartupStep {
     registerAppType(configEditorAppRegistration);
     registerAppType(releaseAppRegistration);
 
-    // The management sidebar tabs (Settings, Releases, Cleanup, Migrations).
+    // The management sidebar tabs (Workspaces, Settings, Releases, Cleanup,
+    // Migrations) and the log tabs (Log Streams, Log Search).
     registerManagementSidebarTabs();
+    registerLogSidebarTabs();
 
     // ── Load the extensions' renderer entries ───────────────────────────
     // Each self-registers its surfaces; the set is fetched from main and

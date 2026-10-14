@@ -64,9 +64,15 @@ Each step ships on its own; the old windows keep working until step 5.
    platform's `workspace-config` / `config-overrides` payloads (platform drag
    sources), and the workspaces extension consumes `workspace-config` (its
    editor falls back to `workspacesDir` and titles tabs by `name`).
-2. **Logs in the workspace window.** Streams and Search as sidebar tabs, a log
-   stream as a `log-viewer` grid tab. "Open logs" (and the debug seed, and
-   `host.openLog(errorId)`) opens or focuses a Logs tab instead of a window.
+2. **Done (2026-10-14).** **Logs in the workspace window.** Log Streams and
+   Log Search sidebar tabs; a stream is a `log-viewer` grid tab (one per
+   stream: `log:<system>`), with the row detail drawer
+   (`<openp41ge-log-detail-drawer>`, shared with the logs window). "Open logs"
+   from a workspace window (Logs menu, error toasts, `host.openLog`, the debug
+   seed) comes back to it (`electron/logs-routing.ts`,
+   `logs:open-in-window`) and opens the platform log, or reveals the error in
+   its stream's tab. Settings-editor and release tabs now open once per cell
+   too. The logs window keeps its own Streams/Search panes until step 5.
 3. **Workspace-free tabs.** An app type says whether it needs a workspace.
    A window with no workspace gets an in-memory state; it can host
    workspace-free grid and sidebar tabs only.

@@ -100,15 +100,22 @@ export function addTabToCell(
   });
 }
 
-/** App types whose `config.filePath` is a real file identity. Other apps reuse
- *  the slot for non-unique data (e.g. git tabs store the repo name for every
- *  worktree tab), so the no-duplicate rule applies to these only. */
-const FILE_APP_TYPES: ReadonlySet<string> = new Set(["file-viewer"]);
+/** App types whose `config.filePath` is a real identity: a file, a log stream
+ *  (`log:<system>`), a settings editor (`config:<id>`), a release
+ *  (`release:<tag>`). Other apps reuse the slot for non-unique data (e.g. git
+ *  tabs store the repo name for every worktree tab), so the no-duplicate rule
+ *  applies to these only. */
+const FILE_APP_TYPES: ReadonlySet<string> = new Set([
+  "file-viewer",
+  "log-viewer",
+  "config-editor",
+  "release",
+]);
 
 /**
  * The tab in cell (row 0, `col`) already showing `filePath` with `appType`,
  * if any — a cell never holds the same file twice (pinned or preview).
- * Always null for non-file app types.
+ * Always null for other app types.
  */
 export function findFileTabInCell(
   workspace: Workspace,
