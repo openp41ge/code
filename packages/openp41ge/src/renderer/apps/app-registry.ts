@@ -36,6 +36,11 @@ export function registerSettingsAppType(settings: SystemTabSettings): void {
   });
 }
 
+/** The app types that need no workspace open (`workspace: "none"`). */
+export function workspaceFreeAppTypes(): string[] {
+  return [..._appRegistry.values()].filter((r) => r.workspace === "none").map((r) => r.id);
+}
+
 export function getAppTypeRegistration(id: string): AppTypeRegistration | undefined {
   return _appRegistry.get(id);
 }

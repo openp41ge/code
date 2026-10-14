@@ -142,6 +142,11 @@ contextBridge.exposeInMainWorld("openp41ge", {
         }),
       );
     },
+    /** Move a grid tab to another window (a cross-window drop). Across
+     *  workspaces only `workspaceFreeAppTypes` move; resolves "moved" or
+     *  "refused". */
+    moveTabToWindow: (move, workspaceFreeAppTypes) =>
+      ipcRenderer.invoke("tab:move-to-window", move, workspaceFreeAppTypes),
     /** Request creation of a new child window with a detached tab. */
     detachTab: (windowId, tabId, bounds, dropScreenX, dropScreenY) => {
       ipcRenderer.send(

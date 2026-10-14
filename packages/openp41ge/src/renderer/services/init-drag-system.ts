@@ -10,6 +10,7 @@
  *     for drag data, resolve local target, dispatch workspace operation
  */
 
+import { workspaceFreeAppTypes } from "../apps/app-registry";
 import {
   DragOrchestrator,
   TabDragSource,
@@ -1775,16 +1776,7 @@ function _dispatchCrossWindowMove(
   targetCol: number,
   dropIndex: number,
 ): void {
-  // dispatch uses (fn, ...args) rest params — pass individual arguments, NOT an array
-  window.openp41ge.workspace.dispatch(
-    "moveTabBetweenCells",
-    sourceWinId,
-    tabId,
-    targetWinId,
-    0,
-    targetCol,
-    dropIndex,
-  );
+  _moveTabToWindow({ sourceWinId, tabId, targetWinId, col: targetCol, index: dropIndex });
 }
 
 function _dispatchCrossWindowSplit(
@@ -1794,13 +1786,30 @@ function _dispatchCrossWindowSplit(
   splitCol: number,
   splitLeft: boolean,
 ): void {
-  window.openp41ge.workspace.dispatch(
-    "splitCrossWindowTab",
-    sourceWinId,
-    tabId,
-    targetWinId,
-    splitCol,
-    splitLeft,
+  _moveTabToWindow({ sourceWinId, tabId, targetWinId, col: splitCol, index: -1, splitLeft });
+}
+
+/** Move a grid tab to another window. Windows of the same workspace share its
+ *  state; across workspaces only a tab that needs no workspace moves (the
+ *  main process opens it in the target's state and closes it in the
+ *  source's). */
+function _moveTabToWindow(move: {
+  sourceWinId: string;
+  tabId: string;
+  targetWinId: string;
+  col: number;
+  index: number;
+  splitLeft?: boolean;
+}): void {
+  void window.openp41ge.workspace.moveTabToWindow?.(move, workspaceFreeAppTypes()).then(
+    (result) => {
+      if (result === "refused") {
+        log.info("tab not moved: it needs its workspace, and the target window shows another", {
+          tabId: move.tabId,
+        });
+      }
+    },
+    (err: unknown) => log.warn("cross-window tab move failed:", err),
   );
 }
 

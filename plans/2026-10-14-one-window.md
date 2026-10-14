@@ -92,7 +92,11 @@ Each step ships on its own; the old windows keep working until step 5.
    takes the new id and reloads (`rebindWindow`). Found on the way: the main
    process's console.error forwarding recursed forever when a window's page
    went away mid-send (100% CPU); fixed (`console-error-forwarder.ts`).
-5. **Cross-workspace drags; remove the old windows.** A workspace-free grid
+5. **Cross-workspace drags (done 2026-10-14); remove the old windows.** A
+   cross-window tab drop goes through `tab:move-to-window`
+   (`electron/cross-window-tab-move.ts`): within one workspace's state as
+   before; across states only `workspace: "none"` tab types, opened in the
+   target's state and closed in the source's. Remaining: A workspace-free grid
    tab dropped on a window of another workspace moves between the two
    dispatchers. Then drop the `manager` and `logs` window types, the Window
    menu items that open them, `manager-grid.json`, and update AGENTS.md.

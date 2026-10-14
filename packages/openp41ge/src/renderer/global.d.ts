@@ -82,6 +82,18 @@ declare global {
         getLaunchTab: () => WindowManagerTabId | null;
         waitForInit: () => Promise<void>;
         detachPane: (windowId: string, paneId: string, bounds?: { x: number; y: number; width: number; height: number }) => void;
+        /** Move a grid tab to another window; across workspaces only the given app types move. */
+        moveTabToWindow?: (
+          move: {
+            sourceWinId: string;
+            tabId: string;
+            targetWinId: string;
+            col: number;
+            index: number;
+            splitLeft?: boolean;
+          },
+          workspaceFreeAppTypes: string[],
+        ) => Promise<"moved" | "refused">;
         detachTab: (
           windowId: string,
           tabId: string,
