@@ -15,8 +15,7 @@
       "options": {
         "command": "tsc --noEmit",
         "cwd": "{projectRoot}"
-      },
-      "cache": true
+      }
     },
     "clean": {
       "executor": "nx:run-commands",

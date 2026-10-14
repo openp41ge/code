@@ -13,9 +13,12 @@
       "outputs": ["{projectRoot}/dist", "{projectRoot}/dist-electron"],
       "cache": true
     },
+    // Typecheck is never cached. tsc reads the dependencies' built dist/*.d.ts,
+    // which are gitignored and so not in the task hash: a cached result can
+    // replay errors (or a pass) from a different build of the dependencies.
     "typecheck": {
       "dependsOn": ["^build"],
-      "cache": true
+      "cache": false
     },
     // Lint is cheap (oxlint, seconds) and must never be served stale — a cached
     // ESLint/oxlint pass once hid real violations. Always run it fresh.
