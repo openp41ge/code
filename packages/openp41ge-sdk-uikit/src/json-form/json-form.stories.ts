@@ -22,6 +22,31 @@ const settings = {
       secret: true,
     },
     enabled: { type: "boolean", title: "Enabled", default: true },
+    defaultProfile: {
+      type: "string",
+      title: "Default profile",
+      description: "Used when a request doesn't pick one.",
+      "x-keysOf": "profiles",
+      default: "local",
+    },
+    profiles: {
+      type: "object",
+      title: "Profiles",
+      description: "Connections, by id. `local` comes with the defaults.",
+      default: { local: { url: "http://localhost:8000" } },
+      additionalProperties: {
+        type: "object",
+        properties: {
+          url: { type: "string", title: "URL" },
+          token: { type: "string", title: "Token", secret: true },
+          levels: {
+            type: "object",
+            title: "Levels",
+            additionalProperties: { type: ["string", "null"] },
+          },
+        },
+      },
+    },
     model: {
       enum: ["small", "medium", "large"],
       title: "Model",
@@ -79,7 +104,7 @@ const meta: Meta = {
   },
   args: { readonly: false },
   render: (args) => html`
-    <div style="max-width:640px;padding:16px;background:#1e1e1e">
+    <div style="max-width:640px;padding:16px;background:var(--bg-primary, #161616)">
       <json-form
         .schema=${args.schema ?? settings}
         .value=${args.value ?? {}}
@@ -97,7 +122,8 @@ type Story = StoryObj;
 /** Nothing set yet: defaults show faded; the required key comes first. */
 export const Empty: Story = {};
 
-/** Some values set (with Reset), a list and two endpoint cards. */
+/** Some values set (with Reset), a list, two endpoint cards and a second
+ *  profile, the default. */
 export const WithValues: Story = {
   args: {
     value: {
@@ -109,6 +135,8 @@ export const WithValues: Story = {
         { name: "Fallback", url: "https://b.example/v1", timeout: 30 },
       ],
       headers: { "X-Team": "core" },
+      defaultProfile: "cloud",
+      profiles: { cloud: { url: "https://api.example", levels: { Off: null, High: "high" } } },
     },
   },
 };

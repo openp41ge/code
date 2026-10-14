@@ -9,8 +9,13 @@
  *
  * The schema is JSON Schema (draft 2020-12). The platform checks a subset —
  * `type`, `properties`, `required`, `additionalProperties`, `items`, `enum`,
- * `minimum`, `maximum` — and keeps every other keyword (`title`,
- * `description`, …) for the editor.
+ * `minimum`, `maximum` — plus one of its own, `x-keysOf` (below) — and keeps
+ * every other keyword (`title`, `description`, …) for the editor.
+ *
+ * `"x-keysOf": "<property>"` on a string property: its value must be one of
+ * the keys of that sibling property's object (a map), e.g. a default
+ * provider id naming one of `providers`. The form editor shows it as a menu
+ * of those keys.
  */
 
 /** The JSON types a config schema may name. */
@@ -32,6 +37,8 @@ export interface ConfigSchema {
   readonly items?: ConfigSchema;
   readonly minimum?: number;
   readonly maximum?: number;
+  /** A string's value must be a key of this sibling property's object. */
+  readonly "x-keysOf"?: string;
   /** Other JSON Schema keywords are kept for the editor and not checked. */
   readonly [keyword: string]: unknown;
 }
@@ -84,6 +91,13 @@ function checkSchema(schema: Record<string, unknown>, path: string): void {
     if (!isPlainObject(schema.properties)) fail("properties must be an object");
     for (const [key, sub] of Object.entries(schema.properties as Record<string, unknown>)) {
       if (!isPlainObject(sub)) fail(`${at(path, key)} must be a schema`);
+      const keysOf = (sub as Record<string, unknown>)["x-keysOf"];
+      if (
+        keysOf !== undefined &&
+        (typeof keysOf !== "string" || !(keysOf in (schema.properties as object)))
+      ) {
+        fail(`${at(path, key)}: x-keysOf must name a sibling property`);
+      }
       checkSchema(sub as Record<string, unknown>, at(path, key));
     }
   }
@@ -182,6 +196,16 @@ export function configErrors(schema: ConfigSchema, value: unknown, path = ""): s
         errors.push(`${at(path, key)}: is not allowed`);
       } else if (isPlainObject(schema.additionalProperties)) {
         errors.push(...configErrors(schema.additionalProperties, item, at(path, key)));
+      }
+    }
+    for (const [name, sub] of Object.entries(properties)) {
+      const map = sub["x-keysOf"] === undefined ? undefined : value[sub["x-keysOf"]];
+      const v = value[name];
+      if (typeof v === "string" && isPlainObject(map) && !(v in map)) {
+        const keys = Object.keys(map).map((k) => JSON.stringify(k));
+        errors.push(
+          `${at(path, name)}: must be one of the keys of ${sub["x-keysOf"]} (${keys.join(", ")})`,
+        );
       }
     }
   }

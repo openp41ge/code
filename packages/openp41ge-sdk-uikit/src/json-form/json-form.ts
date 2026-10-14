@@ -6,8 +6,12 @@
  * `minimum` / `maximum`), a menu for an `enum`, a text input (masked for
  * `"secret": true`), an editable list for an array of values, cards for an
  * array of objects (one accordion segment per item: open it to edit, move
- * it, remove it) and a group for an object. A shape it cannot edit points to
- * the JSON view and shows its value.
+ * it, remove it), a group for an object, and cards for a map (an object
+ * whose keys are the user's: one segment per key, with add under a new key,
+ * rename and remove; an entry its defaults have can only be edited). A
+ * string with `x-keysOf` is a menu of its sibling map's keys, and the map
+ * marks that entry Default (with Make default on the others). A shape it
+ * cannot edit points to the JSON view and shows its value.
  *
  * `value` is the user's values only (what is stored); `defaults` the schema's
  * defaults. An unset field shows its default, faded; editing sets it, and
@@ -25,7 +29,8 @@
 import { LitElement, html, css, nothing, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
-import { cloneDeep, type JsonPath } from "../json-editor/json-tree";
+import { live } from "lit/directives/live.js";
+import { cloneDeep, getAt, type JsonPath } from "../json-editor/json-tree";
 import { renderMarkdown } from "../json-editor/md-render";
 import "../components/openp41ge-toggle";
 import {
@@ -93,8 +98,13 @@ export class JsonFormElement extends LitElement {
 
   /** The values being edited: `value`, then each edit applied. */
   @state() private _value: Record<string, unknown> = {};
-  /** Open items of lists of objects, by key (`hosts[0]`). */
+  /** Open items of lists of objects and entries of maps, by key
+   *  (`hosts[0]`, `providers.vllm`). */
   @state() private _open: ReadonlySet<string> = new Set();
+  /** The key being typed in each map's Add row, by the map's key. */
+  @state() private _newKeys: ReadonlyMap<string, string> = new Map();
+  /** The maps' paths in the last render (their entries are never pruned). */
+  private _maps: JsonPath[] = [];
 
   override willUpdate(changed: Map<string, unknown>): void {
     if (changed.has("value")) {
@@ -124,7 +134,7 @@ export class JsonFormElement extends LitElement {
   }
 
   private _reset(path: JsonPath): void {
-    this._commit(resetField(this._value, path));
+    this._commit(resetField(this._value, path, this._maps));
   }
 
   /** Set a list (of values or objects) to `list`. */
@@ -155,6 +165,16 @@ export class JsonFormElement extends LitElement {
 
   override render(): TemplateResult {
     const fields = formFields(this.schema, this._value, this.defaults, this.errors);
+    this._maps = [];
+    const walk = (fs: readonly FormField[]): void => {
+      for (const f of fs) {
+        if (f.kind === "map") this._maps.push(f.path);
+        walk(f.fields ?? []);
+        walk(f.entries ?? []);
+        for (const item of f.items ?? []) walk(item);
+      }
+    };
+    walk(fields);
     return html`<div class="jf">${fields.map((f) => this._field(f))}</div>`;
   }
 
@@ -162,7 +182,7 @@ export class JsonFormElement extends LitElement {
     if (f.kind === "group") return this._group(f);
     const id = idFor(f.key);
     const faded = !f.set && f.hasDefault;
-    const labelled = f.kind !== "list" && f.kind !== "objects" && f.kind !== "unsupported";
+    const labelled = !["list", "objects", "map", "unsupported"].includes(f.kind);
     return html`
       <div class="jf-field ${faded ? "jf-default" : ""}" data-key=${f.key}>
         <div class="jf-head">
@@ -236,13 +256,15 @@ export class JsonFormElement extends LitElement {
           type=${f.kind === "secret" ? "password" : "text"}
           autocomplete=${f.kind === "secret" ? "off" : nothing}
           spellcheck="false"
-          placeholder=${placeholder}
+          placeholder=${f.nullable ? "null" : placeholder}
           .value=${typeof f.value === "string" ? f.value : ""}
           ?disabled=${this.readonly}
           @input=${(e: Event) => {
             const text = (e.target as HTMLInputElement).value;
-            // Clearing a setting with no default removes it.
-            if (text === "" && !f.hasDefault) this._reset(f.path);
+            // Clearing a value that may be null sets null; clearing a
+            // setting with no default removes it.
+            if (text === "" && f.nullable) this._set(f.path, null);
+            else if (text === "" && !f.hasDefault) this._reset(f.path);
             else this._set(f.path, text);
           }}
         />`;
@@ -250,6 +272,8 @@ export class JsonFormElement extends LitElement {
         return this._list(f);
       case "objects":
         return this._objects(f);
+      case "map":
+        return this._map(f);
       default:
         return html`
           <p class="jf-note">Edit this in the JSON view.</p>
@@ -479,6 +503,169 @@ export class JsonFormElement extends LitElement {
     `;
   }
 
+  /** A map: a card with one segment per key (objects) or one row per key
+   *  (values), and an Add row that takes the new key. */
+  private _map(f: FormField): TemplateResult {
+    const entries = f.entries ?? [];
+    const keys = entries.map((e) => e.name);
+    const fromDefaults = new Set(f.defaultKeys ?? []);
+    const userMap = (): Record<string, unknown> => {
+      const v = getAt(this._value, f.path);
+      return v !== null && typeof v === "object" && !Array.isArray(v)
+        ? (v as Record<string, unknown>)
+        : {};
+    };
+    const newKey = this._newKeys.get(f.key) ?? "";
+    const canAdd = newKey.trim() !== "" && !keys.includes(newKey.trim());
+    const setNewKey = (text: string) => {
+      const next = new Map(this._newKeys);
+      next.set(f.key, text);
+      this._newKeys = next;
+    };
+    const add = () => {
+      if (!canAdd) return;
+      const key = newKey.trim();
+      setNewKey("");
+      if (f.objectValues) {
+        const open = new Set(this._open);
+        open.add(`${f.key}.${key}`);
+        this._open = open;
+      }
+      this._set([...f.path, key], cloneDeep(f.newEntry ?? null));
+    };
+    const remove = (key: string) => {
+      const { [key]: _removed, ...rest } = userMap();
+      if (Object.keys(rest).length === 0) this._reset(f.path);
+      else this._set(f.path, rest);
+    };
+    const rename = (from: string, input: HTMLInputElement) => {
+      const to = input.value.trim();
+      if (!to || to === from || keys.includes(to)) {
+        input.value = from;
+        return;
+      }
+      const map = Object.fromEntries(
+        Object.entries(userMap()).map(([k, v]) => [k === from ? to : k, v]),
+      );
+      let next = setFieldValue(this._value, this.defaults, f.path, map);
+      // The setting that names this entry follows it.
+      if (f.marked && f.marked.key === from) {
+        next = setFieldValue(next, this.defaults, f.marked.path, to);
+      }
+      const open = new Set(this._open);
+      if (open.delete(`${f.key}.${from}`)) open.add(`${f.key}.${to}`);
+      this._open = open;
+      this._commit(next);
+    };
+    const removeButton = (key: string) =>
+      html`<button
+        type="button"
+        class="jf-icon-btn jf-x"
+        aria-label="Remove ${key} from ${f.label}"
+        title=${fromDefaults.has(key) ? "A default entry: it cannot be removed" : "Remove"}
+        ?disabled=${this.readonly || fromDefaults.has(key)}
+        @click=${() => remove(key)}
+      >
+        ${REMOVE_ICON}
+      </button>`;
+    const marked = f.marked;
+    const markActions = (key: string) => {
+      if (!marked) return nothing;
+      return marked.key === key
+        ? html`<span class="jf-pill">Default</span>`
+        : html`<button
+            type="button"
+            class="jf-add jf-make"
+            aria-label="Make ${key} the ${marked.label.toLowerCase()}"
+            ?disabled=${this.readonly}
+            @click=${() => this._set(marked.path, key)}
+          >
+            Make default
+          </button>`;
+    };
+    const segment = (e: FormField) => {
+      const open = this._open.has(e.key);
+      const locked = this.readonly || fromDefaults.has(e.name);
+      return html`<div class="jf-seg ${open ? "jf-seg--open" : ""}">
+        <div
+          class="jf-seg-head"
+          role="button"
+          tabindex="0"
+          aria-expanded=${open}
+          @click=${() => this._toggleOpen(e.key)}
+          @keydown=${(ev: KeyboardEvent) => {
+            if (ev.target === ev.currentTarget && (ev.key === "Enter" || ev.key === " ")) {
+              ev.preventDefault();
+              this._toggleOpen(e.key);
+            }
+          }}
+        >
+          <span class="jf-chev" aria-hidden="true">›</span>
+          <span class="jf-seg-title">${e.name}</span>
+          <span class="jf-seg-actions" @click=${(ev: Event) => ev.stopPropagation()}>
+            ${markActions(e.name)} ${removeButton(e.name)}
+          </span>
+        </div>
+        ${
+          open
+            ? html`<div class="jf-seg-body">
+                <div class="jf-field">
+                  <label class="jf-label" for=${idFor(`${e.key}.__key`)}>Key</label>
+                  <input
+                    class="jf-input"
+                    id=${idFor(`${e.key}.__key`)}
+                    type="text"
+                    spellcheck="false"
+                    aria-label="Key of ${e.name}"
+                    title=${fromDefaults.has(e.name) ? "A default entry: it cannot be renamed" : ""}
+                    .value=${live(e.name)}
+                    ?disabled=${locked}
+                    @change=${(ev: Event) => rename(e.name, ev.target as HTMLInputElement)}
+                  />
+                </div>
+                ${(e.fields ?? [e]).map((child) => this._field(child))}
+              </div>`
+            : nothing
+        }
+      </div>`;
+    };
+    const row = (e: FormField) =>
+      html`<div class="jf-map-row ${e.error ? "jf-map-row--error" : ""}" data-key=${e.key}>
+        <span class="jf-map-key">${e.name}</span>
+        ${this._control(e, idFor(e.key))} ${markActions(e.name)} ${removeButton(e.name)}
+        ${e.error ? html`<div class="jf-error" role="alert">${e.error}</div>` : nothing}
+      </div>`;
+    return html`
+      <div class="jf-card" role="group" aria-labelledby=${idFor(f.key)}>
+        ${entries.map((e) => (f.objectValues ? segment(e) : row(e)))}
+        <div class="jf-addrow jf-map-add">
+          <input
+            class="jf-input"
+            type="text"
+            spellcheck="false"
+            placeholder="New key"
+            aria-label="New key for ${f.label}"
+            .value=${live(newKey)}
+            ?disabled=${this.readonly}
+            @input=${(e: Event) => setNewKey((e.target as HTMLInputElement).value)}
+            @keydown=${(e: KeyboardEvent) => {
+              if (e.key === "Enter") add();
+            }}
+          />
+          <button
+            type="button"
+            class="jf-add"
+            aria-label="Add to ${f.label}"
+            ?disabled=${this.readonly || !canAdd}
+            @click=${add}
+          >
+            ＋ Add
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
   static override styles = css`
     :host {
       display: block;
@@ -571,14 +758,17 @@ export class JsonFormElement extends LitElement {
       padding: 5px 8px;
       border: none;
       border-radius: 4px;
-      background: var(--jf-input-bg, var(--bg-tertiary, #222));
+      background: var(--jf-input-bg, var(--bg-tertiary, #2a2a2a));
       color: var(--text-primary, #ddd);
       font: inherit;
       font-size: 12px;
     }
     .jf-input:focus {
       outline: none;
-      background: var(--jf-input-focus-bg, color-mix(in srgb, var(--bg-tertiary, #222) 92%, #fff));
+      background: var(
+        --jf-input-focus-bg,
+        color-mix(in srgb, var(--bg-tertiary, #2a2a2a) 92%, #fff)
+      );
     }
     .jf-input:disabled {
       opacity: 0.6;
@@ -606,7 +796,7 @@ export class JsonFormElement extends LitElement {
       padding: 6px 8px;
       overflow: auto;
       border-radius: 4px;
-      background: var(--jf-input-bg, var(--bg-tertiary, #222));
+      background: var(--jf-input-bg, var(--bg-tertiary, #2a2a2a));
       font-family: var(--font-mono, ui-monospace, monospace);
       font-size: 11px;
       color: var(--text-secondary, #999);
@@ -691,7 +881,7 @@ export class JsonFormElement extends LitElement {
     .jf-card {
       border: 1px solid var(--divider, #333);
       border-radius: 6px;
-      background: var(--jf-card-bg, var(--bg-secondary, #222));
+      background: var(--jf-card-bg, var(--bg-secondary, #161616));
       overflow: hidden;
     }
     .jf-card > .jf-seg + .jf-seg,
@@ -747,6 +937,58 @@ export class JsonFormElement extends LitElement {
       text-align: left;
       border-radius: 0;
       padding: 6px 8px 6px 30px;
+    }
+    /* Maps: the Add row takes the new key. */
+    .jf-map-add {
+      box-sizing: border-box;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+    }
+    .jf-map-add .jf-input {
+      flex: 1;
+    }
+    .jf-map-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+    }
+    .jf-card > .jf-map-row + .jf-map-row,
+    .jf-card > .jf-map-row + .jf-map-add,
+    .jf-card > .jf-seg + .jf-map-add {
+      border-top: 1px solid var(--divider, #2a2a2a);
+    }
+    .jf-map-key {
+      flex: 0 0 30%;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+    .jf-map-row > .jf-input {
+      flex: 1;
+      width: auto;
+    }
+    .jf-map-row > .jf-error {
+      flex-basis: 100%;
+    }
+    .jf-pill {
+      padding: 1px 6px;
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--accent, #569cd6) 22%, transparent);
+      color: var(--accent, #569cd6);
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .jf-make {
+      padding: 1px 6px;
+      font-size: 11px;
     }
   `;
 }

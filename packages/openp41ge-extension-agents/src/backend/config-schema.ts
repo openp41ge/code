@@ -1,8 +1,9 @@
 /**
  * config-schema.ts — the agents extension's config (`registerConfigSchema`):
  * which chat provider new chats use and the table of providers (endpoints,
- * models, generation options). The platform's JSON editor shows each
- * property's `description` (Markdown) as the key's tooltip.
+ * models, generation options). The settings form shows each property's
+ * `title` and `description` (Markdown, kept short: the form shows the
+ * structure); the JSON editor shows the description as the key's tooltip.
  *
  * This is the real persisted shape, including the per-model fields (`input`,
  * `thinking`, `maxTokens`, `contextWindow`) the chat composer reads even
@@ -12,80 +13,6 @@
  */
 
 import type { ConfigSchema } from "openp41ge-sdk";
-
-const PROVIDERS_MD = `# Providers
-
-The table of provider connections, keyed by provider id. Chats that don't pick
-a provider use \`defaultProviderId\`'s.
-
-\`\`\`json
-{
-  "vllm": {
-    "baseUrl": "http://localhost:8000/v1",
-    "defaultModel": "Qwen2.5-Coder-7B-Instruct",
-    "models": [{ "id": "Qwen2.5-Coder-7B-Instruct" }]
-  }
-}
-\`\`\``;
-
-const PROVIDER_MD = `# Provider connection
-
-A single provider connection. The key is the provider id (e.g. \`vllm\`,
-\`openai\`). Each provider exposes an **OpenAI-compatible** endpoint; the runtime
-appends \`/chat/completions\` and \`/models\`.
-
-\`\`\`json
-{
-  "baseUrl": "https://api.example.com/v1",
-  "defaultModel": "gpt-4o",
-  "apiKey": "sk-…",
-  "temperature": 0.7,
-  "models": [{ "id": "gpt-4o" }]
-}
-\`\`\``;
-
-const MODELS_MD = `# Models
-
-The models available from this provider. The provider-level \`defaultModel\` is
-used when a chat doesn't pick one explicitly.
-
-\`\`\`json
-[
-  {
-    "id": "Qwen2.5-7B",
-    "input": ["text"],
-    "maxTokens": 8192,
-    "contextWindow": 32768,
-    "thinking": { "Low": "Low" }
-  }
-]
-\`\`\``;
-
-const THINKING_MD = `# Thinking configuration
-
-Key/value pairs describing this model's thinking configuration. Each **key**
-becomes a thinking level in the composer's dropdown; each **value** is sent to
-the provider **verbatim** as the request's \`reasoning_effort\`. You define the
-levels the provider understands — there is no hardcoded mapping here.
-
-Set a value to **\`null\`** (or an empty string, \`off\`, \`none\`, \`0\`) to disable
-thinking for that level: \`reasoning_effort\` is omitted and the model applies
-its default behaviour. Any other value — \`low\`, \`medium\`, \`high\`, or a
-provider-specific level — is passed through unchanged.
-
-\`\`\`json
-{
-  "Off": null,
-  "Minimal": "minimal",
-  "Low": "low",
-  "High": "high",
-  "Max": "max"
-}
-\`\`\`
-
-> \`null\` is the JSON-native way to represent "off" — JSON has no \`undefined\`.
-> The value must be accepted by your provider; if the server rejects a level
-> you configured, pick one the provider supports (e.g. \`low\`/\`medium\`/\`high\`).`;
 
 /** The provider used until the user configures one. */
 export const DEFAULT_PROVIDER_ID = "vllm";
@@ -97,95 +24,106 @@ export const AGENTS_CONFIG_SCHEMA: ConfigSchema = {
   properties: {
     defaultProviderId: {
       type: "string",
+      title: "Default provider",
+      "x-keysOf": "providers",
       default: DEFAULT_PROVIDER_ID,
-      description:
-        "The provider chats use when they don't pick one. Must match a key in `providers`.",
+      description: "The provider chats use when they don't pick one.",
     },
     tools: {
       type: "object",
+      title: "Tools",
       additionalProperties: true,
       description: "Which of the agent's tools chats may use.",
       properties: {
         enabled: {
           type: "array",
+          title: "Enabled tools",
           items: { type: "string" },
           description:
-            "The tool names chats may use (e.g. `read_file`, `search_files`, `edit_file`, `create_or_replace_file`). When absent, every tool is available.",
+            "The tool names chats may use (e.g. `read_file`, `search_files`, `edit_file`, `create_or_replace_file`). When unset, every tool is available.",
         },
       },
     },
     providers: {
       type: "object",
-      description: PROVIDERS_MD,
+      title: "Providers",
+      description:
+        "Provider connections, by id. Each is an **OpenAI-compatible** endpoint: the runtime appends `/chat/completions` and `/models`.",
       default: {
         [DEFAULT_PROVIDER_ID]: { baseUrl: "http://localhost:8000/v1", defaultModel: "" },
       },
       additionalProperties: {
         type: "object",
-        description: PROVIDER_MD,
         additionalProperties: true,
         properties: {
+          name: {
+            type: "string",
+            title: "Name",
+            description: "A display name for the settings. The chat runtime ignores it.",
+          },
           baseUrl: {
             type: "string",
-            description:
-              "The OpenAI-compatible endpoint URL, e.g. `https://api.example.com/v1`. The runtime appends `/chat/completions` and `/models`.",
-          },
-          defaultModel: {
-            type: "string",
-            description:
-              "The **default** model id used when a chat doesn't pick one explicitly. Distinct from `models`, the list of available models.",
+            title: "Base URL",
+            description: "The endpoint, e.g. `https://api.example.com/v1`.",
           },
           apiKey: {
             type: "string",
-            description:
-              "Bearer **API key** for hosted services. Local servers usually don't need one.",
+            title: "API key",
+            secret: true,
+            description: "For hosted services. Local servers usually don't need one.",
+          },
+          defaultModel: {
+            type: "string",
+            title: "Default model",
+            description: "The model id chats use when they don't pick one.",
           },
           temperature: {
             type: "number",
-            description:
-              "Sampling randomness (0–2). Optional; the server default is used when unset.",
+            title: "Temperature",
+            description: "Sampling randomness (0–2). The server's default when unset.",
           },
           maxTokens: {
             type: "number",
-            description:
-              "Max output tokens per completion. Optional; the server default is used when unset.",
-          },
-          name: {
-            type: "string",
-            description:
-              "Friendly **display name** for the settings UI only. The chat runtime ignores it.",
+            title: "Max tokens",
+            description: "Output tokens per completion. The server's default when unset.",
           },
           models: {
             type: "array",
-            description: MODELS_MD,
+            title: "Models",
+            description: "The models this provider offers.",
             items: {
               type: "object",
               additionalProperties: true,
               properties: {
                 id: {
                   type: "string",
-                  description: "The **exact model id** used when requesting chat completions.",
+                  title: "Model id",
+                  description: "The exact id sent when requesting chat completions.",
                 },
                 input: {
                   type: "array",
+                  title: "Input",
                   items: { type: "string" },
-                  description:
-                    "A list of strings describing the model's accepted input (e.g. modalities). Settings-only for now.",
+                  description: "What the model accepts (e.g. modalities). Settings only for now.",
                 },
                 thinking: {
                   type: "object",
+                  title: "Thinking levels",
                   // Values are sent verbatim as the provider's reasoning_effort;
                   // `null` means off (field omitted).
                   additionalProperties: { type: ["string", "null"] },
-                  description: THINKING_MD,
+                  description:
+                    "Each key is a level in the composer; its value is sent as the request's `reasoning_effort`, as is. An empty value (or `null`, `off`, `none`, `0`) turns thinking off for that level.",
                 },
                 maxTokens: {
                   type: "number",
-                  description: "Max output tokens for this model. Optional.",
+                  title: "Max tokens",
+                  description: "Output tokens for this model.",
                 },
                 contextWindow: {
                   type: "number",
-                  description: "Context window size in tokens. Shown in the composer; optional.",
+                  title: "Context window",
+                  description: "In tokens. Shown in the composer.",
                 },
               },
             },

@@ -36,7 +36,7 @@ import {
   stripDefaults,
   type JsonPath,
 } from "openp41ge-sdk-uikit/json-editor";
-import { configErrors, type ConfigSchema } from "openp41ge-sdk";
+import { configErrors, mergeConfig, type ConfigSchema } from "openp41ge-sdk";
 import { createLogger } from "openp41ge-core-logger";
 import type { ExtensionConfigBridge } from "../services/extension-configs";
 import { settingsBridge, type PlatformConfigBridge } from "../services/settings-sources";
@@ -194,10 +194,12 @@ export class Openp41geConfigEditor extends LitElement {
     }
   }
 
-  /** The schema's problems with the staged values, by path (`a.b[0]`). */
+  /** The schema's problems with the staged values merged over the defaults
+   *  (what Save checks), by path (`a.b[0]`). */
   private _formErrors(): Array<{ path: string; message: string }> {
     if (!this._schema || !this._overrides) return [];
-    return configErrors(this._schema, this._overrides).map((message) => {
+    const merged = mergeConfig(this._defaults, this._overrides);
+    return configErrors(this._schema, merged).map((message) => {
       const at = message.indexOf(": ");
       return { path: at > 0 ? message.slice(0, at) : "", message };
     });

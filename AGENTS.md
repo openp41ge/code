@@ -278,6 +278,10 @@ the view, `ctx.config.get()` in the backend. The platform owns storage and
 merge: the user's values live in `config.json` under
 `extensions.<extensionId>` (only what the user wrote), and are validated
 against the schema on save. The extension never manages its own settings file.
+Beyond standard JSON Schema the platform checks one keyword of its own:
+`"x-keysOf": "<sibling>"` on a string — its value must be a key of that
+sibling property's object (e.g. `defaultProviderId` names one of
+`providers`); the form shows it as a menu of those keys.
 
 The platform's config editor is the `config-editor` grid tab — a form built
 from the schema (the UI kit's `<json-form>`), with a switch to the JSON view —
