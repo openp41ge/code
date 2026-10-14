@@ -313,6 +313,15 @@ class Openp41geSidebar extends LitElement {
 
   // ═══ Render ──────────────────────────────────────────────────────────
 
+  /** A sidebar sits against the window's edge, so its outer bottom corner
+   *  is the window's rounded one: publish the pad the grid publishes for a
+   *  cell there, so a tab's corner bottom-bar button moves 8px in. */
+  private _cornerPads(): string {
+    const outer = this.side === "right" ? "right" : "left";
+    const inner = outer === "right" ? "left" : "right";
+    return `--grid-edge-${outer}-pad:8px;--grid-edge-${inner}-pad:0px;`;
+  }
+
   render(): TemplateResult {
     const borderClass =
       this.side === "left" ? "border-r border-divider" : "border-l border-divider";
@@ -443,6 +452,7 @@ class Openp41geSidebar extends LitElement {
         <div
           class="sidebar-content flex-1 relative overflow-hidden"
           data-sidebar-content="${this.side}"
+          style=${this._cornerPads()}
         ></div>
       </div>
     `;

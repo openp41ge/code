@@ -335,6 +335,13 @@ export class Openp41geConfigEditor extends LitElement {
           height: 14px;
           fill: currentColor;
         }
+        /* The corner button: push the icon 8px in from the window's rounded
+           corner. The grid (and a sidebar) publishes --grid-edge-right-pad:
+           8px when this tab is flush with a rounded right corner, else 0px. */
+        .cfe-btn:last-child {
+          box-sizing: content-box;
+          padding-right: var(--grid-edge-right-pad, 0px);
+        }
         /* Outline icons (the JSON switch's braces) are drawn with stroke. */
         .cfe-btn svg[stroke] {
           fill: none;
