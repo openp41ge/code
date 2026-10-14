@@ -563,24 +563,22 @@ export class JsonFormElement extends LitElement {
     .jf-description p + p {
       margin-top: 4px;
     }
+    /* Inputs are cards, as in the workspace editor: full width, a
+       background, no outline. */
     .jf-input {
       box-sizing: border-box;
       width: 100%;
-      max-width: 420px;
       padding: 5px 8px;
-      border: 1px solid var(--divider, #333);
+      border: none;
       border-radius: 4px;
-      background: var(--jf-input-bg, var(--bg-secondary, #2a2a2a));
+      background: var(--jf-input-bg, var(--bg-tertiary, #222));
       color: var(--text-primary, #ddd);
       font: inherit;
       font-size: 12px;
     }
     .jf-input:focus {
       outline: none;
-      border-color: var(--accent, #569cd6);
-    }
-    .jf-number {
-      max-width: 160px;
+      background: var(--jf-input-focus-bg, color-mix(in srgb, var(--bg-tertiary, #222) 92%, #fff));
     }
     .jf-input:disabled {
       opacity: 0.6;
@@ -606,11 +604,9 @@ export class JsonFormElement extends LitElement {
     .jf-json {
       margin: 0;
       padding: 6px 8px;
-      max-width: 420px;
       overflow: auto;
-      border: 1px solid var(--divider, #333);
       border-radius: 4px;
-      background: var(--jf-input-bg, var(--bg-secondary, #2a2a2a));
+      background: var(--jf-input-bg, var(--bg-tertiary, #222));
       font-family: var(--font-mono, ui-monospace, monospace);
       font-size: 11px;
       color: var(--text-secondary, #999);
@@ -632,7 +628,6 @@ export class JsonFormElement extends LitElement {
       display: flex;
       flex-direction: column;
       gap: 4px;
-      max-width: 420px;
     }
     .jf-list-item {
       display: flex;
@@ -694,7 +689,6 @@ export class JsonFormElement extends LitElement {
     }
     /* Lists of objects: the workspace editor's accordion card. */
     .jf-card {
-      max-width: 520px;
       border: 1px solid var(--divider, #333);
       border-radius: 6px;
       background: var(--jf-card-bg, var(--bg-secondary, #222));
