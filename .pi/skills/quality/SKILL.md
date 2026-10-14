@@ -5,7 +5,7 @@ description: Always run before submitting work. Runs all tooling — dead code d
 
 # Code Quality
 
-Run all available tooling in sequence to verify the health of the codebase. Always run from the project root (`/Users/rk/Repository/openp41ge/master`).
+Run all available tooling in sequence to verify the health of the codebase. Always run from the project root (`/Users/rk/Repository/openp41ge/code/master`).
 
 ## Available Tooling
 

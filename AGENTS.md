@@ -531,7 +531,8 @@ general reasoning. If no skill matches, proceed with general reasoning.
   so the public repo cannot be used to recreate the application from them.
   Never add a test, test config, test helper or demo to this repo. code-tests
   mirrors this repo's layout (`packages/<pkg>/test/...`) and runs against a
-  checkout of it (`APP_DIR`; by default `../code/master`, else `../app/master`, beside code-tests): from
+  checkout of it (`APP_DIR`; by default the `code/master` worktree beside code-tests' own
+  `code-tests/master` worktree): from
   code-tests, `pnpm test` runs everything, `pnpm test --project <pkg>` one
   package. Its README has the details. In CI, app's prerequisites dispatch
   code-tests, which reports the `code-tests` commit status the release gate

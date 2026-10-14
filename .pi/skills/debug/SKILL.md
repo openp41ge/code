@@ -9,7 +9,7 @@ Use this skill when investigating bugs, unexpected behaviour, crashes, or visual
 
 ## 1. Start the App in Dev Mode
 
-From the monorepo root (`/Users/rk/Repository/openp41ge/master`), run:
+From the monorepo root (`/Users/rk/Repository/openp41ge/code/master`), run:
 
 ```bash
 cd packages/openp41ge
