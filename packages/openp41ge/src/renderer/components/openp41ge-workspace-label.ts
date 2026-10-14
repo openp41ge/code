@@ -75,7 +75,7 @@ openp41ge-workspace-label .wl-filter { flex: none; margin: 8px; padding: 6px 10p
 openp41ge-workspace-label .wl-filter:focus { border-color: var(--accent, #4fc1ff); }
 openp41ge-workspace-label .wl-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 8px 2px; }
 openp41ge-workspace-label .wl-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 5px; font-size: 13px; color: var(--text-primary, #ddd); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-openp41ge-workspace-label .wl-item:hover { background: var(--bg-hover, #2a2d2e); }
+openp41ge-workspace-label .wl-item:hover { background: color-mix(in srgb, var(--text-primary, #ddd) 12%, transparent); }
 openp41ge-workspace-label .wl-item--current { font-weight: 600; }
 openp41ge-workspace-label .wl-item-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 openp41ge-workspace-label .wl-active { flex-shrink: 0; margin-left: auto; padding: 0 6px; border-radius: 999px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; background: rgba(111, 200, 114, 0.16); color: #6fc872; }
