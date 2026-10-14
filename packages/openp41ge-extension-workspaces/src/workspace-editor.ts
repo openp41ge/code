@@ -42,10 +42,6 @@ import { WORKSPACE_FILE_SCHEMA, editableView, mergeEditableFields } from "./work
 const SAVE_ICON =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7l3 3v7H3V3z"/><path d="M5 3v3h4V3"/><path d="M5 13v-3h6v3"/></svg>';
 
-/** Open-in-new-window icon (the toolbar's Open), as SVG markup. */
-const OPEN_ICON =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h280v80H200v560h560v-280h80v280q0 33-23.5 56.5T760-120H200Zm188-212-56-56 372-372H560v-80h280v280h-80v-144L388-332Z"/></svg>';
-
 /** Closed-padlock icon (locked workspace name), as SVG markup. */
 const LOCK_ICON =
   '<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="M240-80q-33 0-56.5-23.5T160-160v-400q0-33 23.5-56.5T240-640h40v-80q0-83 58.5-141.5T480-920q83 0 141.5 58.5T680-720v80h40q33 0 56.5 23.5T800-560v400q0 33-23.5 56.5T720-80H240Zm0-80h480v-400H240v400Zm296.5-143.5Q560-327 560-360t-23.5-56.5Q513-440 480-440t-56.5 23.5Q400-393 400-360t23.5 56.5Q447-280 480-280t56.5-23.5ZM360-640h240v-80q0-50-35-85t-85-35q-50 0-85 35t-35 85v80ZM240-160v-400 400Z"/></svg>';
@@ -549,44 +545,6 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
         overflow: hidden;
         display: flex;
         flex-direction: column;
-      }
-      /* The first content row: the editor's buttons (Open first), at the right. */
-      .we-toolbar {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 6px;
-        padding: 12px 12px 0;
-        flex-shrink: 0;
-      }
-      .we-toolbar-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        box-sizing: border-box;
-        height: 26px;
-        padding: 0 14px;
-        font: inherit;
-        font-size: 12px;
-        color: var(--text-primary, #d4d4d4);
-        border: 1px solid var(--divider, #333);
-        border-radius: 0;
-        background: transparent;
-        cursor: pointer;
-      }
-      .we-toolbar-btn:hover {
-        background: var(--bg-active, #37373d);
-      }
-      .we-toolbar-btn span {
-        display: inline-flex;
-      }
-      .we-toolbar-btn svg {
-        display: block;
-        width: 14px;
-        height: 14px;
-      }
-      .we-toolbar + .we-json {
-        margin-top: 12px;
       }
       .we-note {
         padding: 12px;
@@ -1179,28 +1137,15 @@ export function renderWorkspaceEditor(host: WorkspaceEditorHost): TemplateResult
             ? html`<div class="we-note">Loading…</div>`
             : !data
               ? html`<div class="we-note">${error ?? "Unable to load workspace file."}</div>`
-              : html`${renderToolbar(host)}${mode === "json" ? renderJsonView(host) : renderUiView(host)}`
+              : mode === "json"
+                ? renderJsonView(host)
+                : renderUiView(host)
         }
         ${error && loaded ? html`<div class="we-error">${error}</div>` : nothing}
       </div>
       <we-bottom-bar .buttons=${barButtons}></we-bottom-bar>
     </div>
   `;
-
-  function renderToolbar(h: WorkspaceEditorHost): TemplateResult {
-    return html`
-      <div class="we-toolbar">
-        <button
-          type="button"
-          class="we-toolbar-btn"
-          data-action="open-window"
-          @click=${() => h.workspace.openWindow(h.state.path)}
-        >
-          <span .innerHTML=${OPEN_ICON}></span>Open
-        </button>
-      </div>
-    `;
-  }
 
   function renderJsonView(h: WorkspaceEditorHost): TemplateResult {
     const data = h.state.data!;
