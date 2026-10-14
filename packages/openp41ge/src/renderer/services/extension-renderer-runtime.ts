@@ -469,6 +469,7 @@ export function deriveSurfaceCatalog(
         icon,
         description,
         ...(spec.tabLabel ? { tabLabel: spec.tabLabel } : {}),
+        ...(spec.workspace ? { workspace: spec.workspace } : {}),
         createController: (tabId) => new RendererAppController(tabId, id, spec, deps),
       });
     } else {
@@ -478,6 +479,7 @@ export function deriveSurfaceCatalog(
         icon,
         description,
         defaultSide: spec.defaultSide,
+        ...(spec.workspace ? { workspace: spec.workspace } : {}),
         createController: (tabId) => new RendererSystemTabController(tabId, id, spec, deps),
       });
     }

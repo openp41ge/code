@@ -7,6 +7,7 @@
  * (e.g., reorderTabsInCell, moveTabBetweenCells, activateTabInCell).
  */
 
+import { createLogger } from "openp41ge-core-logger";
 import type { ICommandBus } from "../interfaces/command-bus";
 import type { TabMountManager } from "./tab-mount-manager";
 import type { Workspace } from "../../layout/types.js";
@@ -14,6 +15,9 @@ import { TabActivationHistory } from "./tab-activation-history";
 import { translateGridOpen } from "./grid-open-translators";
 import { getAppTypeRegistration } from "../apps/app-registry";
 import { extensionTabLabel } from "../components/grid-tab-decorations";
+import { availableInWindow } from "./window-workspace";
+
+const log = createLogger("openp41ge", "tabs-event-handler");
 
 type CleanupFn = () => void;
 
@@ -179,6 +183,12 @@ export class Openp41geTabsEventHandler {
       };
       const winId = eventWinId || this._findWinId();
       if (!winId) return;
+
+      // A window with no workspace opens only tabs that need none.
+      if (!availableInWindow(getAppTypeRegistration(_tabType))) {
+        log.info("not opening a tab that needs a workspace in a window without one:", _tabType);
+        return;
+      }
 
       // Translate the drop into how this app type opens (built-in apps have
       // app-specific open data; any other registered app type — e.g. an

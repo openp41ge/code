@@ -16,6 +16,8 @@
  *     → ctrl.snapshot()           // serializable state for persistence
  */
 
+import type { SurfaceWorkspace } from "openp41ge-sdk";
+
 export interface TabController {
   readonly tabId: string;
   readonly appType: string;
@@ -71,6 +73,9 @@ export interface AppTypeRegistration {
     description?: string;
     icon?: string;
   };
+  /** Whether it needs a workspace open (default "required"): a window with
+   *  no workspace opens only "none" app types. */
+  workspace?: SurfaceWorkspace;
 }
 
 // ─── System Tab Registration ──────────────────────────────────────────────
@@ -132,6 +137,9 @@ export interface SystemTabRegistration {
   description: string;
   /** Default sidebar where this tab type opens when first created. */
   defaultSide: "left" | "right";
+  /** Whether it needs a workspace open (default "required"): a window with
+   *  no workspace offers only "none" sidebar tabs. */
+  workspace?: SurfaceWorkspace;
   /** Factory function to create the system tab content controller. */
   createController: (tabId: string, config?: Record<string, unknown>) => SystemTabController;
   /** This tab's own, unique settings surface (grid tab). Optional. */

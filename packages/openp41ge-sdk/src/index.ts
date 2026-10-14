@@ -52,6 +52,7 @@ export {
   type TabLabel,
   type SidebarSurfaceSpec,
   type SurfaceSpec,
+  type SurfaceWorkspace,
   type RendererRegistrations,
   type ProcessRegistrations,
   type OpenTabRequest,

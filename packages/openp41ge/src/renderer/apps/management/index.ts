@@ -137,6 +137,7 @@ export function managementSidebarTabs(): SystemTabRegistration[] {
     icon: t.icon,
     description: t.description,
     defaultSide: "left",
+    workspace: "none",
     createController: (tabId: string) => new PaneTabController(tabId, t.id, t.create),
   }));
 }

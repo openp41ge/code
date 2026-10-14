@@ -51,6 +51,7 @@ export function registerLogSidebarTabs(): void {
     icon: "",
     description: "Every log stream: click to preview, drag to the grid to open",
     defaultSide: "left",
+    workspace: "none",
     createController: (tabId) => new PaneTabController(tabId, "log-streams", streamsPane),
   });
   registerSystemTabType({
@@ -59,6 +60,7 @@ export function registerLogSidebarTabs(): void {
     icon: "",
     description: "Search the logs of every stream",
     defaultSide: "left",
+    workspace: "none",
     createController: (tabId) => new PaneTabController(tabId, "log-search", searchPane),
   });
   extensionDrag.registerPlatformSources([STREAM_ROW]);

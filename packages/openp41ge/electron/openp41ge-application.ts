@@ -784,18 +784,11 @@ export class Openp41geApplication {
     this.dispatcher.setTerminalCleanup((paneId: string) =>
       this.terminalManager.killByPaneId(paneId),
     );
-    this.dispatcher.setBroadcast((serialized: string) => {
-      for (const [, bw] of openp41geWindows) {
-        try {
-          bw.webContents.send("openp41ge:state-update", serialized);
-        } catch {
-          // window might be closing
-        }
-      }
-    });
-    // The default dispatcher is never saved: it serves windows bound to no
-    // workspace (window manager, logs), so it has no file. Each workspace's
-    // dispatcher (the registry's) saves its layout to that workspace's file.
+    // The default dispatcher holds the windows with no workspace open: their
+    // state goes to them only, and is never saved (it has no file; their tabs
+    // live in memory). Each workspace's dispatcher (the registry's) saves its
+    // layout to that workspace's file.
+    this.dispatcher.setBroadcast((serialized: string) => broadcastToWorkspace(null, serialized));
 
     setDispatcher(this.dispatcher);
     setRegistry(this.registry);
@@ -1066,13 +1059,19 @@ export class Openp41geApplication {
     ];
 
     // Window menu — includes dev items (Reload, Devtools) only in dev mode.
-    // "Add Workspace Window" is pinned at the TOP of this menu with a separator
-    // below it. It binds the new window to the focused window's workspace — the
+    // "New Window" (no workspace) and "Add Workspace Window" are pinned at the
+    // TOP of this menu with a separator below them. It binds the new window to the focused window's workspace — the
     // Window Manager has no workspace to add a window to, so it (and its
     // separator) are omitted there.
     template.push({
       label: "Window",
       submenu: [
+        // A window with no workspace open: settings, releases, logs…
+        {
+          label: "New Window",
+          accelerator: "CmdOrCtrl+Shift+N",
+          click: () => this._newWindow(),
+        },
         ...(isWindowManager
           ? []
           : [
@@ -1118,6 +1117,21 @@ export class Openp41geApplication {
       if (win === bw) return openp41geWindowMeta.get(id)?.windowType ?? null;
     }
     return null;
+  }
+
+  /** Window menu > New Window — a window with no workspace open (its tabs live
+   *  in memory, in the default dispatcher). */
+  private _newWindow(): void {
+    const src = BrowserWindow.getFocusedWindow() ?? undefined;
+    this.dispatcher.apply("newWindow", []);
+    const ws = this.dispatcher.getWorkspace();
+    const newWin = ws.windows[ws.windows.length - 1];
+    if (!newWin) return;
+    this.dispatcher.broadcast();
+    createOpenp41geWindow(newWin.id, false, src, undefined, undefined, {
+      windowType: "workspace",
+      workspacePath: null,
+    });
   }
 
   /** Window menu > Add Workspace Window — bind a new window to the focused workspace. */

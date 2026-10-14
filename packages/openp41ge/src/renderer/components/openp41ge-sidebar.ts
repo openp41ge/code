@@ -10,6 +10,7 @@ import { property, state } from "lit/decorators.js";
 import { emitEvent } from "../app";
 import type { SystemTabRegistration } from "../controllers/types";
 import { getSystemTabRegistration, getAllSystemTabRegistrations } from "../apps/app-registry";
+import { availableInWindow } from "../services/window-workspace";
 import { emitOpenSystemTab } from "./openp41ge-worktree-controller";
 import type { Openp41geContextMenuElement } from "../interfaces/element-guards";
 import type { SystemTabController } from "../controllers/types";
@@ -150,9 +151,11 @@ class Openp41geSidebar extends LitElement {
   }
 
   /** Sidebar tabs offered in the ＋ menu: every registered sidebar tab (the
-   *  extensions', e.g. `ext:openp41ge-extension-explorer:explorer`). */
+   *  platform's and the extensions', e.g.
+   *  `ext:openp41ge-extension-explorer:explorer`) this window can host — with
+   *  no workspace open, those that need none. */
   private _menuTabRegistrations(): SystemTabRegistration[] {
-    return getAllSystemTabRegistrations();
+    return getAllSystemTabRegistrations().filter((reg) => availableInWindow(reg));
   }
 
   private _onTabBarScroll(e: Event): void {

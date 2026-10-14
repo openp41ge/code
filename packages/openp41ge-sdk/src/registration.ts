@@ -64,6 +64,14 @@ export interface TabLabel {
   readonly icon?: string;
 }
 
+/**
+ * Whether a surface needs a workspace open in its window: `"required"` (the
+ * default: it works on the workspace's repositories, files, chats…) or
+ * `"none"` (it works without one, e.g. a settings editor). A window with no
+ * workspace offers and opens only `"none"` surfaces.
+ */
+export type SurfaceWorkspace = "required" | "none";
+
 /** A grid cell (an app tab occupying a grid cell). */
 export interface GridSurfaceSpec {
   readonly kind: "grid";
@@ -78,6 +86,8 @@ export interface GridSurfaceSpec {
    * so a restored tab is labelled before it mounts. Must not throw.
    */
   readonly tabLabel?: (params: Readonly<Record<string, unknown>>) => TabLabel;
+  /** Whether it needs a workspace open (default `"required"`). */
+  readonly workspace?: SurfaceWorkspace;
   readonly render: RendererFn;
 }
 
@@ -91,6 +101,8 @@ export interface SidebarSurfaceSpec {
   readonly description?: string;
   /** Default sidebar where this tab opens when first created. */
   readonly defaultSide: "left" | "right";
+  /** Whether it needs a workspace open (default `"required"`). */
+  readonly workspace?: SurfaceWorkspace;
   readonly render: RendererFn;
 }
 

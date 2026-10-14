@@ -116,6 +116,11 @@ others the platform adds) and the **mount/update/dispose lifecycle** that
 surrounds them. The extension registers render functions _into_ those surfaces
 and owns everything that renders inside.
 
+A surface declares whether it needs a workspace open in its window
+(`workspace: "required" | "none"`, default `"required"`). A window with no
+workspace offers and opens only `"none"` surfaces; the platform's own tab
+types declare it the same way.
+
 Multiple grid cells are just multiple mounts of the same render function — each
 gets its own host context (its own state and subscriptions).
 

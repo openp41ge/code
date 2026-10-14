@@ -73,9 +73,15 @@ Each step ships on its own; the old windows keep working until step 5.
    `logs:open-in-window`) and opens the platform log, or reveals the error in
    its stream's tab. Settings-editor and release tabs now open once per cell
    too. The logs window keeps its own Streams/Search panes until step 5.
-3. **Workspace-free tabs.** An app type says whether it needs a workspace.
-   A window with no workspace gets an in-memory state; it can host
-   workspace-free grid and sidebar tabs only.
+3. **Done (2026-10-14).** **Workspace-free tabs.** Every tab type says
+   whether it needs a workspace: `workspace: "required" | "none"` (default
+   "required") on `GridSurfaceSpec` / `SidebarSurfaceSpec` in `openp41ge-sdk`
+   and on the platform's registrations. The management and log tabs, settings
+   editors, releases, log streams and the workspace editor need none. A
+   window with no workspace (Window > New Window, ⌘⇧N) uses the default
+   dispatcher's in-memory state, which goes to such windows only
+   (`electron/window-binding.ts`) and loses a window when it closes; its
+   sidebar + menus offer, and its grid opens, only "none" tab types.
 4. **Top-bar workspace picker; replacing a window's workspace.** The label
    becomes a button + overlay. Picking a workspace rebinds the window in the
    main process (its meta, its dispatcher), unmounts the old layout and loads
@@ -95,11 +101,5 @@ the running dev app.
 
 ## Open questions
 
-- **Which tabs are workspace-free** — the step 3 flag. Platform apps (config
-  editor, release, log viewer) are clear. For extension surfaces it is a
-  contract addition in `openp41ge-sdk` (e.g. a `workspace: "required" |
-"none"` on a surface registration); confirm the name before adding it.
-- **The workspace editor** (workspaces extension) edits a workspace by path,
-  so it does not need one open; it should be workspace-free.
 - **Saved management layout** (`manager-grid.json`): carry it into the
   first workspace opened after the update, or drop it.

@@ -10,6 +10,7 @@ import { appTitle, keepWindowTitle } from "./app-title.js";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createLogger } from "openp41ge-core-logger";
+import { showsState } from "./window-binding.js";
 import { logsOpenInPlace } from "./logs-routing.js";
 import { showConfirm } from "./confirm-dialog-manager.js";
 import type { TabNameGenerator } from "../src/main/index.js";
@@ -116,11 +117,13 @@ export function dispatcherForEvent(event: {
   return resolveDispatcherFor(workspacePathForSender(event));
 }
 
-/** Send a serialized state update to every window bound to `workspacePath`. */
-export function broadcastToWorkspace(workspacePath: string, serialized: string): void {
+/** Send a serialized state update to every window showing `workspacePath`'s
+ *  state (null: the no-workspace state). */
+export function broadcastToWorkspace(workspacePath: string | null, serialized: string): void {
   for (const [id, bw] of openp41geWindows) {
     if (bw.isDestroyed()) continue;
-    if (openp41geWindowMeta.get(id)?.workspacePath !== workspacePath) continue;
+    const meta = openp41geWindowMeta.get(id);
+    if (!meta || !showsState(meta, workspacePath)) continue;
     try {
       bw.webContents.send("openp41ge:state-update", serialized);
     } catch {
@@ -304,6 +307,16 @@ export function createOpenp41geWindow(
       // rendering the right grid and reopening restores it.
       const isWorkspace = meta?.windowType === "workspace";
       const wsPath = meta?.workspacePath;
+      // A window with no workspace keeps its tabs in memory only: closing it
+      // drops them.
+      if (isWorkspace && !wsPath) {
+        const d = resolveDispatcherFor(null);
+        if (d?.getWorkspace().windows.some((w) => w.id === openp41geWinId)) {
+          d.apply("closeWindow", [openp41geWinId]);
+          d.broadcast();
+        }
+        return;
+      }
       if (isWorkspace && wsPath) {
         const d = resolveDispatcherFor(wsPath);
         if (!d) return;

@@ -18,6 +18,8 @@ export const releaseAppRegistration: AppTypeRegistration = {
   label: "Release",
   icon: RELEASE_ICON,
   description: "A release of the app",
+  // Needs no workspace open (a window without one can host it).
+  workspace: "none",
   createController: (tabId: string) => new ReleaseController(tabId),
 };
 

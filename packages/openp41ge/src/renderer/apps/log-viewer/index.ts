@@ -13,5 +13,7 @@ export const logViewerAppRegistration: AppTypeRegistration = {
   label: "Logs",
   icon: "\u2318",
   description: "Application log viewer",
+  // Needs no workspace open (a window without one can host it).
+  workspace: "none",
   createController: (tabId: string) => new LogViewerController(tabId),
 };

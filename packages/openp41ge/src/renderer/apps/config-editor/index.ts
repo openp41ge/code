@@ -13,6 +13,8 @@ export const configEditorAppRegistration: AppTypeRegistration = {
   label: "Settings",
   icon: "⚙",
   description: "An extension's settings",
+  // Needs no workspace open (a window without one can host it).
+  workspace: "none",
   createController: (tabId: string) => new ConfigEditorController(tabId),
   settings: true,
 };
