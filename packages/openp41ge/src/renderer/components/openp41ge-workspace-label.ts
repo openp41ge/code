@@ -77,10 +77,11 @@ openp41ge-workspace-label .wl-list { flex: 1; min-height: 0; overflow-y: auto; p
 openp41ge-workspace-label .wl-item { display: flex; align-items: center; gap: 8px; padding: 6px 14px; font-size: 13px; color: var(--text-primary, #ddd); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 openp41ge-workspace-label .wl-item:hover { background: var(--bg-hover, #2a2d2e); }
 openp41ge-workspace-label .wl-item--current { font-weight: 600; }
-openp41ge-workspace-label .wl-item--current::after { content: "✓"; margin-left: auto; color: var(--accent, #4fc1ff); }
-openp41ge-workspace-label .wl-foot { flex: none; display: flex; justify-content: flex-end; padding: 8px; border-top: 1px solid var(--border-divider, #333); }
-openp41ge-workspace-label .wl-close { padding: 4px 10px; border: 1px solid var(--accent-error, #f44747); border-radius: 5px; background: transparent; color: var(--accent-error, #f44747); font-size: 12px; font-family: inherit; cursor: pointer; }
-openp41ge-workspace-label .wl-close:hover { background: var(--accent-error, #f44747); color: #fff; }
+openp41ge-workspace-label .wl-item-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+openp41ge-workspace-label .wl-active { flex-shrink: 0; margin-left: auto; padding: 0 6px; border-radius: 999px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; background: rgba(111, 200, 114, 0.16); color: #6fc872; }
+openp41ge-workspace-label .wl-foot { flex: none; padding: 8px; }
+openp41ge-workspace-label .wl-close { width: 100%; padding: 6px 10px; border: 1px solid color-mix(in srgb, var(--accent-error, #f44747) 35%, transparent); border-radius: 5px; background: color-mix(in srgb, var(--accent-error, #f44747) 8%, transparent); color: color-mix(in srgb, var(--accent-error, #f44747) 70%, var(--text-primary, #ddd)); font-size: 12px; font-family: inherit; cursor: pointer; }
+openp41ge-workspace-label .wl-close:hover { background: color-mix(in srgb, var(--accent-error, #f44747) 16%, transparent); }
 openp41ge-workspace-label .wl-empty { padding: 8px 14px; font-size: 12px; color: var(--text-muted, #888); font-style: italic; }
 `;
 
@@ -213,7 +214,8 @@ export class Openp41geWorkspaceLabel extends LitElement {
                       aria-selected=${w.filePath === current}
                       @click=${() => void this._pick(w.filePath)}
                     >
-                      ${nameOf(w)}
+                      <span class="wl-item-name">${nameOf(w)}</span>
+                      ${w.filePath === current ? html`<span class="wl-active">ACTIVE</span>` : nothing}
                     </div>
                   `,
                 )
