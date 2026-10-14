@@ -63,6 +63,9 @@ const DEFAULT_DEPS: WorkspaceLabelDeps = {
 
 const nameOf = (w: PickerWorkspace): string => w.data.name?.trim() || "Unnamed";
 
+/** How long Close workspace is held (its background filling) before it closes. */
+export const CLOSE_HOLD_MS = 900;
+
 const STYLE_ATTR = "data-openp41ge-workspace-label";
 const STYLES = `
 openp41ge-workspace-label { position: relative; display: flex; align-items: center; height: 100%; }
@@ -82,6 +85,10 @@ openp41ge-workspace-label .wl-active { flex-shrink: 0; margin-left: auto; paddin
 openp41ge-workspace-label .wl-foot { flex: none; padding: 8px; }
 openp41ge-workspace-label .wl-close { width: 100%; padding: 6px 10px; border: 1px solid color-mix(in srgb, var(--accent-error, #f44747) 35%, transparent); border-radius: 5px; background: color-mix(in srgb, var(--accent-error, #f44747) 8%, transparent); color: color-mix(in srgb, var(--accent-error, #f44747) 70%, var(--text-primary, #ddd)); font-size: 12px; font-family: inherit; cursor: pointer; }
 openp41ge-workspace-label .wl-close:hover { background: color-mix(in srgb, var(--accent-error, #f44747) 16%, transparent); }
+openp41ge-workspace-label .wl-close { position: relative; overflow: hidden; isolation: isolate; user-select: none; }
+openp41ge-workspace-label .wl-close-label { position: relative; z-index: 1; }
+openp41ge-workspace-label .wl-close-fill { position: absolute; z-index: 0; width: 0; height: 0; border-radius: 50%; pointer-events: none; background: color-mix(in srgb, var(--accent-error, #f44747) 32%, transparent); transform: translate(-50%, -50%) scale(0); transition: transform 180ms ease-out; }
+openp41ge-workspace-label .wl-close.is-holding .wl-close-fill { transform: translate(-50%, -50%) scale(1); transition: transform ${CLOSE_HOLD_MS}ms linear; }
 openp41ge-workspace-label .wl-empty { padding: 8px 10px; font-size: 12px; color: var(--text-muted, #888); font-style: italic; }
 `;
 
@@ -129,6 +136,7 @@ export class Openp41geWorkspaceLabel extends LitElement {
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
+    this._cancelHold();
     document.removeEventListener(WORKSPACE_CHANGED_EVENT, this._onUpdate);
   }
 
@@ -154,7 +162,47 @@ export class Openp41geWorkspaceLabel extends LitElement {
   }
 
   private _close(): void {
+    this._cancelHold();
     this._open = false;
+  }
+
+  // ── Close workspace: a long press ─────────────────────────────────────
+
+  private _holdTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Press: the background fills, as a circle growing from the press point
+   *  to the button's farthest corner; full, the workspace closes. */
+  private readonly _onCloseDown = (e: PointerEvent): void => {
+    if (e.button !== 0) return;
+    const button = e.currentTarget as HTMLElement;
+    const fill = button.querySelector<HTMLElement>(".wl-close-fill");
+    const r = button.getBoundingClientRect();
+    const x = e.clientX - r.left;
+    const y = e.clientY - r.top;
+    const reach = Math.hypot(Math.max(x, r.width - x), Math.max(y, r.height - y));
+    if (fill) {
+      fill.style.left = `${x}px`;
+      fill.style.top = `${y}px`;
+      fill.style.width = fill.style.height = `${reach * 2}px`;
+    }
+    this._cancelHold();
+    button.classList.add("is-holding");
+    this._holdTimer = setTimeout(() => {
+      this._holdTimer = null;
+      button.classList.remove("is-holding");
+      void this._pick(null);
+    }, CLOSE_HOLD_MS);
+  };
+
+  /** Release or leave before it is full: the fill drains, nothing closes. */
+  private readonly _onCloseUp = (e: Event): void => {
+    (e.currentTarget as HTMLElement).classList.remove("is-holding");
+    this._cancelHold();
+  };
+
+  private _cancelHold(): void {
+    if (this._holdTimer !== null) clearTimeout(this._holdTimer);
+    this._holdTimer = null;
   }
 
   private async _pick(path: string | null): Promise<void> {
@@ -224,8 +272,16 @@ export class Openp41geWorkspaceLabel extends LitElement {
         ${
           current !== null
             ? html`<div class="wl-foot">
-                <button class="wl-close" @click=${() => void this._pick(null)}>
-                  Close workspace
+                <button
+                  class="wl-close"
+                  title="Press and hold to close the workspace"
+                  @pointerdown=${this._onCloseDown}
+                  @pointerup=${this._onCloseUp}
+                  @pointerleave=${this._onCloseUp}
+                  @pointercancel=${this._onCloseUp}
+                >
+                  <span class="wl-close-fill"></span>
+                  <span class="wl-close-label">Close workspace</span>
                 </button>
               </div>`
             : nothing
