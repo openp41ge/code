@@ -41,7 +41,8 @@ export interface AgentsBackendOptions {
 
 /** The agent config the backend reads (`ctx.config.get()`). */
 interface AgentsConfig {
-  readonly providerId?: string;
+  /** The provider a chat uses when it has not picked one. */
+  readonly defaultProviderId?: string;
   readonly providers?: Readonly<Record<string, ChatProviderConfig>>;
   /** The tools agents may use (absent: all). */
   readonly tools?: { readonly enabled?: readonly string[] };
@@ -109,7 +110,8 @@ export class AgentsBackend {
       ),
       create: command((p, ctx, ws) => {
         const chat = this._threads.create(ws, {
-          providerId: str(p, "providerId") ?? this._config(ctx).providerId ?? DEFAULT_PROVIDER_ID,
+          providerId:
+            str(p, "providerId") ?? this._config(ctx).defaultProviderId ?? DEFAULT_PROVIDER_ID,
           title: str(p, "title"),
         });
         ctx.publish("changed", {});
@@ -161,7 +163,7 @@ export class AgentsBackend {
       "ping-provider": command(async (p, ctx) => {
         const config = this._config(ctx);
         const providerId =
-          str(p, "providerId") ?? config.providerId ?? this._providers.defaultId ?? "";
+          str(p, "providerId") ?? config.defaultProviderId ?? this._providers.defaultId ?? "";
         const factory = this._providers.get(providerId);
         if (!factory) return { ok: false, error: "Unknown provider" };
         const providerConfig = config.providers?.[providerId];

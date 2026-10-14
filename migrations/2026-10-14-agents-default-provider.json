@@ -1,0 +1,14 @@
+{
+  "id": "2026-10-14-agents-default-provider",
+  "description": "The agents extension's providerId setting is now defaultProviderId: a stored value moves to the new name.",
+  "release": "0.1.0-alpha.18",
+  "steps": [
+    {
+      "op": "renameJsonField",
+      "file": ".config/config.json",
+      "in": ["extensions", "openp41ge-extension-agents"],
+      "from": "providerId",
+      "to": "defaultProviderId"
+    }
+  ]
+}

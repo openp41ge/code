@@ -41,7 +41,8 @@ The operations, their fields and variables are documented, and checked, in
 
 - Files: `move`, `copy`, `mkdir`, `removeIfEmpty`.
 - JSON: `rewriteJsonPaths` (strings at or under a prefix get a new prefix, in
-  files matching a glob), `removeJsonField`, `renameAppType` (saved tabs of a
+  files matching a glob), `removeJsonField`, `renameJsonField` (a key of an
+  object, keeping its place), `renameAppType` (saved tabs of a
   renamed surface get its new app type, and title if given).
 - Git: `relinkWorktrees` (a moved clone's own worktrees).
 - Iteration: `forEachWorkspace` (`${workspace.id}`, `${workspace.dataDir}`,

@@ -1,6 +1,6 @@
 /**
  * config-schema.ts — the agents extension's config (`registerConfigSchema`):
- * which chat provider is active and the table of providers (endpoints,
+ * which chat provider new chats use and the table of providers (endpoints,
  * models, generation options). The platform's JSON editor shows each
  * property's `description` (Markdown) as the key's tooltip.
  *
@@ -15,8 +15,8 @@ import type { ConfigSchema } from "openp41ge-sdk";
 
 const PROVIDERS_MD = `# Providers
 
-The table of provider connections, keyed by provider id. The **active** one is
-\`providerId\` — chats that don't pin a provider use that connection.
+The table of provider connections, keyed by provider id. Chats that don't pick
+a provider use \`defaultProviderId\`'s.
 
 \`\`\`json
 {
@@ -95,11 +95,11 @@ export const AGENTS_CONFIG_SCHEMA: ConfigSchema = {
   additionalProperties: true,
   description: "Chat providers, endpoints and models.",
   properties: {
-    providerId: {
+    defaultProviderId: {
       type: "string",
       default: DEFAULT_PROVIDER_ID,
       description:
-        "The **active** provider id. Must match a key in `providers`. Chat requests that don't pin a provider use this one.",
+        "The provider chats use when they don't pick one. Must match a key in `providers`.",
     },
     tools: {
       type: "object",

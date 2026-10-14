@@ -155,8 +155,13 @@ function deletePath(obj: Record<string, unknown>, dotPath: string): void {
   }
 }
 
-/** A provider's legacy `model` becomes `defaultModel` (unless that is set). */
-function renameLegacyModel(agent: Record<string, unknown>): void {
+/** A provider's legacy `model` becomes `defaultModel` (unless that is set),
+ *  and the legacy `providerId` becomes `defaultProviderId`. */
+function renameLegacyKeys(agent: Record<string, unknown>): void {
+  if ("providerId" in agent) {
+    if (agent.defaultProviderId === undefined) agent.defaultProviderId = agent.providerId;
+    delete agent.providerId;
+  }
   const providers = agent.providers;
   if (!providers || typeof providers !== "object") return;
   for (const provider of Object.values(providers) as Array<Record<string, unknown>>) {
@@ -520,13 +525,14 @@ export class ConfigService {
     let changed = false;
     // The platform's agent settings are the agents extension's config now
     // (`extensions.<id>`): move them there — renaming a provider's legacy
-    // `model` to `defaultModel` on the way — unless the extension already
+    // `model` to `defaultModel` and `providerId` to `defaultProviderId` on
+    // the way — unless the extension already
     // has its own, which wins.
     const cfg = config as unknown as Record<string, unknown>;
     const agent = cfg.agent;
     if (agent !== undefined) {
       if (agent && typeof agent === "object" && !Array.isArray(agent)) {
-        renameLegacyModel(agent as Record<string, unknown>);
+        renameLegacyKeys(agent as Record<string, unknown>);
         const extensions = (cfg.extensions ??= {}) as Record<string, unknown>;
         if (extensions[AGENTS_EXTENSION_ID] === undefined) {
           extensions[AGENTS_EXTENSION_ID] = agent;

@@ -49,6 +49,17 @@ export type Step =
       readonly field: string;
     }
   | {
+      /** Rename a key of a JSON object, keeping its place. When the new key
+       *  is already there it is kept and the old one is dropped. */
+      readonly op: "renameJsonField";
+      readonly file: string;
+      /** The keys of the object holding it, from the top; the top level
+       *  when absent. */
+      readonly in?: readonly string[];
+      readonly from: string;
+      readonly to: string;
+    }
+  | {
       /** Convert the old single chat store (`chats.json`) into a workspace's
        *  chat threads, then rename it `<file>.migrated`. An unreadable file
        *  is left in place (and noted). */
@@ -191,6 +202,25 @@ function checkStep(raw: unknown, where: string, vars: ReadonlySet<string>): Step
     case "removeJsonField":
       if (typeof s.field !== "string" || !s.field) fail(at, "field is required");
       return { op: s.op, file: checkPath(s.file, `${at}.file`, vars), field: s.field };
+    case "renameJsonField": {
+      for (const key of ["from", "to"]) {
+        if (typeof s[key] !== "string" || !s[key]) fail(at, `${key} is required`);
+      }
+      if (s.from === s.to) fail(at, "from and to are the same");
+      if (
+        s.in !== undefined &&
+        (!Array.isArray(s.in) || s.in.some((k) => typeof k !== "string" || !k))
+      ) {
+        fail(`${at}.in`, "must be a list of keys");
+      }
+      return {
+        op: s.op,
+        file: checkPath(s.file, `${at}.file`, vars),
+        ...(s.in !== undefined ? { in: [...(s.in as string[])] } : {}),
+        from: s.from as string,
+        to: s.to as string,
+      };
+    }
     case "importLegacyChats":
       return {
         op: s.op,

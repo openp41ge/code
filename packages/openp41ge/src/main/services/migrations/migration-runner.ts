@@ -43,6 +43,9 @@ export interface RunResult {
 
 type Vars = Readonly<Record<string, string>>;
 
+const isJsonObject = (v: unknown): v is Record<string, unknown> =>
+  v !== null && typeof v === "object" && !Array.isArray(v);
+
 /** `true` when `abs` is `root` or inside it, following symlinks that exist. */
 function inside(root: string, abs: string): boolean {
   const realRoot = fs.realpathSync(root);
@@ -245,6 +248,25 @@ class Run {
         const { [step.field]: _removed, ...rest } = data;
         writeAtomic(file, JSON.stringify(rest, null, 2));
         this.done.push(`removed ${step.field} from ${this._show(file)}`);
+        return;
+      }
+      case "renameJsonField": {
+        const file = this._abs(step.file, vars);
+        if (!fs.existsSync(file)) return;
+        const data = JSON.parse(fs.readFileSync(file, "utf-8")) as unknown;
+        let holder = data;
+        for (const key of step.in ?? []) {
+          holder = isJsonObject(holder) ? holder[key] : undefined;
+        }
+        if (!isJsonObject(holder) || !(step.from in holder)) return;
+        const entries = Object.entries(holder).flatMap(([k, v]): [string, unknown][] => {
+          if (k === step.from) return step.to in holder ? [] : [[step.to, v]];
+          return [[k, v]];
+        });
+        for (const k of Object.keys(holder)) delete holder[k];
+        Object.assign(holder, Object.fromEntries(entries));
+        writeAtomic(file, JSON.stringify(data, null, 2));
+        this.done.push(`renamed ${step.from} to ${step.to} in ${this._show(file)}`);
         return;
       }
       case "importLegacyChats": {
