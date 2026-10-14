@@ -41,7 +41,14 @@ import { createLogger } from "openp41ge-core-logger";
 import type { ExtensionConfigBridge } from "../services/extension-configs";
 import { settingsBridge, type PlatformConfigBridge } from "../services/settings-sources";
 import { appServices } from "../app";
-import { jsonIcon, resetIcon, saveIcon, showDefaultsIcon, sortKeysIcon } from "./settings-icons";
+import {
+  formIcon,
+  jsonIcon,
+  resetIcon,
+  saveIcon,
+  showDefaultsIcon,
+  sortKeysIcon,
+} from "./settings-icons";
 
 const log = createLogger("openp41ge", "config-editor");
 
@@ -384,23 +391,27 @@ export class Openp41geConfigEditor extends LitElement {
                   </button>`
               : nothing
           }
-          <button
-            class="cfe-btn ${this._mode === "json" ? "cfe-btn--on" : ""}"
-            type="button"
-            aria-label=${this._mode === "form" ? "Edit as JSON" : "Edit as form"}
-            aria-pressed="${this._mode === "json"}"
-            ?disabled=${!this._schema}
-            @click=${() => (this._mode = this._mode === "form" ? "json" : "form")}
-            ${tooltipContent({
-              type: "simple",
-              text: this._mode === "form" ? "Edit as JSON" : "Edit as form",
-            })}
-          >
-            ${jsonIcon()}
-          </button>
+          ${this._viewButton("form", "Form view", formIcon())}
+          ${this._viewButton("json", "JSON view", jsonIcon())}
         </div>
       </div>
     `;
+  }
+
+  /** A bottom-bar button that opens a view; pressed while it is open. */
+  private _viewButton(mode: "form" | "json", label: string, icon: TemplateResult): TemplateResult {
+    const on = this._mode === mode;
+    return html`<button
+      class="cfe-btn ${on ? "cfe-btn--on" : ""}"
+      type="button"
+      aria-label=${label}
+      aria-pressed="${on}"
+      ?disabled=${!this._schema}
+      @click=${() => (this._mode = mode)}
+      ${tooltipContent({ type: "simple", text: label })}
+    >
+      ${icon}
+    </button>`;
   }
 
   override createRenderRoot(): HTMLElement {
