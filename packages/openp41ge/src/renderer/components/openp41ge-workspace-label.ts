@@ -3,7 +3,8 @@
  * opens the workspace picker.
  *
  * The picker lists every workspace (the window's own marked), filtered as you
- * type, and "No workspace" when the window has one. Picking one replaces the
+ * type, and — when the window has one — a red "Close workspace" button.
+ * Picking one replaces the
  * window's workspace: the window reloads as a window of it. When the window
  * has unsaved files it asks first, since they would be lost.
  *
@@ -77,7 +78,9 @@ openp41ge-workspace-label .wl-item { display: flex; align-items: center; gap: 8p
 openp41ge-workspace-label .wl-item:hover { background: var(--bg-hover, #2a2d2e); }
 openp41ge-workspace-label .wl-item--current { font-weight: 600; }
 openp41ge-workspace-label .wl-item--current::after { content: "✓"; margin-left: auto; color: var(--accent, #4fc1ff); }
-openp41ge-workspace-label .wl-item--none { border-top: 1px solid var(--border-divider, #333); margin-top: 6px; padding-top: 8px; color: var(--text-secondary, #aaa); }
+openp41ge-workspace-label .wl-foot { flex: none; display: flex; justify-content: flex-end; padding: 8px; border-top: 1px solid var(--border-divider, #333); }
+openp41ge-workspace-label .wl-close { padding: 4px 10px; border: 1px solid var(--accent-error, #f44747); border-radius: 5px; background: transparent; color: var(--accent-error, #f44747); font-size: 12px; font-family: inherit; cursor: pointer; }
+openp41ge-workspace-label .wl-close:hover { background: var(--accent-error, #f44747); color: #fff; }
 openp41ge-workspace-label .wl-empty { padding: 8px 14px; font-size: 12px; color: var(--text-muted, #888); font-style: italic; }
 `;
 
@@ -215,18 +218,16 @@ export class Openp41geWorkspaceLabel extends LitElement {
                   `,
                 )
           }
-          ${
-            current !== null && !q
-              ? html`<div
-                  class="wl-item wl-item--none"
-                  role="option"
-                  @click=${() => void this._pick(null)}
-                >
-                  No workspace
-                </div>`
-              : nothing
-          }
         </div>
+        ${
+          current !== null
+            ? html`<div class="wl-foot">
+                <button class="wl-close" @click=${() => void this._pick(null)}>
+                  Close workspace
+                </button>
+              </div>`
+            : nothing
+        }
       </div>
     `;
   }
