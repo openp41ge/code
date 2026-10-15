@@ -18,7 +18,10 @@
  * points to the JSON view and shows its value.
  *
  * The form scrolls itself (padded by `--jf-padding`), so its drawers cover
- * what is in view: give it a height to fill.
+ * what is in view: give it a height to fill. A host can give the drawers a
+ * larger area to cover (`drawerArea`, e.g. the tab's whole cell, tab bar
+ * included); they block it until dismissed, and keep Tab inside the front
+ * drawer. `drawersOpen` says whether one is open.
  *
  * `value` is the user's values only (what is stored); `defaults` the schema's
  * defaults. An unset field shows its default, faded; editing sets it, and
@@ -150,6 +153,14 @@ export class JsonFormElement extends LitElement {
   /** Problems to show beside fields. */
   @property({ attribute: false }) errors: readonly JsonFormError[] = [];
   @property({ type: Boolean, reflect: true }) readonly = false;
+  /** The element the drawers cover (by default the form): a host passes
+   *  its tab's cell so they cover its tab bar too. */
+  @property({ attribute: false }) drawerArea: HTMLElement | null = null;
+
+  /** Whether a drawer is open (the host holds its own shortcuts meanwhile). */
+  get drawersOpen(): boolean {
+    return this._drawers.length > 0;
+  }
 
   /** The values being edited: `value`, then each edit applied. */
   @state() private _value: Record<string, unknown> = {};
@@ -164,6 +175,29 @@ export class JsonFormElement extends LitElement {
   private _targets = new Map<string, DrawerTarget>();
   /** How many of `_drawers` still had something to show at the last render. */
   private _shown = 0;
+  /** Follows `drawerArea`'s size while a drawer is open. */
+  private _areaObserver: ResizeObserver | null = null;
+  private readonly _onWindowResize = (): void => this.requestUpdate();
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._watchArea(false);
+  }
+
+  /** Re-place the drawers when their area or the window changes size. */
+  private _watchArea(on: boolean): void {
+    if (!on || !this.drawerArea) {
+      this._areaObserver?.disconnect();
+      this._areaObserver = null;
+      window.removeEventListener("resize", this._onWindowResize);
+      return;
+    }
+    if (this._areaObserver) return;
+    window.addEventListener("resize", this._onWindowResize);
+    if (typeof ResizeObserver === "undefined") return;
+    this._areaObserver = new ResizeObserver(() => this.requestUpdate());
+    this._areaObserver.observe(this.drawerArea);
+  }
 
   override willUpdate(changed: Map<string, unknown>): void {
     if (changed.has("value")) {
@@ -231,6 +265,8 @@ export class JsonFormElement extends LitElement {
   }
 
   override updated(changed: PropertyValues<this>): void {
+    if (changed.has("drawerArea")) this._watchArea(false);
+    this._watchArea(this._drawers.length > 0);
     // A drawer whose value is gone (removed, reset) closes, with those in
     // front of it.
     if (this._shown < this._drawers.length) {
@@ -290,7 +326,11 @@ export class JsonFormElement extends LitElement {
   private _layer(open: readonly OpenDrawer[]): TemplateResult {
     const front = open.length - 1;
     const place = (i: number) => (i === front ? "front" : i === front - 1 ? "back" : "hidden");
-    return html`<div class="jf-layer">
+    const area = this.drawerArea?.getBoundingClientRect();
+    const placed = area
+      ? `left:${area.left}px;top:${area.top}px;width:${area.width}px;height:${area.height}px`
+      : "";
+    return html`<div class="jf-layer ${area ? "jf-layer--area" : ""}" style=${placed}>
       <div class="jf-mask" @click=${() => this._closeTo(0)}></div>
       <div class="jf-drawer-shadow jf-drawer--${open.length > 1 ? "back" : "front"}"></div>
       ${repeat(
@@ -309,7 +349,9 @@ export class JsonFormElement extends LitElement {
               if (i === front - 1) this._closeTo(i + 1);
             }}
             @keydown=${(e: KeyboardEvent) => {
-              if (e.key !== "Escape" || e.defaultPrevented) return;
+              if (e.defaultPrevented) return;
+              if (e.key === "Tab") this._keepTabIn(e);
+              if (e.key !== "Escape") return;
               e.preventDefault();
               e.stopPropagation();
               this._closeTo(i);
@@ -319,15 +361,14 @@ export class JsonFormElement extends LitElement {
               <div class="jf-drawer-heading">
                 ${
                   i > 0
-                    ? html`<div class="jf-drawer-trail">
-                        ${open
+                    ? html`<span class="jf-drawer-trail"
+                        >${open
                           .slice(0, i)
-                          .map((o) => o.target.label)
-                          .join(" › ")}
-                      </div>`
+                          .map((o) => `${o.target.label} › `)
+                          .join("")}</span
+                      >`
                     : nothing
-                }
-                <div class="jf-drawer-title">${d.target.label}</div>
+                }<span class="jf-drawer-title">${d.target.label}</span>
               </div>
               <button
                 type="button"
@@ -346,6 +387,28 @@ export class JsonFormElement extends LitElement {
           </section>`,
       )}
     </div>`;
+  }
+
+  /** Tab from the front drawer's last control goes to its first (Shift+Tab
+   *  the other way): a drawer blocks the rest of its area. */
+  private _keepTabIn(e: KeyboardEvent): void {
+    const drawer = e.currentTarget as HTMLElement;
+    const controls = [
+      ...drawer.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), [tabindex="0"]',
+      ),
+    ];
+    if (controls.length === 0) return;
+    const at = controls.indexOf(this.shadowRoot?.activeElement as HTMLElement);
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (e.shiftKey && at <= 0) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && (at === -1 || at === controls.length - 1)) {
+      e.preventDefault();
+      first.focus();
+    }
   }
 
   /** A card that opens `key`'s drawer: its title, description and what it
@@ -1260,6 +1323,12 @@ export class JsonFormElement extends LitElement {
       z-index: 10;
       overflow: hidden;
     }
+    /* Over the host's area (its cell, tab bar included), placed from its box. */
+    .jf-layer--area {
+      position: fixed;
+      inset: auto;
+      z-index: 100;
+    }
     .jf-mask {
       position: absolute;
       inset: 0;
@@ -1327,29 +1396,26 @@ export class JsonFormElement extends LitElement {
       display: flex;
       align-items: center;
       gap: 8px;
-      min-height: 35px;
+      /* As tall as the tab bar it covers. */
+      height: 35px;
       box-sizing: border-box;
       padding-left: 16px;
       border-bottom: 1px solid var(--border-divider, var(--divider, #2d2d2d));
       background: var(--bg-surface, #161616);
     }
+    /* One line: the trail, then the title. */
     .jf-drawer-heading {
       flex: 1;
       min-width: 0;
-      padding: 6px 0;
-    }
-    .jf-drawer-trail {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      color: var(--text-secondary, #999);
-      font-size: 11px;
-    }
-    .jf-drawer-title {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
       font-size: 13px;
+    }
+    .jf-drawer-trail {
+      color: var(--text-secondary, #999);
+    }
+    .jf-drawer-title {
       font-weight: 600;
     }
     .jf-drawer-close {

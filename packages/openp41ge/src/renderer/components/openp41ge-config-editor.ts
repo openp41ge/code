@@ -193,7 +193,16 @@ export class Openp41geConfigEditor extends LitElement {
     this._error = "";
   }
 
+  /** The tab's cell (its tab bar and content): the form's drawers cover it. */
+  private _cell(): HTMLElement | null {
+    return (
+      this.closest<HTMLElement>(".grid-cell") ?? this.closest<HTMLElement>("openp41ge-sidebar")
+    );
+  }
+
   private _onKeyDown(e: KeyboardEvent): void {
+    // An open drawer blocks the cell, Save included.
+    if ((e.currentTarget as { drawersOpen?: boolean } | null)?.drawersOpen) return;
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
       e.preventDefault();
       e.stopPropagation();
@@ -224,6 +233,7 @@ export class Openp41geConfigEditor extends LitElement {
           .value=${this._overrides ?? {}}
           .defaults=${this._defaults}
           .errors=${this._formErrors()}
+          .drawerArea=${this._cell()}
           @json-form-change=${(e: CustomEvent) => this._sync((e.detail as { value: Doc }).value)}
           @keydown=${(e: KeyboardEvent) => this._onKeyDown(e)}
         ></json-form>
