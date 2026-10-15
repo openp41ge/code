@@ -13,7 +13,9 @@
  * (hidden when the tab is scrolled out of it).
  *
  * The line is never shown while its window is not focused, so only the
- * focused window shows one (each window has its own document and line).
+ * focused window shows one (each window has its own document and line). Nor
+ * while something covers its tab: a drawer over the tab's cell calls
+ * `cover(owner, area)` while it is open and `uncover(owner)` after.
  *
  * Every tab bar calls `syncFocusLine(this, root)` after it renders and
  * `focusLineLayer().hide(this)` when it is removed. The bar that shows the
@@ -32,6 +34,8 @@ export class FocusLineLayer {
   private _resize: ResizeObserver | null = null;
   /** Whether the window is focused (the line shows only then). */
   private _windowFocused: boolean;
+  /** Areas something covers (a drawer over a cell), by who covers them. */
+  private readonly _covers = new Map<object, Element>();
   private readonly _update = (): void => this.update();
 
   constructor(private readonly _doc: Document) {
@@ -85,10 +89,29 @@ export class FocusLineLayer {
     this.element.style.display = "none";
   }
 
+  /** `owner` covers `area` (its tab, if the line's is in it, is hidden). */
+  cover(owner: object, area: Element): void {
+    this._covers.set(owner, area);
+    this.update();
+  }
+
+  /** `owner` no longer covers anything. */
+  uncover(owner: object): void {
+    if (this._covers.delete(owner)) this.update();
+  }
+
+  /** Whether a covered area holds `tab` (across shadow roots). */
+  private _covered(tab: Element): boolean {
+    if (this._covers.size === 0) return false;
+    const areas = new Set(this._covers.values());
+    for (let el: Element | null = tab; el; el = parentOf(el)) if (areas.has(el)) return true;
+    return false;
+  }
+
   /** Place the line over its tab again. */
   update(): void {
     const tab = this._target;
-    if (!tab || !tab.isConnected || !this._windowFocused) {
+    if (!tab || !tab.isConnected || !this._windowFocused || this._covered(tab)) {
       this.element.style.display = "none";
       return;
     }

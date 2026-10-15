@@ -46,6 +46,7 @@ import { cloneDeep, getAt, type JsonPath } from "../json-editor/json-tree";
 import { renderMarkdown } from "../json-editor/md-render";
 import "../components/openp41ge-toggle";
 import "../components/openp41ge-select";
+import { focusLineLayer } from "../components/tabs/focus-line";
 import {
   formFields,
   resetField,
@@ -184,14 +185,17 @@ export class JsonFormElement extends LitElement {
     this._watchArea(false);
   }
 
-  /** Re-place the drawers when their area or the window changes size. */
+  /** While a drawer is open over `drawerArea`: re-place the drawers when it
+   *  or the window changes size, and cover it (its tab's focus line hides). */
   private _watchArea(on: boolean): void {
     if (!on || !this.drawerArea) {
       this._areaObserver?.disconnect();
       this._areaObserver = null;
       window.removeEventListener("resize", this._onWindowResize);
+      focusLineLayer().uncover(this);
       return;
     }
+    focusLineLayer().cover(this, this.drawerArea);
     if (this._areaObserver) return;
     window.addEventListener("resize", this._onWindowResize);
     if (typeof ResizeObserver === "undefined") return;
@@ -1343,11 +1347,13 @@ export class JsonFormElement extends LitElement {
       background: rgba(0, 0, 0, 0.4);
       animation: jf-fade 0.18s ease-out;
     }
+    /* It runs past the top and bottom (the layer clips it): a blur ending
+       at the area's edge would fade there and round the drawers' corners. */
     .jf-drawer-shadow {
       position: absolute;
-      top: 0;
+      top: -24px;
       right: 0;
-      bottom: 0;
+      bottom: -24px;
       box-shadow: -2px 0 12px rgba(0, 0, 0, 0.45);
       transition: width 0.18s ease-out;
       animation: jf-slide 0.18s ease-out;
