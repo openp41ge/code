@@ -272,10 +272,11 @@ export class Openp41geConfigEditor extends LitElement {
           flex: 1;
           min-height: 0;
         }
-        .cfe-editor--form {
-          overflow: auto;
-          padding: 16px;
-          box-sizing: border-box;
+        /* The form scrolls itself, so its drawers cover the pane. */
+        .cfe-editor--form > json-form {
+          flex: 1;
+          min-height: 0;
+          --jf-padding: 16px;
         }
         .cfe-note {
           flex: 1;

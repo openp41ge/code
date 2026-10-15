@@ -104,8 +104,9 @@ const meta: Meta = {
   },
   args: { readonly: false },
   render: (args) => html`
-    <div style="max-width:640px;padding:16px;background:var(--bg-primary, #161616)">
+    <div style="max-width:640px;height:560px;display:flex;background:var(--bg-primary, #161616)">
       <json-form
+        style="flex:1;min-width:0;--jf-padding:16px"
         .schema=${args.schema ?? settings}
         .value=${args.value ?? {}}
         .defaults=${args.defaults ?? defaultsOf(settings)}

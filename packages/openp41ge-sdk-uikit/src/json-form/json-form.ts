@@ -4,14 +4,21 @@
  * One labelled field per property, in schema order (required settings with no
  * default first): a toggle for a boolean, a number input (bounded by
  * `minimum` / `maximum`), a menu for an `enum`, a text input (masked for
- * `"secret": true`), an editable list for an array of values, cards for an
- * array of objects (one accordion segment per item: open it to edit, move
- * it, remove it), a group for an object, and cards for a map (an object
- * whose keys are the user's: one segment per key, with add under a new key,
- * rename and remove; an entry its defaults have can only be edited). A
- * string with `x-keysOf` is a menu of its sibling map's keys, and the map
- * marks that entry Default (with Make default on the others). A shape it
- * cannot edit points to the JSON view and shows its value.
+ * `"secret": true`). Every object and array is a card (its title, its
+ * description and what it holds: "3 properties · 1 set") that opens a drawer
+ * from the right with it as a form: an object's fields; an array of values
+ * as an editable list; an array of objects as a card per item (move,
+ * remove, add); a map (an object whose keys are the user's) as a card per
+ * object entry or a row per value, with add under a new key, rename and
+ * remove (an entry its defaults have can only be edited). Drawers stack:
+ * the front one is 80% of the form's width, the one behind it 90%, older
+ * ones hidden; one mask and one shadow for the stack. A string with
+ * `x-keysOf` is a menu of its sibling map's keys, and the map marks that
+ * entry Default (with Make default on the others). A shape it cannot edit
+ * points to the JSON view and shows its value.
+ *
+ * The form scrolls itself (padded by `--jf-padding`), so its drawers cover
+ * what is in view: give it a height to fill.
  *
  * `value` is the user's values only (what is stored); `defaults` the schema's
  * defaults. An unset field shows its default, faded; editing sets it, and
@@ -27,8 +34,9 @@
  * it in a plain page.
  */
 
-import { LitElement, html, css, nothing, type TemplateResult } from "lit";
+import { LitElement, html, css, nothing, type PropertyValues, type TemplateResult } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { repeat } from "lit/directives/repeat.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { live } from "lit/directives/live.js";
 import { cloneDeep, getAt, type JsonPath } from "../json-editor/json-tree";
@@ -67,6 +75,42 @@ const RESET_ICON = html`<svg viewBox="0 -960 960 960" fill="currentColor" aria-h
 
 /** Settings whose control sits on one row, with Reset at its right. */
 const ROW_KINDS: readonly string[] = ["boolean", "number", "enum", "string", "secret"];
+
+/** Settings shown as a card that opens a drawer (objects and arrays). */
+const CARD_KINDS: readonly string[] = ["group", "list", "objects", "map"];
+
+/** What a card opens: the drawer's title and its body. */
+interface DrawerTarget {
+  readonly label: string;
+  readonly body: () => TemplateResult;
+}
+
+/** An open drawer: its key, what it shows, and its rendered body. */
+interface OpenDrawer {
+  readonly key: string;
+  readonly target: DrawerTarget;
+  readonly body: TemplateResult;
+}
+
+/** `n` and the noun for it: `1 entry`, `3 entries`. */
+const count = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
+
+/** A list's items, named by their kind. */
+const ITEM_NOUNS: Record<string, [string, string]> = {
+  string: ["string", "strings"],
+  number: ["number", "numbers"],
+  boolean: ["boolean", "booleans"],
+  enum: ["value", "values"],
+};
+
+/** The errors on a field and everything in it. */
+function errorCount(f: FormField): number {
+  let n = f.error ? 1 : 0;
+  for (const child of f.fields ?? []) n += errorCount(child);
+  for (const entry of f.entries ?? []) n += errorCount(entry);
+  for (const item of f.items ?? []) for (const child of item) n += errorCount(child);
+  return n;
+}
 
 /** A DOM id for a field (unique within the form's shadow root). */
 const idFor = (key: string): string => `jf-${key.replace(/[^A-Za-z0-9_-]/g, "-")}`;
@@ -109,13 +153,17 @@ export class JsonFormElement extends LitElement {
 
   /** The values being edited: `value`, then each edit applied. */
   @state() private _value: Record<string, unknown> = {};
-  /** Open items of lists of objects and entries of maps, by key
-   *  (`hosts[0]`, `providers.vllm`). */
-  @state() private _open: ReadonlySet<string> = new Set();
+  /** The open drawers, back to front, by the key of what each shows
+   *  (`editor`, `hosts[0]`, `providers.vllm`). */
+  @state() private _drawers: readonly string[] = [];
   /** The key being typed in each map's Add row, by the map's key. */
   @state() private _newKeys: ReadonlyMap<string, string> = new Map();
   /** The maps' paths in the last render (their entries are never pruned). */
   private _maps: JsonPath[] = [];
+  /** What each card rendered this time opens, by its key. */
+  private _targets = new Map<string, DrawerTarget>();
+  /** How many of `_drawers` still had something to show at the last render. */
+  private _shown = 0;
 
   override willUpdate(changed: Map<string, unknown>): void {
     if (changed.has("value")) {
@@ -153,23 +201,57 @@ export class JsonFormElement extends LitElement {
     this._set(f.path, list);
   }
 
-  private _toggleOpen(key: string): void {
-    const open = new Set(this._open);
-    if (open.has(key)) open.delete(key);
-    else open.add(key);
-    this._open = open;
+  // ── Drawers ───────────────────────────────────────────────────────────
+
+  /** Open `key`'s drawer in front of the drawer holding its card (or of none,
+   *  for a card on the form). */
+  private _openFrom(card: HTMLElement, key: string): void {
+    const holder = card.closest<HTMLElement>(".jf-drawer")?.dataset.drawer;
+    this._openAfter(holder ?? null, key);
   }
 
-  /** Keep items open across a move (`from` ↔ `to`) or a removal (`to` null). */
-  private _reindexOpen(f: FormField, from: number, to: number | null, length: number): void {
-    const isOpen = (i: number) => this._open.has(`${f.key}[${i}]`);
-    const was = Array.from({ length }, (_, i) => isOpen(i));
-    const now = [...was];
-    if (to === null) now.splice(from, 1);
-    else [now[from], now[to]] = [was[to], was[from]];
-    const open = new Set([...this._open].filter((k) => !k.startsWith(`${f.key}[`)));
-    now.forEach((o, i) => o && open.add(`${f.key}[${i}]`));
-    this._open = open;
+  /** Open `key`'s drawer in front of `parent`'s (null: as the first drawer). */
+  private _openAfter(parent: string | null, key: string): void {
+    const at = parent === null ? -1 : this._drawers.indexOf(parent);
+    this._drawers = [...this._drawers.slice(0, at + 1), key];
+  }
+
+  /** Keep the first `n` drawers. */
+  private _closeTo(n: number): void {
+    if (n < this._drawers.length) this._drawers = this._drawers.slice(0, n);
+  }
+
+  /** A renamed map entry's drawers follow it. */
+  private _renameDrawers(from: string, to: string): void {
+    this._drawers = this._drawers.map((k) =>
+      k === from || k.startsWith(`${from}.`) || k.startsWith(`${from}[`)
+        ? to + k.slice(from.length)
+        : k,
+    );
+  }
+
+  override updated(changed: PropertyValues<this>): void {
+    // A drawer whose value is gone (removed, reset) closes, with those in
+    // front of it.
+    if (this._shown < this._drawers.length) {
+      this._drawers = this._drawers.slice(0, this._shown);
+      return;
+    }
+    const key = "_drawers" as keyof JsonFormElement;
+    if (!changed.has(key)) return;
+    const before = (changed.get(key) as readonly string[] | undefined) ?? [];
+    if (this._drawers.length > before.length) {
+      this.renderRoot
+        .querySelector<HTMLElement>(".jf-drawer--front")
+        ?.focus({ preventScroll: true });
+    } else if (this._drawers.length < before.length) {
+      // Back to the card that opened the drawer just closed.
+      const closed = before[this._drawers.length];
+      const card = [...this.renderRoot.querySelectorAll<HTMLElement>(".jf-sub")].find(
+        (c) => c.dataset.key === closed,
+      );
+      card?.focus({ preventScroll: true });
+    }
   }
 
   // ── Render ────────────────────────────────────────────────────────────
@@ -186,11 +268,218 @@ export class JsonFormElement extends LitElement {
       }
     };
     walk(fields);
-    return html`<div class="jf">${fields.map((f) => this._field(f))}</div>`;
+    this._targets = new Map();
+    const form = fields.map((f) => this._field(f));
+    // Each drawer's card was rendered by the form or by the drawer behind it,
+    // so what it opens is known by the time it renders.
+    const open: OpenDrawer[] = [];
+    for (const key of this._drawers) {
+      const target = this._targets.get(key);
+      if (!target) break;
+      open.push({ key, target, body: target.body() });
+    }
+    this._shown = open.length;
+    return html`
+      <div class="jf-scroll"><div class="jf">${form}</div></div>
+      ${open.length ? this._layer(open) : nothing}
+    `;
+  }
+
+  /** The drawers over the form: one mask, one shadow, then the drawers. The
+   *  front one is 80% wide, the one behind it 90%, older ones hidden. */
+  private _layer(open: readonly OpenDrawer[]): TemplateResult {
+    const front = open.length - 1;
+    const place = (i: number) => (i === front ? "front" : i === front - 1 ? "back" : "hidden");
+    return html`<div class="jf-layer">
+      <div class="jf-mask" @click=${() => this._closeTo(0)}></div>
+      <div class="jf-drawer-shadow jf-drawer--${open.length > 1 ? "back" : "front"}"></div>
+      ${repeat(
+        open,
+        (d) => d.key,
+        (d, i) =>
+          html`<section
+            class="jf-drawer jf-drawer--${place(i)}"
+            data-drawer=${d.key}
+            role="dialog"
+            aria-label=${d.target.label}
+            tabindex="-1"
+            @click=${() => {
+              // Behind the front drawer only its strip shows: a click there
+              // goes back to it.
+              if (i === front - 1) this._closeTo(i + 1);
+            }}
+            @keydown=${(e: KeyboardEvent) => {
+              if (e.key !== "Escape" || e.defaultPrevented) return;
+              e.preventDefault();
+              e.stopPropagation();
+              this._closeTo(i);
+            }}
+          >
+            <header class="jf-drawer-head">
+              <div class="jf-drawer-heading">
+                ${
+                  i > 0
+                    ? html`<div class="jf-drawer-trail">
+                        ${open
+                          .slice(0, i)
+                          .map((o) => o.target.label)
+                          .join(" › ")}
+                      </div>`
+                    : nothing
+                }
+                <div class="jf-drawer-title">${d.target.label}</div>
+              </div>
+              <button
+                type="button"
+                class="jf-drawer-close"
+                aria-label="Close ${d.target.label}"
+                title="Close"
+                @click=${(e: Event) => {
+                  e.stopPropagation();
+                  this._closeTo(i);
+                }}
+              >
+                ${REMOVE_ICON}
+              </button>
+            </header>
+            <div class="jf-drawer-body">${d.body}</div>
+          </section>`,
+      )}
+    </div>`;
+  }
+
+  /** A card that opens `key`'s drawer: its title, description and what it
+   *  holds, with its own actions (Reset, Remove…) at the right. */
+  private _card(
+    key: string,
+    show: {
+      readonly title: string;
+      readonly description?: string | null;
+      readonly required?: boolean;
+      readonly meta: readonly string[];
+      readonly errors: number;
+      readonly error?: string | null;
+      readonly actions?: TemplateResult | typeof nothing;
+    },
+    target: DrawerTarget,
+  ): TemplateResult {
+    this._targets.set(key, target);
+    const open = (e: Event) => this._openFrom(e.currentTarget as HTMLElement, key);
+    return html`<div
+      class="jf-sub"
+      data-key=${key}
+      role="button"
+      tabindex="0"
+      aria-haspopup="dialog"
+      @click=${open}
+      @keydown=${(e: KeyboardEvent) => {
+        if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          open(e);
+        }
+      }}
+    >
+      <div class="jf-sub-main">
+        <div class="jf-sub-headline">
+          <span class="jf-sub-title">${show.title}</span>
+          ${show.required ? html`<span class="jf-required">Required</span>` : nothing}
+        </div>
+        ${
+          show.description
+            ? html`<div class="jf-description">
+                ${unsafeHTML(renderMarkdown(show.description))}
+              </div>`
+            : nothing
+        }
+        <div class="jf-meta">
+          ${show.meta.join(" · ")}
+          ${
+            show.errors
+              ? html`<span class="jf-meta-error">· ${count(show.errors, "error", "errors")}</span>`
+              : nothing
+          }
+        </div>
+        ${show.error ? html`<div class="jf-error" role="alert">${show.error}</div>` : nothing}
+      </div>
+      ${
+        show.actions && show.actions !== nothing
+          ? html`<span
+              class="jf-sub-actions"
+              @click=${(e: Event) => e.stopPropagation()}
+              @keydown=${(e: Event) => e.stopPropagation()}
+            >
+              ${show.actions}
+            </span>`
+          : nothing
+      }
+      <span class="jf-chev" aria-hidden="true">›</span>
+    </div>`;
+  }
+
+  /** What an object's fields hold: how many, how many set, how many default. */
+  private _fieldsMeta(fields: readonly FormField[]): string[] {
+    const set = fields.filter((f) => f.set).length;
+    const byDefault = fields.filter((f) => !f.set && f.hasDefault).length;
+    return [
+      count(fields.length, "property", "properties"),
+      `${set} set`,
+      ...(byDefault ? [`${byDefault} default`] : []),
+    ];
+  }
+
+  /** What an object or array setting holds. */
+  private _meta(f: FormField): string[] {
+    const fromDefaults = !f.set && f.hasDefault ? ["default"] : [];
+    const length = Array.isArray(f.value) ? f.value.length : 0;
+    switch (f.kind) {
+      case "group":
+        return this._fieldsMeta(f.fields ?? []);
+      case "list": {
+        const [one, many] = ITEM_NOUNS[f.item?.kind ?? ""] ?? ["value", "values"];
+        return [count(length, one, many), ...fromDefaults];
+      }
+      case "objects":
+        return [count(length, "object", "objects"), ...fromDefaults];
+      default: {
+        const fromDefaultKeys = f.defaultKeys?.length ?? 0;
+        return [
+          count(f.entries?.length ?? 0, "entry", "entries"),
+          ...(fromDefaultKeys ? [`${fromDefaultKeys} default`] : []),
+        ];
+      }
+    }
+  }
+
+  /** An object or array setting: its card, and what its drawer shows. */
+  private _fieldCard(f: FormField): TemplateResult {
+    const body = (): TemplateResult => {
+      const content =
+        f.kind === "group"
+          ? html`<div class="jf">${(f.fields ?? []).map((child) => this._field(child))}</div>`
+          : f.kind === "list"
+            ? this._list(f)
+            : f.kind === "objects"
+              ? this._objects(f)
+              : this._map(f);
+      return html`${this._description(f)}${content}`;
+    };
+    return this._card(
+      f.key,
+      {
+        title: f.label,
+        description: f.description,
+        required: f.required,
+        meta: this._meta(f),
+        errors: errorCount(f),
+        error: f.error,
+        actions: this._resetButton(f),
+      },
+      { label: f.label, body },
+    );
   }
 
   private _field(f: FormField): TemplateResult {
-    if (f.kind === "group") return this._group(f);
+    if (CARD_KINDS.includes(f.kind)) return this._fieldCard(f);
     const id = idFor(f.key);
     const faded = !f.set && f.hasDefault;
     const labelled = !["list", "objects", "map", "unsupported"].includes(f.kind);
@@ -240,17 +529,6 @@ export class JsonFormElement extends LitElement {
     return f.description
       ? html`<div class="jf-description">${unsafeHTML(renderMarkdown(f.description))}</div>`
       : nothing;
-  }
-
-  private _group(f: FormField): TemplateResult {
-    return html`
-      <fieldset class="jf-group" data-key=${f.key}>
-        <legend class="jf-label">${f.label}</legend>
-        ${this._description(f)}
-        ${f.error ? html`<div class="jf-error" role="alert">${f.error}</div>` : nothing}
-        ${(f.fields ?? []).map((child) => this._field(child))}
-      </fieldset>
-    `;
   }
 
   private _control(f: FormField, id: string): TemplateResult {
@@ -376,7 +654,7 @@ export class JsonFormElement extends LitElement {
       this._setList(f, next);
     };
     return html`
-      <div class="jf-list" role="group" aria-labelledby=${idFor(f.key)}>
+      <div class="jf-list" role="group" aria-label=${f.label}>
         ${list.map((item, i) => {
           const id = idFor(`${f.key}[${i}]`);
           const control =
@@ -433,52 +711,37 @@ export class JsonFormElement extends LitElement {
     `;
   }
 
-  /** A list of objects: a card with one accordion segment per item. */
+  /** A list of objects: a card per item (it opens the item's drawer), with
+   *  move and remove; Add opens the new item. */
   private _objects(f: FormField): TemplateResult {
     const list = Array.isArray(f.value) ? f.value : [];
     const items = f.items ?? [];
     const move = (i: number, d: number) => {
       const next = [...list];
       [next[i], next[i + d]] = [next[i + d], next[i]];
-      this._reindexOpen(f, i, i + d, list.length);
       this._setList(f, next);
     };
-    const remove = (i: number) => {
-      this._reindexOpen(f, i, null, list.length);
+    const remove = (i: number) =>
       this._setList(
         f,
         list.filter((_, j) => j !== i),
       );
-    };
     const add = () => {
-      const open = new Set(this._open);
-      open.add(`${f.key}[${list.length}]`);
-      this._open = open;
+      this._openAfter(f.key, `${f.key}[${list.length}]`);
       this._setList(f, [...list, {}]);
     };
     return html`
-      <div class="jf-card" role="group" aria-labelledby=${idFor(f.key)}>
+      <div class="jf-subs" role="group" aria-label=${f.label}>
         ${items.map((fields, i) => {
-          const key = `${f.key}[${i}]`;
-          const open = this._open.has(key);
           const n = i + 1;
-          return html`<div class="jf-seg ${open ? "jf-seg--open" : ""}">
-            <div
-              class="jf-seg-head"
-              role="button"
-              tabindex="0"
-              aria-expanded=${open}
-              @click=${() => this._toggleOpen(key)}
-              @keydown=${(e: KeyboardEvent) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  this._toggleOpen(key);
-                }
-              }}
-            >
-              <span class="jf-chev" aria-hidden="true">›</span>
-              <span class="jf-seg-title">${itemTitle(fields, i)}</span>
-              <span class="jf-seg-actions" @click=${(e: Event) => e.stopPropagation()}>
+          const title = itemTitle(fields, i);
+          return this._card(
+            `${f.key}[${i}]`,
+            {
+              title,
+              meta: this._fieldsMeta(fields),
+              errors: fields.reduce((sum, child) => sum + errorCount(child), 0),
+              actions: html`
                 <button
                   type="button"
                   class="jf-icon-btn"
@@ -509,18 +772,17 @@ export class JsonFormElement extends LitElement {
                 >
                   ${REMOVE_ICON}
                 </button>
-              </span>
-            </div>
-            ${
-              open
-                ? html`<div class="jf-seg-body">${fields.map((child) => this._field(child))}</div>`
-                : nothing
-            }
-          </div>`;
+              `,
+            },
+            {
+              label: title,
+              body: () => html`<div class="jf">${fields.map((child) => this._field(child))}</div>`,
+            },
+          );
         })}
         <button
           type="button"
-          class="jf-add jf-addrow"
+          class="jf-add"
           aria-label="Add to ${f.label}"
           ?disabled=${this.readonly}
           @click=${add}
@@ -531,8 +793,8 @@ export class JsonFormElement extends LitElement {
     `;
   }
 
-  /** A map: a card with one segment per key (objects) or one row per key
-   *  (values), and an Add row that takes the new key. */
+  /** A map: a card per object entry (it opens the entry's drawer, with its
+   *  key) or a row per value, and an Add row that takes the new key. */
   private _map(f: FormField): TemplateResult {
     const entries = f.entries ?? [];
     const keys = entries.map((e) => e.name);
@@ -554,11 +816,7 @@ export class JsonFormElement extends LitElement {
       if (!canAdd) return;
       const key = newKey.trim();
       setNewKey("");
-      if (f.objectValues) {
-        const open = new Set(this._open);
-        open.add(`${f.key}.${key}`);
-        this._open = open;
-      }
+      if (f.objectValues) this._openAfter(f.key, `${f.key}.${key}`);
       this._set([...f.path, key], cloneDeep(f.newEntry ?? null));
     };
     const remove = (key: string) => {
@@ -580,9 +838,7 @@ export class JsonFormElement extends LitElement {
       if (f.marked && f.marked.key === from) {
         next = setFieldValue(next, this.defaults, f.marked.path, to);
       }
-      const open = new Set(this._open);
-      if (open.delete(`${f.key}.${from}`)) open.add(`${f.key}.${to}`);
-      this._open = open;
+      this._renameDrawers(`${f.key}.${from}`, `${f.key}.${to}`);
       this._commit(next);
     };
     const removeButton = (key: string) =>
@@ -611,51 +867,39 @@ export class JsonFormElement extends LitElement {
             Make default
           </button>`;
     };
-    const segment = (e: FormField) => {
-      const open = this._open.has(e.key);
+    const card = (e: FormField) => {
       const locked = this.readonly || fromDefaults.has(e.name);
-      return html`<div class="jf-seg ${open ? "jf-seg--open" : ""}">
-        <div
-          class="jf-seg-head"
-          role="button"
-          tabindex="0"
-          aria-expanded=${open}
-          @click=${() => this._toggleOpen(e.key)}
-          @keydown=${(ev: KeyboardEvent) => {
-            if (ev.target === ev.currentTarget && (ev.key === "Enter" || ev.key === " ")) {
-              ev.preventDefault();
-              this._toggleOpen(e.key);
-            }
-          }}
-        >
-          <span class="jf-chev" aria-hidden="true">›</span>
-          <span class="jf-seg-title">${e.name}</span>
-          <span class="jf-seg-actions" @click=${(ev: Event) => ev.stopPropagation()}>
-            ${markActions(e.name)} ${removeButton(e.name)}
-          </span>
-        </div>
-        ${
-          open
-            ? html`<div class="jf-seg-body">
-                <div class="jf-field">
-                  <label class="jf-label" for=${idFor(`${e.key}.__key`)}>Key</label>
-                  <input
-                    class="jf-input"
-                    id=${idFor(`${e.key}.__key`)}
-                    type="text"
-                    spellcheck="false"
-                    aria-label="Key of ${e.name}"
-                    title=${fromDefaults.has(e.name) ? "A default entry: it cannot be renamed" : ""}
-                    .value=${live(e.name)}
-                    ?disabled=${locked}
-                    @change=${(ev: Event) => rename(e.name, ev.target as HTMLInputElement)}
-                  />
-                </div>
-                ${(e.fields ?? [e]).map((child) => this._field(child))}
-              </div>`
-            : nothing
-        }
-      </div>`;
+      const fields = e.fields ?? [e];
+      return this._card(
+        e.key,
+        {
+          title: e.name,
+          meta: this._fieldsMeta(fields),
+          errors: errorCount(e),
+          actions: html`${markActions(e.name)} ${removeButton(e.name)}`,
+        },
+        {
+          label: e.name,
+          body: () =>
+            html`<div class="jf">
+              <div class="jf-field">
+                <label class="jf-label" for=${idFor(`${e.key}.__key`)}>Key</label>
+                <input
+                  class="jf-input"
+                  id=${idFor(`${e.key}.__key`)}
+                  type="text"
+                  spellcheck="false"
+                  aria-label="Key of ${e.name}"
+                  title=${fromDefaults.has(e.name) ? "A default entry: it cannot be renamed" : ""}
+                  .value=${live(e.name)}
+                  ?disabled=${locked}
+                  @change=${(ev: Event) => rename(e.name, ev.target as HTMLInputElement)}
+                />
+              </div>
+              ${fields.map((child) => this._field(child))}
+            </div>`,
+        },
+      );
     };
     const row = (e: FormField) =>
       html`<div class="jf-map-row ${e.error ? "jf-map-row--error" : ""}" data-key=${e.key}>
@@ -663,43 +907,53 @@ export class JsonFormElement extends LitElement {
         ${this._control(e, idFor(e.key))} ${markActions(e.name)} ${removeButton(e.name)}
         ${e.error ? html`<div class="jf-error" role="alert">${e.error}</div>` : nothing}
       </div>`;
-    return html`
-      <div class="jf-card" role="group" aria-labelledby=${idFor(f.key)}>
-        ${entries.map((e) => (f.objectValues ? segment(e) : row(e)))}
-        <div class="jf-addrow jf-map-add">
-          <input
-            class="jf-input"
-            type="text"
-            spellcheck="false"
-            placeholder="New key"
-            aria-label="New key for ${f.label}"
-            .value=${live(newKey)}
-            ?disabled=${this.readonly}
-            @input=${(e: Event) => setNewKey((e.target as HTMLInputElement).value)}
-            @keydown=${(e: KeyboardEvent) => {
-              if (e.key === "Enter") add();
-            }}
-          />
-          <button
-            type="button"
-            class="jf-add"
-            aria-label="Add to ${f.label}"
-            ?disabled=${this.readonly || !canAdd}
-            @click=${add}
-          >
-            ＋ Add
-          </button>
-        </div>
-      </div>
-    `;
+    const addRow = html`<div class="jf-map-add">
+      <input
+        class="jf-input"
+        type="text"
+        spellcheck="false"
+        placeholder="New key"
+        aria-label="New key for ${f.label}"
+        .value=${live(newKey)}
+        ?disabled=${this.readonly}
+        @input=${(e: Event) => setNewKey((e.target as HTMLInputElement).value)}
+        @keydown=${(e: KeyboardEvent) => {
+          if (e.key === "Enter") add();
+        }}
+      />
+      <button
+        type="button"
+        class="jf-add"
+        aria-label="Add to ${f.label}"
+        ?disabled=${this.readonly || !canAdd}
+        @click=${add}
+      >
+        ＋ Add
+      </button>
+    </div>`;
+    return f.objectValues
+      ? html`<div class="jf-subs" role="group" aria-label=${f.label}>
+          ${entries.map(card)} ${addRow}
+        </div>`
+      : html`<div class="jf-card" role="group" aria-label=${f.label}>
+          ${entries.map(row)} ${addRow}
+        </div>`;
   }
 
   static override styles = css`
     :host {
       display: block;
+      position: relative;
       color: var(--text-primary, #ddd);
       font-family: var(--font-ui, system-ui, sans-serif);
       font-size: 12px;
+    }
+    /* The form scrolls itself, so the drawers cover what is in view. */
+    .jf-scroll {
+      box-sizing: border-box;
+      height: 100%;
+      overflow: auto;
+      padding: var(--jf-padding, 0);
     }
     .jf {
       display: flex;
@@ -858,19 +1112,6 @@ export class JsonFormElement extends LitElement {
       font-size: 11px;
       color: var(--text-secondary, #999);
     }
-    .jf-group {
-      margin: 0;
-      padding: 10px 12px 12px;
-      border: 1px solid var(--divider, #333);
-      border-radius: 6px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      min-width: 0;
-    }
-    .jf-group > legend {
-      padding: 0 4px;
-    }
     .jf-list {
       display: flex;
       flex-direction: column;
@@ -934,66 +1175,212 @@ export class JsonFormElement extends LitElement {
       opacity: 0.35;
       cursor: default;
     }
-    /* Lists of objects: the workspace editor's accordion card. */
+    /* A map's rows of values. */
     .jf-card {
       border: 1px solid var(--divider, #333);
       border-radius: 6px;
       background: var(--jf-card-bg, var(--bg-secondary, #161616));
       overflow: hidden;
     }
-    .jf-card > .jf-seg + .jf-seg,
-    .jf-card > .jf-addrow {
-      border-top: 1px solid var(--divider, #2a2a2a);
+    /* An object or array: a card that opens its drawer. */
+    .jf-subs {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
-    .jf-seg-head {
+    .jf-sub {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 6px 8px;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      background: var(--jf-input-bg, var(--bg-tertiary, #2a2a2a));
       cursor: pointer;
       user-select: none;
     }
-    .jf-seg-head:hover {
-      background: var(--jf-hover, rgba(255, 255, 255, 0.04));
+    .jf-sub:hover {
+      background: var(
+        --jf-input-focus-bg,
+        color-mix(in srgb, var(--bg-tertiary, #2a2a2a) 92%, #fff)
+      );
     }
-    .jf-seg-head:focus-visible {
+    /* Reset on a card is drawn like Reset in an input's card. */
+    .jf-sub-actions > .jf-reset {
+      background: transparent;
+    }
+    .jf-sub:focus-visible {
       outline: 1px solid var(--accent, #569cd6);
       outline-offset: -1px;
     }
-    .jf-chev {
-      flex-shrink: 0;
-      width: 14px;
-      text-align: center;
-      color: var(--text-secondary, #999);
-      transition: transform 0.15s ease;
-    }
-    .jf-seg--open .jf-chev {
-      transform: rotate(90deg);
-    }
-    .jf-seg-title {
+    .jf-sub-main {
       flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .jf-sub-headline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .jf-sub-title {
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
       font-size: 13px;
+      font-weight: 600;
     }
-    .jf-seg-actions {
+    .jf-meta {
+      color: var(--text-secondary, #999);
+      font-size: 11px;
+    }
+    .jf-meta-error {
+      color: var(--jf-error, #f44747);
+    }
+    .jf-sub-actions {
       display: flex;
-      gap: 2px;
+      align-items: center;
+      gap: 4px;
+      cursor: default;
     }
-    .jf-seg-body {
+    .jf-chev {
+      flex-shrink: 0;
+      width: 14px;
+      text-align: center;
+      font-size: 16px;
+      color: var(--text-secondary, #999);
+    }
+    /* The drawers: over the form, sliding in from the right. One mask and
+       one shadow for the whole stack; the drawers cast none. */
+    .jf-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      overflow: hidden;
+    }
+    .jf-mask {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      animation: jf-fade 0.18s ease-out;
+    }
+    .jf-drawer-shadow {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      box-shadow: -2px 0 12px rgba(0, 0, 0, 0.45);
+      transition: width 0.18s ease-out;
+      animation: jf-slide 0.18s ease-out;
+    }
+    .jf-drawer {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--border-divider, var(--divider, #2d2d2d));
+      background: var(--bg-primary, #1e1e1e);
+      color: var(--text-primary, #d4d4d4);
+      transition: width 0.18s ease-out;
+      animation: jf-slide 0.18s ease-out;
+    }
+    .jf-drawer:focus {
+      outline: none;
+    }
+    .jf-drawer--front {
+      width: 80%;
+    }
+    .jf-drawer--back {
+      width: 90%;
+    }
+    .jf-drawer--hidden {
+      width: 90%;
+      visibility: hidden;
+    }
+    /* Behind the front drawer only a strip shows: it goes back. */
+    .jf-drawer.jf-drawer--back {
+      cursor: pointer;
+    }
+    @keyframes jf-slide {
+      from {
+        transform: translateX(100%);
+      }
+      to {
+        transform: translateX(0);
+      }
+    }
+    @keyframes jf-fade {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+    .jf-drawer-head {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 35px;
+      box-sizing: border-box;
+      padding-left: 16px;
+      border-bottom: 1px solid var(--border-divider, var(--divider, #2d2d2d));
+      background: var(--bg-surface, #161616);
+    }
+    .jf-drawer-heading {
+      flex: 1;
+      min-width: 0;
+      padding: 6px 0;
+    }
+    .jf-drawer-trail {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text-secondary, #999);
+      font-size: 11px;
+    }
+    .jf-drawer-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .jf-drawer-close {
+      flex-shrink: 0;
+      align-self: stretch;
+      width: 35px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: none;
+      border-left: 1px solid var(--border-divider, var(--divider, #2d2d2d));
+      background: transparent;
+      color: var(--text-secondary, #999);
+      cursor: pointer;
+    }
+    .jf-drawer-close svg {
+      width: 16px;
+      height: 16px;
+    }
+    .jf-drawer-close:hover {
+      color: var(--text-primary, #ddd);
+      background: var(--jf-hover, rgba(255, 255, 255, 0.06));
+    }
+    .jf-drawer-body {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
       display: flex;
       flex-direction: column;
       gap: 12px;
-      padding: 4px 12px 12px 30px;
-    }
-    .jf-addrow {
-      align-self: stretch;
-      width: 100%;
-      text-align: left;
-      border-radius: 0;
-      padding: 6px 8px 6px 30px;
+      padding: 16px;
     }
     /* Maps: the Add row takes the new key. */
     .jf-map-add {
@@ -1002,6 +1389,9 @@ export class JsonFormElement extends LitElement {
       align-items: center;
       gap: 6px;
       padding: 6px 8px;
+    }
+    .jf-subs > .jf-map-add {
+      padding: 0;
     }
     .jf-map-add .jf-input {
       flex: 1;
@@ -1014,8 +1404,7 @@ export class JsonFormElement extends LitElement {
       padding: 6px 8px;
     }
     .jf-card > .jf-map-row + .jf-map-row,
-    .jf-card > .jf-map-row + .jf-map-add,
-    .jf-card > .jf-seg + .jf-map-add {
+    .jf-card > .jf-map-row + .jf-map-add {
       border-top: 1px solid var(--divider, #2a2a2a);
     }
     .jf-map-key {
