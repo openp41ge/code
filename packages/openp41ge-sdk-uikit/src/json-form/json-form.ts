@@ -424,16 +424,7 @@ export class JsonFormElement extends LitElement {
           >
             <header class="jf-drawer-head">
               <div class="jf-drawer-heading">
-                ${
-                  i > 0
-                    ? html`<span class="jf-drawer-trail"
-                        >${open
-                          .slice(0, i)
-                          .map((o) => `${o.target.label} › `)
-                          .join("")}</span
-                      >`
-                    : nothing
-                }<span class="jf-drawer-title">${d.target.label}</span>
+                <span class="jf-drawer-title">${d.target.label}</span>
               </div>
               <button
                 type="button"
@@ -1544,7 +1535,7 @@ export class JsonFormElement extends LitElement {
       border-bottom: 1px solid var(--border-divider, var(--divider, #2d2d2d));
       background: var(--bg-surface, #161616);
     }
-    /* One line: the trail, then the title. */
+    /* One line: the drawer's name. */
     .jf-drawer-heading {
       flex: 1;
       min-width: 0;
@@ -1552,9 +1543,6 @@ export class JsonFormElement extends LitElement {
       text-overflow: ellipsis;
       white-space: nowrap;
       font-size: 13px;
-    }
-    .jf-drawer-trail {
-      color: var(--text-secondary, #999);
     }
     .jf-drawer-title {
       font-weight: 600;
