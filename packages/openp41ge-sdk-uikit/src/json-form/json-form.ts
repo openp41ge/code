@@ -146,6 +146,22 @@ function errorCount(f: FormField): number {
   return n;
 }
 
+/** A number as typed: optional sign, digits, a fraction, an exponent. */
+const NUMBER_TEXT = /^[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?$/;
+const INTEGER_TEXT = /^[-+]?\d+$/;
+
+/** The number `text` is (a whole one when `integer`), or null. */
+function parseNumber(text: string, integer: boolean): number | null {
+  const t = text.trim();
+  if (!(integer ? INTEGER_TEXT : NUMBER_TEXT).test(t)) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** What a number field asks for when its text is not one. */
+const numberHint = (integer: boolean): string =>
+  integer ? "Enter a whole number" : "Enter a number";
+
 /** A DOM id for a field (unique within the form's shadow root). */
 const idFor = (key: string): string => `jf-${key.replace(/[^A-Za-z0-9_-]/g, "-")}`;
 
@@ -207,6 +223,10 @@ export class JsonFormElement extends LitElement {
   private _drafts = new Map<string, { list: JsonPath; index: number }>();
   /** The control to focus after the next render (an item just added). */
   private _focusNext: string | null = null;
+  /** What is typed in each number field being edited, by its id: it stays as
+   *  typed (a number is stored as soon as it is one; other text is not, and
+   *  is marked) until the field is left. */
+  @state() private _numberText: ReadonlyMap<string, string> = new Map();
   /** The maps' paths in the last render (their entries are never pruned). */
   private _maps: JsonPath[] = [];
   /** What each card rendered this time opens, by its key. */
@@ -247,6 +267,7 @@ export class JsonFormElement extends LitElement {
       this._jsonViews = new Set([...this._jsonViews].filter((k) => open.has(k)));
     }
     if (changed.has("value")) {
+      this._numberText = new Map();
       const v = this.value;
       this._value =
         v !== null && typeof v === "object" && !Array.isArray(v)
@@ -751,9 +772,29 @@ export class JsonFormElement extends LitElement {
               </div>`
             : this._control(f, id)
         }
+        ${
+          f.kind === "number" && this._notANumber(id, !!f.integer)
+            ? html`<div class="jf-error" role="alert">${numberHint(!!f.integer)}</div>`
+            : nothing
+        }
         ${f.error ? html`<div class="jf-error" role="alert">${f.error}</div>` : nothing}
       </div>
     `;
+  }
+
+  /** Keep `text` as what is typed in the number field `id` (null: none). */
+  private _setNumberText(id: string, text: string | null): void {
+    if (text === null && !this._numberText.has(id)) return;
+    const next = new Map(this._numberText);
+    if (text === null) next.delete(id);
+    else next.set(id, text);
+    this._numberText = next;
+  }
+
+  /** Whether the number field `id` holds text that is not a number. */
+  private _notANumber(id: string, integer: boolean): boolean {
+    const text = this._numberText.get(id);
+    return text !== undefined && text.trim() !== "" && parseNumber(text, integer) === null;
   }
 
   /** Reset: on every setting with a default (greyed out while unset), and
@@ -766,7 +807,10 @@ export class JsonFormElement extends LitElement {
       aria-label="Reset ${f.label}"
       title=${f.hasDefault ? "Use the default" : "Clear"}
       ?disabled=${!f.set}
-      @click=${() => this._reset(f.path)}
+      @click=${() => {
+        this._setNumberText(idFor(f.key), null);
+        this._reset(f.path);
+      }}
     >
       ${RESET_ICON}
     </button>`;
@@ -835,27 +879,42 @@ export class JsonFormElement extends LitElement {
     }
   }
 
+  /** A number field: a text field that takes a number (a whole one for an
+   *  integer); text that is not one is kept, marked, and not stored. */
   private _numberInput(
     id: string,
     value: unknown,
-    limits: { integer?: boolean; minimum?: number; maximum?: number; hasDefault?: boolean },
+    limits: { integer?: boolean; hasDefault?: boolean },
     onChange: (v: number | undefined) => void,
+    label: string | null = null,
   ): TemplateResult {
+    const integer = !!limits.integer;
+    const typed = this._numberText.get(id);
+    const invalid = this._notANumber(id, integer);
     return html`<input
       class="jf-input jf-number"
       id=${id}
-      type="number"
-      min=${limits.minimum ?? nothing}
-      max=${limits.maximum ?? nothing}
-      step=${limits.integer ? "1" : "any"}
+      type="text"
+      inputmode=${integer ? "numeric" : "decimal"}
+      autocomplete="off"
+      spellcheck="false"
+      aria-label=${label ?? nothing}
+      aria-invalid=${invalid ? "true" : "false"}
+      title=${invalid ? numberHint(integer) : ""}
       placeholder=${limits.hasDefault === false ? "Not set" : ""}
-      .value=${typeof value === "number" ? String(value) : ""}
+      .value=${live(typed ?? (typeof value === "number" ? String(value) : ""))}
       ?disabled=${this.readonly}
       @input=${(e: Event) => {
         const text = (e.target as HTMLInputElement).value;
-        if (text === "") return onChange(undefined);
-        const n = Number(text);
-        if (!Number.isNaN(n)) onChange(n);
+        this._setNumberText(id, text);
+        if (text.trim() === "") return onChange(undefined);
+        const n = parseNumber(text, integer);
+        if (n !== null) onChange(n);
+      }}
+      @blur=${() => {
+        // Leaving the field shows the stored number, unless what is typed
+        // is not one (it stays, marked).
+        if (!this._notANumber(id, integer)) this._setNumberText(id, null);
       }}
     />`;
   }
@@ -918,7 +977,13 @@ export class JsonFormElement extends LitElement {
                   @change=${(e: CustomEvent<{ checked: boolean }>) => edit(i, e.detail.checked)}
                 ></openp41ge-toggle>`
               : kind.kind === "number"
-                ? this._numberInput(id, item, { integer: kind.integer }, (v) => edit(i, v ?? 0))
+                ? this._numberInput(
+                    id,
+                    item,
+                    { integer: kind.integer },
+                    (v) => edit(i, v ?? 0),
+                    `${f.label} item ${i + 1}`,
+                  )
                 : kind.kind === "enum"
                   ? this._select(id, item, kind.options ?? [], false, (v) => edit(i, v))
                   : html`<input
@@ -976,24 +1041,57 @@ export class JsonFormElement extends LitElement {
           </button>`
         : kind.kind === "enum"
           ? this._select(id, undefined, kind.options ?? [], false, add, "New item", label)
-          : html`<input
-              class="jf-input ${kind.kind === "number" ? "jf-number" : ""}"
-              id=${id}
-              type=${kind.kind === "number" ? "number" : "text"}
-              step=${kind.kind === "number" ? (kind.integer ? "1" : "any") : nothing}
-              spellcheck="false"
-              placeholder="New item"
-              aria-label=${label}
-              .value=${live("")}
-              @input=${(e: Event) => {
-                const text = (e.target as HTMLInputElement).value;
-                if (text === "") return;
-                if (kind.kind !== "number") return add(text);
-                const n = Number(text);
-                if (!Number.isNaN(n)) add(n);
-              }}
-            />`;
+          : kind.kind === "number"
+            ? this._newNumberRow(id, label, kind.integer, (n, text) => {
+                // The new item keeps the text as typed ("1." stays "1.").
+                this._setNumberText(idFor(`${f.key}[${list.length}]`), text);
+                add(n);
+              })
+            : html`<input
+                class="jf-input"
+                id=${id}
+                type="text"
+                spellcheck="false"
+                placeholder="New item"
+                aria-label=${label}
+                .value=${live("")}
+                @input=${(e: Event) => {
+                  const text = (e.target as HTMLInputElement).value;
+                  if (text !== "") add(text);
+                }}
+              />`;
     return html`<div class="jf-list-item jf-new">${control}</div>`;
+  }
+
+  /** A number list's empty row: a number typed there is a new item; other
+   *  text stays, marked. */
+  private _newNumberRow(
+    id: string,
+    label: string,
+    integer: boolean,
+    add: (n: number, text: string) => void,
+  ): TemplateResult {
+    const invalid = this._notANumber(id, integer);
+    return html`<input
+      class="jf-input jf-number"
+      id=${id}
+      type="text"
+      inputmode=${integer ? "numeric" : "decimal"}
+      autocomplete="off"
+      spellcheck="false"
+      placeholder="New item"
+      aria-label=${label}
+      aria-invalid=${invalid ? "true" : "false"}
+      title=${invalid ? numberHint(integer) : ""}
+      .value=${live(this._numberText.get(id) ?? "")}
+      @input=${(e: Event) => {
+        const text = (e.target as HTMLInputElement).value;
+        const n = text.trim() === "" ? null : parseNumber(text, integer);
+        if (n === null) return this._setNumberText(id, text === "" ? null : text);
+        this._setNumberText(id, null);
+        add(n, text);
+      }}
+    />`;
   }
 
   /** A list of objects: a card per item (it opens the item's drawer), with
@@ -1855,6 +1953,7 @@ export class JsonFormElement extends LitElement {
       color: var(--text-secondary, #999);
       cursor: pointer;
     }
+    .jf-number[aria-invalid="true"],
     .jf-new .jf-input[aria-invalid="true"] {
       box-shadow: inset 0 0 0 1px var(--jf-error, #f44747);
     }
