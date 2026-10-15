@@ -1,6 +1,7 @@
 export { Openp41geIcon } from "./components/openp41ge-icon";
 export type { IconName } from "./components/openp41ge-icon";
 export { Openp41geToggle } from "./components/openp41ge-toggle";
+export { Openp41geSelect, type SelectOption } from "./components/openp41ge-select";
 export { Openp41geInlineIcon } from "./components/openp41ge-inline-icon";
 export { FileExtensionSvg } from "./components/file-extension-svg";
 export {

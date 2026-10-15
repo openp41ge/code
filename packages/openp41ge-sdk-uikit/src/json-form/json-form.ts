@@ -34,6 +34,7 @@ import { live } from "lit/directives/live.js";
 import { cloneDeep, getAt, type JsonPath } from "../json-editor/json-tree";
 import { renderMarkdown } from "../json-editor/md-render";
 import "../components/openp41ge-toggle";
+import "../components/openp41ge-select";
 import {
   formFields,
   resetField,
@@ -342,23 +343,27 @@ export class JsonFormElement extends LitElement {
     onChange: (v: unknown) => void,
   ): TemplateResult {
     const selected = options.findIndex((o) => JSON.stringify(o) === JSON.stringify(value));
-    return html`<select
-      class="jf-input"
+    const choices = [
+      ...(withEmpty ? [{ value: "", label: "Not set" }] : []),
+      ...options.map((o, i) => ({
+        value: String(i),
+        label: typeof o === "string" ? o : JSON.stringify(o),
+      })),
+    ];
+    return html`<openp41ge-select
+      class="jf-input jf-select"
       id=${id}
+      .options=${choices}
+      .value=${selected < 0 ? "" : String(selected)}
+      placeholder="Not set"
+      align-to=".jf-input-card"
       ?disabled=${this.readonly}
-      @change=${(e: Event) => {
-        const idx = (e.target as HTMLSelectElement).value;
+      @change=${(e: CustomEvent<{ value: string }>) => {
+        e.stopPropagation();
+        const idx = e.detail.value;
         onChange(idx === "" ? undefined : options[Number(idx)]);
       }}
-    >
-      ${withEmpty ? html`<option value="" ?selected=${selected < 0}>Not set</option>` : nothing}
-      ${options.map(
-        (o, i) =>
-          html`<option value=${String(i)} ?selected=${i === selected}>
-            ${typeof o === "string" ? o : JSON.stringify(o)}
-          </option>`,
-      )}
-    </select>`;
+    ></openp41ge-select>`;
   }
 
   /** A list of values: one control per item, with Remove; Add at the end. */
@@ -785,6 +790,16 @@ export class JsonFormElement extends LitElement {
     .jf-input:disabled {
       opacity: 0.6;
     }
+    /* The toolkit's dropdown: its trigger pads itself. */
+    .jf-select {
+      padding: 0;
+    }
+    .jf-select:focus-within {
+      background: var(
+        --jf-input-focus-bg,
+        color-mix(in srgb, var(--bg-tertiary, #2a2a2a) 92%, #fff)
+      );
+    }
     .jf-row {
       display: flex;
       align-items: center;
@@ -815,7 +830,8 @@ export class JsonFormElement extends LitElement {
       background: transparent;
     }
     /* An unset field shows its default, faded. */
-    .jf-default > .jf-row > .jf-input,
+    .jf-default > .jf-row > .jf-input:not(.jf-select),
+    .jf-default > .jf-row > .jf-select::part(trigger),
     .jf-default > .jf-row > openp41ge-toggle {
       opacity: 0.55;
     }
