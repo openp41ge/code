@@ -209,7 +209,9 @@ export class JsonFormElement extends LitElement {
         ${this._description(f)}
         ${
           inRow
-            ? html`<div class="jf-row">${this._control(f, id)}${reset}</div>`
+            ? html`<div class="jf-row ${f.kind === "boolean" ? "" : "jf-input-card"}">
+                ${this._control(f, id)}${reset}
+              </div>`
             : this._control(f, id)
         }
         ${f.error ? html`<div class="jf-error" role="alert">${f.error}</div>` : nothing}
@@ -791,6 +793,26 @@ export class JsonFormElement extends LitElement {
     .jf-row > .jf-input {
       flex: 1;
       min-width: 0;
+    }
+    /* An input with Reset: the card holds both, Reset inside at its right. */
+    .jf-input-card {
+      gap: 0;
+      padding-right: 4px;
+      border-radius: 4px;
+      background: var(--jf-input-bg, var(--bg-tertiary, #2a2a2a));
+    }
+    .jf-input-card:focus-within {
+      background: var(
+        --jf-input-focus-bg,
+        color-mix(in srgb, var(--bg-tertiary, #2a2a2a) 92%, #fff)
+      );
+    }
+    .jf-input-card > .jf-input,
+    .jf-input-card > .jf-input:focus {
+      background: transparent;
+    }
+    .jf-input-card > .jf-reset {
+      background: transparent;
     }
     /* An unset field shows its default, faded. */
     .jf-default > .jf-row > .jf-input,
