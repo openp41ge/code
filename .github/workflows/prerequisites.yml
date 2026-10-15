@@ -48,7 +48,7 @@ jobs:
           restore-keys: nx-${{ runner.os }}-
       - run: pnpm nx run-many -t build
 
-  # The tests live in the private openp41ge/code-tests repo. It tests this
+  # The tests live in the openp41ge/code-tests repo. It tests this
   # commit and reports back as the `code-tests` commit status, which the
   # release gate requires.
   dispatch-tests:

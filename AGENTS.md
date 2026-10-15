@@ -322,8 +322,8 @@ package (`registration.ts`), which also carries `surface`, `context`,
 - **Official extensions** — systems shipped as extensions, built against the
   SDK exactly like a third-party extension would be (e.g. the explorer, git,
   workspaces and agents).
-- **Tests and demo apps** live in the private `openp41ge/code-tests` repo, not
-  here (§5.6): the tests, their configs and helpers, and the small
+- **Tests and demo apps** live in the separate `openp41ge/code-tests` repo,
+  not here (§5.6): the tests, their configs and helpers, and the small
   per-capability demo harnesses used for isolated development and visual
   testing.
 
@@ -553,8 +553,8 @@ general reasoning. If no skill matches, proceed with general reasoning.
 
 ### 5.6 Testing
 
-- **Tests are private.** They live in the private `openp41ge/code-tests` repo,
-  so the public repo cannot be used to recreate the application from them.
+- **Tests live in their own repo.** They are open source, in the separate
+  `openp41ge/code-tests` repo, so this repo carries no test code.
   Never add a test, test config, test helper or demo to this repo. code-tests
   mirrors this repo's layout (`packages/<pkg>/test/...`) and runs against a
   checkout of it (`APP_DIR`; by default the `code/master` worktree beside code-tests' own

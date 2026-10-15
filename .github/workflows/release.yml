@@ -91,7 +91,7 @@ jobs:
 
   gate:
     # Refuse to release a commit that never got a green prerequisites run
-    # (quality / build) and a passing code-tests status (the private tests). Guards manual dispatch on an
+    # (quality / build) and a passing code-tests status (the tests). Guards manual dispatch on an
     # arbitrary commit as well as tag-triggered releases.
     #
     # A tag push and its prerequisites push land at the same time, so the gate
@@ -169,7 +169,7 @@ jobs:
             exit 1
           fi
 
-      # The tests run in the private openp41ge/code-tests repo (dispatched by
+      # The tests run in the openp41ge/code-tests repo (dispatched by
       # prerequisites), which reports the `code-tests` commit status.
       - name: Require passing code-tests for this commit (wait while pending)
         run: |
