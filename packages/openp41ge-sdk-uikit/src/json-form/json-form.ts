@@ -343,10 +343,18 @@ export class JsonFormElement extends LitElement {
             role="dialog"
             aria-label=${d.target.label}
             tabindex="-1"
-            @click=${() => {
+            @click=${{
               // Behind the front drawer only its strip shows: a click there
-              // goes back to it.
-              if (i === front - 1) this._closeTo(i + 1);
+              // goes back to it, and does not reach what it hits. Decided as
+              // the click comes in (capture): a real click lets the form
+              // re-render between listeners, so by the time it bubbles out of
+              // a card that opened a drawer, this drawer is already behind.
+              capture: true,
+              handleEvent: (e: Event) => {
+                if (i !== front - 1) return;
+                e.stopPropagation();
+                this._closeTo(i + 1);
+              },
             }}
             @keydown=${(e: KeyboardEvent) => {
               if (e.defaultPrevented) return;
