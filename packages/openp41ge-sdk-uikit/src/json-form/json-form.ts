@@ -202,6 +202,11 @@ export class JsonFormElement extends LitElement {
   @state() private _jsonViews: ReadonlySet<string> = new Set();
   /** The key being typed in each map's Add row, by the map's key. */
   @state() private _newKeys: ReadonlyMap<string, string> = new Map();
+  /** Items added from a list's empty card, by key, with their list's path:
+   *  one still empty when its drawer closes is removed again. */
+  private _drafts = new Map<string, { list: JsonPath; index: number }>();
+  /** The control to focus after the next render (an item just added). */
+  private _focusNext: string | null = null;
   /** The maps' paths in the last render (their entries are never pruned). */
   private _maps: JsonPath[] = [];
   /** What each card rendered this time opens, by its key. */
@@ -247,6 +252,26 @@ export class JsonFormElement extends LitElement {
         v !== null && typeof v === "object" && !Array.isArray(v)
           ? (cloneDeep(v) as Record<string, unknown>)
           : {};
+    }
+    this._dropEmptyDrafts(open);
+  }
+
+  /** A new item whose drawer has closed with nothing entered is removed. */
+  private _dropEmptyDrafts(open: ReadonlySet<string>): void {
+    for (const [key, { list, index }] of this._drafts) {
+      if (open.has(key)) continue;
+      this._drafts.delete(key);
+      const items = getAt(this._value, list);
+      const item = Array.isArray(items) ? items[index] : undefined;
+      const empty =
+        item !== null &&
+        typeof item === "object" &&
+        !Array.isArray(item) &&
+        Object.keys(item).length === 0;
+      if (!empty || !Array.isArray(items)) continue;
+      const rest = items.filter((_, i) => i !== index);
+      if (rest.length === 0) this._reset(list);
+      else this._set(list, rest);
     }
   }
 
@@ -315,6 +340,17 @@ export class JsonFormElement extends LitElement {
   }
 
   override updated(changed: PropertyValues<this>): void {
+    if (this._focusNext) {
+      const id = this._focusNext;
+      this._focusNext = null;
+      const target = this.renderRoot.querySelector<HTMLElement>(`#${id}`);
+      target?.focus();
+      // Keep typing where the text ends.
+      if (target instanceof HTMLInputElement && target.type === "text") {
+        const end = target.value.length;
+        target.setSelectionRange(end, end);
+      }
+    }
     if (changed.has("drawerArea")) this._watchArea(false);
     this._watchArea(this._drawers.length > 0);
     // A drawer whose value is gone (removed, reset) closes, with those in
@@ -805,6 +841,8 @@ export class JsonFormElement extends LitElement {
     options: readonly unknown[],
     withEmpty: boolean,
     onChange: (v: unknown) => void,
+    placeholder = "Not set",
+    label: string | null = null,
   ): TemplateResult {
     const selected = options.findIndex((o) => JSON.stringify(o) === JSON.stringify(value));
     const choices = [
@@ -819,7 +857,8 @@ export class JsonFormElement extends LitElement {
       id=${id}
       .options=${choices}
       .value=${selected < 0 ? "" : String(selected)}
-      placeholder="Not set"
+      placeholder=${placeholder}
+      label=${label ?? nothing}
       align-to=".jf-input-card"
       ?disabled=${this.readonly}
       @change=${(e: CustomEvent<{ value: string }>) => {
@@ -830,7 +869,8 @@ export class JsonFormElement extends LitElement {
     ></openp41ge-select>`;
   }
 
-  /** A list of values: one control per item, with Remove; Add at the end. */
+  /** A list of values: one control per item, with Remove, and an empty row
+   *  last: what is entered there is a new item (and a new empty row follows). */
   private _list(f: FormField): TemplateResult {
     const list = Array.isArray(f.value) ? f.value : [];
     const kind = f.item!;
@@ -884,21 +924,56 @@ export class JsonFormElement extends LitElement {
             </button>
           </div>`;
         })}
-        <button
-          type="button"
-          class="jf-add"
-          aria-label="Add to ${f.label}"
-          ?disabled=${this.readonly}
-          @click=${() => this._setList(f, [...list, newListItem(kind)])}
-        >
-          ＋ Add
-        </button>
+        ${this.readonly ? nothing : this._newListRow(f, list)}
       </div>
     `;
   }
 
+  /** A list's empty last row: entering a value there adds it as an item,
+   *  and the typing carries on in that item. */
+  private _newListRow(f: FormField, list: readonly unknown[]): TemplateResult {
+    const kind = f.item!;
+    const label = `New item of ${f.label}`;
+    const add = (v: unknown) => {
+      this._focusNext = idFor(`${f.key}[${list.length}]`);
+      this._setList(f, [...list, v]);
+    };
+    const id = idFor(`${f.key}[new]`);
+    const control =
+      kind.kind === "boolean"
+        ? html`<button
+            type="button"
+            class="jf-input jf-new-btn"
+            aria-label=${label}
+            @click=${() => add(newListItem(kind))}
+          >
+            New item
+          </button>`
+        : kind.kind === "enum"
+          ? this._select(id, undefined, kind.options ?? [], false, add, "New item", label)
+          : html`<input
+              class="jf-input ${kind.kind === "number" ? "jf-number" : ""}"
+              id=${id}
+              type=${kind.kind === "number" ? "number" : "text"}
+              step=${kind.kind === "number" ? (kind.integer ? "1" : "any") : nothing}
+              spellcheck="false"
+              placeholder="New item"
+              aria-label=${label}
+              .value=${live("")}
+              @input=${(e: Event) => {
+                const text = (e.target as HTMLInputElement).value;
+                if (text === "") return;
+                if (kind.kind !== "number") return add(text);
+                const n = Number(text);
+                if (!Number.isNaN(n)) add(n);
+              }}
+            />`;
+    return html`<div class="jf-list-item jf-new">${control}</div>`;
+  }
+
   /** A list of objects: a card per item (it opens the item's drawer), with
-   *  move and remove; Add opens the new item. */
+   *  move and remove, and an empty card last: it opens a drawer for a new
+   *  item (removed again if left empty). */
   private _objects(f: FormField): TemplateResult {
     const list = Array.isArray(f.value) ? f.value : [];
     const items = f.items ?? [];
@@ -913,7 +988,9 @@ export class JsonFormElement extends LitElement {
         list.filter((_, j) => j !== i),
       );
     const add = () => {
-      this._openAfter(f.key, `${f.key}[${list.length}]`);
+      const key = `${f.key}[${list.length}]`;
+      this._drafts.set(key, { list: f.path, index: list.length });
+      this._openAfter(f.key, key);
       this._setList(f, [...list, {}]);
     };
     return html`
@@ -967,21 +1044,34 @@ export class JsonFormElement extends LitElement {
             },
           );
         })}
-        <button
-          type="button"
-          class="jf-add"
-          aria-label="Add to ${f.label}"
-          ?disabled=${this.readonly}
-          @click=${add}
-        >
-          ＋ Add
-        </button>
+        ${
+          this.readonly
+            ? nothing
+            : html`<div
+                class="jf-sub jf-new"
+                role="button"
+                tabindex="0"
+                aria-haspopup="dialog"
+                aria-label="New item of ${f.label}"
+                @click=${add}
+                @keydown=${(e: KeyboardEvent) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    add();
+                  }
+                }}
+              >
+                <div class="jf-sub-main"><span class="jf-sub-title">New item</span></div>
+                <span class="jf-chev" aria-hidden="true">›</span>
+              </div>`
+        }
       </div>
     `;
   }
 
   /** A map: a card per object entry (it opens the entry's drawer, with its
-   *  key) or a row per value, and an Add row that takes the new key. */
+   *  key) or a row per value, and an empty row last that takes a new key:
+   *  Enter, or leaving it, adds the entry (a taken key is marked, not added). */
   private _map(f: FormField): TemplateResult {
     const entries = f.entries ?? [];
     const keys = entries.map((e) => e.name);
@@ -993,7 +1083,8 @@ export class JsonFormElement extends LitElement {
         : {};
     };
     const newKey = this._newKeys.get(f.key) ?? "";
-    const canAdd = newKey.trim() !== "" && !keys.includes(newKey.trim());
+    const taken = keys.includes(newKey.trim());
+    const canAdd = newKey.trim() !== "" && !taken;
     const setNewKey = (text: string) => {
       const next = new Map(this._newKeys);
       next.set(f.key, text);
@@ -1004,6 +1095,7 @@ export class JsonFormElement extends LitElement {
       const key = newKey.trim();
       setNewKey("");
       if (f.objectValues) this._openAfter(f.key, `${f.key}.${key}`);
+      else this._focusNext = idFor(`${f.key}.${key}`);
       this._set([...f.path, key], cloneDeep(f.newEntry ?? null));
     };
     const remove = (key: string) => {
@@ -1095,30 +1187,25 @@ export class JsonFormElement extends LitElement {
         ${this._control(e, idFor(e.key))} ${markActions(e.name)} ${removeButton(e.name)}
         ${e.error ? html`<div class="jf-error" role="alert">${e.error}</div>` : nothing}
       </div>`;
-    const addRow = html`<div class="jf-map-add">
-      <input
-        class="jf-input"
-        type="text"
-        spellcheck="false"
-        placeholder="New key"
-        aria-label="New key for ${f.label}"
-        .value=${live(newKey)}
-        ?disabled=${this.readonly}
-        @input=${(e: Event) => setNewKey((e.target as HTMLInputElement).value)}
-        @keydown=${(e: KeyboardEvent) => {
-          if (e.key === "Enter") add();
-        }}
-      />
-      <button
-        type="button"
-        class="jf-add"
-        aria-label="Add to ${f.label}"
-        ?disabled=${this.readonly || !canAdd}
-        @click=${add}
-      >
-        ＋ Add
-      </button>
-    </div>`;
+    const addRow = this.readonly
+      ? nothing
+      : html`<div class="jf-map-add jf-new">
+          <input
+            class="jf-input"
+            type="text"
+            spellcheck="false"
+            placeholder="New key"
+            aria-label="New key for ${f.label}"
+            aria-invalid=${taken ? "true" : "false"}
+            title=${taken ? "That key is taken" : ""}
+            .value=${live(newKey)}
+            @input=${(e: Event) => setNewKey((e.target as HTMLInputElement).value)}
+            @keydown=${(e: KeyboardEvent) => {
+              if (e.key === "Enter") add();
+            }}
+            @change=${add}
+          />
+        </div>`;
     return f.objectValues
       ? html`<div class="jf-subs" role="group" aria-label=${f.label}>
           ${entries.map(card)} ${addRow}
@@ -1640,6 +1727,26 @@ export class JsonFormElement extends LitElement {
     }
     .jf-subs > .jf-map-add {
       padding: 0;
+    }
+    /* The empty last row (a new item or key): drawn faint until used. */
+    .jf-sub.jf-new {
+      background: transparent;
+      border: 1px dashed var(--divider, #333);
+    }
+    .jf-sub.jf-new:hover {
+      background: var(--jf-hover, rgba(255, 255, 255, 0.04));
+    }
+    .jf-sub.jf-new .jf-sub-title {
+      font-weight: 400;
+      color: var(--text-secondary, #999);
+    }
+    .jf-new-btn {
+      text-align: left;
+      color: var(--text-secondary, #999);
+      cursor: pointer;
+    }
+    .jf-new .jf-input[aria-invalid="true"] {
+      box-shadow: inset 0 0 0 1px var(--jf-error, #f44747);
     }
     .jf-map-add .jf-input {
       flex: 1;
