@@ -266,7 +266,10 @@ may drop there. There is no source-side destination list.
 
 The user-config override is `dragConsumers` in `config.json`: payload kind →
 consumer id (`<extensionId>/<consumerId>`, or a bare platform id such as
-`file-viewer`), edited from the Settings sidebar tab. It applies immediately.
+`file-viewer`), edited from the Settings sidebar tab: the form offers the
+kinds registered now, each with a menu of the consumers registered for it
+(a choice saved for a kind nothing registers now is shown read-only, to
+reset). It applies immediately.
 
 #### Settings / configuration overrides
 

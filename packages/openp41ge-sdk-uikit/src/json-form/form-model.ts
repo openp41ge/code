@@ -75,6 +75,8 @@ export interface FormField {
   readonly items?: FormField[][];
   /** string: `null` is a value (`type: ["string", "null"]`). */
   readonly nullable?: boolean;
+  /** `readOnly` in its schema: shown, not edited (Reset still removes it). */
+  readonly readOnly?: boolean;
   /** enum from `x-keysOf`: the sibling map it names. */
   readonly keysOf?: string;
   /** map: one field per key, named by it. */
@@ -267,6 +269,7 @@ function field(
     required,
     error: ctx.errors.get(key) ?? null,
     ...(isNullableString(s) ? { nullable: true } : {}),
+    ...(s.readOnly === true ? { readOnly: true } : {}),
   };
   switch (kind) {
     case "number":

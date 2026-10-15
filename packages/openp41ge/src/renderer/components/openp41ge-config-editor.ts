@@ -41,6 +41,7 @@ import { createLogger } from "openp41ge-core-logger";
 import type { ExtensionConfigBridge } from "../services/extension-configs";
 import { settingsBridge, type PlatformConfigBridge } from "../services/settings-sources";
 import { appServices } from "../app";
+import { extensionDrag } from "../services/extension-drag";
 import { jsonIcon, resetIcon, saveIcon, showDefaultsIcon, sortKeysIcon } from "./settings-icons";
 
 const log = createLogger("openp41ge", "config-editor");
@@ -87,7 +88,7 @@ export class Openp41geConfigEditor extends LitElement {
       ...(platform as unknown as PlatformConfigBridge),
       set: (key: string, value: unknown) => appServices.configService.set(key, value),
     };
-    this.bridge = settingsBridge(extension, platformBridge);
+    this.bridge = settingsBridge(extension, platformBridge, extensionDrag.registry);
     return this.bridge;
   }
 

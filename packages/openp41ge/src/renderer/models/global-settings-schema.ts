@@ -112,7 +112,7 @@ export const GLOBAL_SETTINGS_SCHEMA = {
       propertyNames: { pattern: "^[^/\\s]+/[^/\\s]+$" },
       additionalProperties: { type: "string" },
       description:
-        'Which component opens a dropped item, when more than one can. Keys are payload kinds ("openp41ge/file-path", "<extensionId>/<kind>"); values are consumer ids ("<extensionId>/<consumerId>", or a platform id such as "file-viewer"). A kind not listed opens in the first registered consumer (the platform\'s own, if it has one). Applies immediately, in every window.',
+        "Which component opens a dropped item, for each kind of item that something registered can open. A kind opens in the first component registered for it (the platform's own, if it has one) unless another is chosen here. Applies immediately, in every window.",
     },
   },
 } as const;

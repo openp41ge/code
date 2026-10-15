@@ -48,6 +48,7 @@ type Placement = "grid" | "sidebar";
 
 export class DragConsumerRegistry {
   private _entries: Entry[] = [];
+  private _listeners = new Set<() => void>();
 
   constructor(private readonly _opts: DragConsumerRegistryOptions) {}
 
@@ -67,10 +68,40 @@ export class DragConsumerRegistry {
         decl: c,
       });
     }
+    this._changed();
   }
 
   unregister(extensionId: string): void {
+    const before = this._entries.length;
     this._entries = this._entries.filter((e) => e.ownerId !== extensionId);
+    if (this._entries.length !== before) this._changed();
+  }
+
+  /** Each kind a grid drop can open, with the ids of the consumers that can
+   *  open it (first registered first: the first is the default), in the
+   *  order the kinds were first registered. The user's override picks one. */
+  choices(): ReadonlyMap<DragKind, readonly string[]> {
+    const out = new Map<DragKind, string[]>();
+    for (const e of this._entries) {
+      for (const kind of e.decl.accepts) {
+        if (!this._canOpen(e, kind, "grid")) continue;
+        const ids = out.get(kind) ?? [];
+        if (!ids.includes(e.qualifiedId)) ids.push(e.qualifiedId);
+        out.set(kind, ids);
+      }
+    }
+    return out;
+  }
+
+  /** Call `fn` when an extension's consumers are registered or removed.
+   *  Returns unsubscribe function. */
+  onChange(fn: () => void): () => void {
+    this._listeners.add(fn);
+    return () => this._listeners.delete(fn);
+  }
+
+  private _changed(): void {
+    for (const fn of this._listeners) fn();
   }
 
   /** Resolve a payload to what opens it at `placement`, or null. */

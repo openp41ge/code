@@ -737,7 +737,10 @@ export class JsonFormElement extends LitElement {
     const reset = this._resetButton(f);
     const inRow = ROW_KINDS.includes(f.kind);
     return html`
-      <div class="jf-field ${faded ? "jf-default" : ""}" data-key=${f.key}>
+      <div
+        class="jf-field ${faded ? "jf-default" : ""} ${f.readOnly ? "jf-readonly" : ""}"
+        data-key=${f.key}
+      >
         <div class="jf-head">
           ${
             labelled
@@ -808,6 +811,7 @@ export class JsonFormElement extends LitElement {
 
   private _control(f: FormField, id: string): TemplateResult {
     const placeholder = f.hasDefault ? "" : "Not set";
+    const locked = this.readonly || f.readOnly === true;
     switch (f.kind) {
       case "boolean":
         return html`<openp41ge-toggle
@@ -815,7 +819,7 @@ export class JsonFormElement extends LitElement {
           id=${id}
           .checked=${f.value === true}
           .label=${f.label}
-          ?disabled=${this.readonly}
+          ?disabled=${locked}
           @change=${(e: CustomEvent<{ checked: boolean }>) => this._set(f.path, e.detail.checked)}
         ></openp41ge-toggle>`;
       case "number":
@@ -823,8 +827,15 @@ export class JsonFormElement extends LitElement {
           v === undefined ? this._reset(f.path) : this._set(f.path, v),
         );
       case "enum":
-        return this._select(id, f.value, f.options ?? [], !f.set && !f.hasDefault, (v) =>
-          v === undefined ? this._reset(f.path) : this._set(f.path, v),
+        return this._select(
+          id,
+          f.value,
+          f.options ?? [],
+          !f.set && !f.hasDefault,
+          (v) => (v === undefined ? this._reset(f.path) : this._set(f.path, v)),
+          "Not set",
+          null,
+          locked,
         );
       case "string":
       case "secret":
@@ -837,7 +848,7 @@ export class JsonFormElement extends LitElement {
           spellcheck="false"
           placeholder=${f.nullable ? "null" : placeholder}
           .value=${typeof f.value === "string" ? f.value : ""}
-          ?disabled=${this.readonly}
+          ?disabled=${locked}
           @input=${(e: Event) => {
             const text = (e.target as HTMLInputElement).value;
             // Clearing a value that may be null sets null; clearing a
@@ -870,7 +881,7 @@ export class JsonFormElement extends LitElement {
   private _numberInput(
     id: string,
     value: unknown,
-    limits: { integer?: boolean; hasDefault?: boolean },
+    limits: { integer?: boolean; hasDefault?: boolean; readOnly?: boolean },
     onChange: (v: number | undefined) => void,
     label: string | null = null,
   ): TemplateResult {
@@ -890,7 +901,7 @@ export class JsonFormElement extends LitElement {
       title=${invalid ? numberHint(integer) : ""}
       placeholder=${limits.hasDefault === false ? "Not set" : ""}
       .value=${live(typed ?? (typeof value === "number" ? String(value) : ""))}
-      ?disabled=${this.readonly}
+      ?disabled=${this.readonly || limits.readOnly === true}
       @input=${(e: Event) => {
         const text = (e.target as HTMLInputElement).value;
         this._setNumberText(id, text);
@@ -914,6 +925,7 @@ export class JsonFormElement extends LitElement {
     onChange: (v: unknown) => void,
     placeholder = "Not set",
     label: string | null = null,
+    disabled = this.readonly,
   ): TemplateResult {
     const selected = options.findIndex((o) => JSON.stringify(o) === JSON.stringify(value));
     const choices = [
@@ -932,7 +944,7 @@ export class JsonFormElement extends LitElement {
       placeholder=${placeholder}
       label=${label ?? nothing}
       align-to=".jf-input-card"
-      ?disabled=${this.readonly}
+      ?disabled=${disabled}
       @change=${(e: CustomEvent<{ value: string }>) => {
         e.stopPropagation();
         const idx = e.detail.value;
@@ -1539,6 +1551,13 @@ export class JsonFormElement extends LitElement {
     }
     .jf-default > .jf-row > .jf-input:focus {
       opacity: 1;
+    }
+    /* A read-only setting (shown, not edited): its label and control greyed. */
+    .jf-readonly > .jf-head > .jf-label,
+    .jf-readonly > .jf-row > .jf-input:not(.jf-select),
+    .jf-readonly > .jf-row > .jf-select::part(trigger),
+    .jf-readonly > .jf-row > openp41ge-toggle {
+      opacity: 0.55;
     }
     .jf-error {
       color: var(--jf-error, #f44747);
