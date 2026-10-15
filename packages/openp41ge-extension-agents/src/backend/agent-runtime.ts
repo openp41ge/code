@@ -28,6 +28,7 @@ import type { ChatProvider, ChatProviderConfig, ProviderDelta } from "./chat-pro
 import type { ChatThreads } from "./chat-threads.js";
 import type { ChatProviderRegistry } from "./chat-provider-registry.js";
 import type { ToolRegistry } from "./tool-registry.js";
+import type { ToolExecutionContext } from "./tool.js";
 
 const log = logFor("AgentRuntime");
 
@@ -35,56 +36,75 @@ const DEFAULT_SYSTEM_PROMPT =
   "You are a helpful coding agent inside Openp41ge. You can use tools to read and search " +
   "files. When you use a tool, explain briefly what you found. Be concise.";
 
-/** A worktree visible in the explorer — what the agent's file tools are scoped to. */
-export interface ConnectedWorktree {
+/** A repository of the chat's workspace; its worktrees are what the agent's
+ *  file tools are scoped to. */
+export interface ConnectedRepository {
   /** Repo identifier as shown in the explorer (e.g. "github.com/org/repo"). */
   repo: string;
-  /** Checked-out branch name. */
-  branch: string;
-  /** Absolute path of the worktree directory. */
-  path: string;
+  /** Whether it is cloned (a worktree can be checked out of it). */
+  cloned: boolean;
+  /** Its checked-out worktrees: the branch, and the worktree directory. */
+  worktrees: Array<{ branch: string; path: string }>;
 }
+
+/** A worktree checked out (`path`), or why not (`error`). */
+export interface WorktreeResult {
+  ok: boolean;
+  path?: string;
+  error?: string;
+}
+
+/** The tool that checks out a worktree (named in the system prompt). */
+const CREATE_WORKTREE_TOOL = "create_worktree";
 
 export interface AgentRuntimeConfig {
   /** Resolve the persisted config for a provider id, or null when unconfigured. */
   getProviderConfig(providerId: string): ChatProviderConfig | null;
   /**
-   * Resolve the connected worktrees (visible in the explorer) that the agent's
-   * file tools are allowed to touch. Return an empty array when nothing is
-   * connected (tools must deny all file access). Omit to keep the previous
-   * unrestricted behaviour.
+   * Resolve the repositories of the chat's workspace, whose worktrees the
+   * agent's file tools are allowed to touch (read again for each request to
+   * the provider). Return an empty array when nothing is connected (tools
+   * must deny all file access). Omit to keep the previous unrestricted
+   * behaviour.
    */
-  getConnectedWorktrees?(chatId: string): Promise<ConnectedWorktree[]>;
+  getConnectedRepositories?(chatId: string): Promise<ConnectedRepository[]>;
+  /** Check out `branch` of `repo` as a worktree of the chat's workspace. */
+  addWorktree?(chatId: string, repo: string, branch: string): Promise<WorktreeResult>;
 }
 
 /**
- * The system prompt, with the connected-worktree scope appended so the model
- * knows exactly which paths its file tools may read and search.
+ * The system prompt, with the connected repositories appended so the model
+ * knows exactly which paths its file tools may read and search, and which
+ * repositories it could check a worktree out of (`canCheckOut`: the
+ * create_worktree tool is available).
  */
-function buildSystemPrompt(connected: ConnectedWorktree[] | undefined): string {
+function buildSystemPrompt(
+  connected: ConnectedRepository[] | undefined,
+  canCheckOut: boolean,
+): string {
   if (connected === undefined) return DEFAULT_SYSTEM_PROMPT;
   if (connected.length === 0) {
     return `${DEFAULT_SYSTEM_PROMPT}\n\nNo connected worktrees. The file tools (read_file, search_files) are scoped and cannot access anything.`;
   }
 
-  // Group worktrees by repo so the model understands a repo may have several
-  // branch checkouts — the same repository at different branches, not distinct
-  // targets. Grouping prevents the model from treating every worktree as a
-  // separate repo and re-reading shared files across sibling worktrees.
-  const byRepo = new Map<string, ConnectedWorktree[]>();
-  for (const w of connected) {
-    const list = byRepo.get(w.repo);
-    if (list) list.push(w);
-    else byRepo.set(w.repo, [w]);
-  }
+  // Worktrees are listed under their repo so the model understands a repo may
+  // have several branch checkouts — the same repository at different
+  // branches, not distinct targets — and does not re-read shared files across
+  // sibling worktrees. A repo with no worktree is listed too, so the model
+  // knows it is there.
+  const blocks = connected.map((r) => {
+    const lines = !r.cloned
+      ? ["    - not cloned yet"]
+      : r.worktrees.length === 0
+        ? ["    - no worktree checked out"]
+        : r.worktrees.map((w) => `    - branch ${w.branch}: ${w.path}`);
+    return `- ${r.repo}\n${lines.join("\n")}`;
+  });
 
-  const blocks: string[] = [];
-  for (const [repo, worktrees] of byRepo) {
-    const wtLines = worktrees.map((w) => `    - branch ${w.branch}: ${w.path}`).join("\n");
-    blocks.push(`- ${repo}\n${wtLines}`);
-  }
-
-  return `${DEFAULT_SYSTEM_PROMPT}\n\nConnected repositories you may read and search (file tools are scoped to their worktrees):\n\n${blocks.join("\n")}\n\nEach repository has one or more worktree checkouts (one per branch) — they are the same repository at different branches. To read or search a repository, use any one of its worktree paths; do not repeat the same file across sibling worktrees.`;
+  const checkOut = canCheckOut
+    ? ` To work in a repository with no worktree, or on another branch, check one out with ${CREATE_WORKTREE_TOOL}; it is then in scope.`
+    : "";
+  return `${DEFAULT_SYSTEM_PROMPT}\n\nConnected repositories you may read and search (file tools are scoped to their worktrees):\n\n${blocks.join("\n")}\n\nEach repository has one or more worktree checkouts (one per branch) — they are the same repository at different branches. To read or search a repository, use any one of its worktree paths; do not repeat the same file across sibling worktrees.${checkOut}`;
 }
 
 /** A tool call accumulated from streamed deltas, awaiting execution. */
@@ -187,21 +207,13 @@ export class AgentRuntime {
       const ping = await provider.ping();
       this._setStatus(winId, chatId, { streaming: true, providerOk: ping });
 
-      // 3. Resolve the connected-worktree scope for this send, then run the
-      //    agent loop. When no scope resolver is configured, `connected` stays
-      //    undefined and tools keep the previous unrestricted behaviour.
-      const connected = this._config.getConnectedWorktrees
-        ? await this._config.getConnectedWorktrees(chatId)
-        : undefined;
-
-      // 4. Agent loop.
+      // 3. Agent loop.
       await this._runLoop(
         chatId,
         winId,
         provider,
         controller.signal,
         cwd,
-        connected,
         enabledTools,
         thinkingLevel,
       );
@@ -238,17 +250,39 @@ export class AgentRuntime {
     provider: ChatProvider,
     signal: AbortSignal,
     cwd?: string,
-    connected?: ConnectedWorktree[],
     enabledTools?: string[],
     thinkingLevel?: string,
   ): Promise<void> {
-    // Roots = the connected worktree paths; undefined when no scope is
-    // configured (legacy behaviour). Empty when nothing is connected (deny).
-    const roots = connected !== undefined ? connected.map((c) => c.path) : undefined;
-    const systemContent = buildSystemPrompt(connected);
+    const addWorktree = this._config.addWorktree;
     while (!signal.aborted) {
       const chat = this._store.get(chatId);
       if (!chat) return;
+
+      const toolDefs = this._tools.definitions();
+      // `enabledTools` is optional: when omitted/undefined, every registered
+      // tool is available (the pre-settings default). When provided — even as
+      // an empty list — it is authoritative, so a workspace that disables all
+      // of its tools yields `[]` and no tool runs.
+      const tools =
+        enabledTools !== undefined
+          ? toolDefs.filter((t) => enabledTools.includes(t.name))
+          : toolDefs;
+
+      // The connected-repository scope, read for each request (a tool may
+      // have checked out a worktree). When no resolver is configured,
+      // `connected` stays undefined and tools keep the previous unrestricted
+      // behaviour.
+      const connected = this._config.getConnectedRepositories
+        ? await this._config.getConnectedRepositories(chatId)
+        : undefined;
+      if (signal.aborted) return;
+      // Roots = the connected worktree paths; undefined when no scope is
+      // configured (legacy behaviour). Empty when nothing is connected (deny).
+      const roots = connected?.flatMap((r) => r.worktrees.map((w) => w.path));
+      const systemContent = buildSystemPrompt(
+        connected,
+        !!addWorktree && tools.some((t) => t.name === CREATE_WORKTREE_TOOL),
+      );
 
       const system: ChatMessage = {
         id: this._id("sys"),
@@ -260,16 +294,6 @@ export class AgentRuntime {
 
       let toolCalls: PendingToolCall[] = [];
       let currentAssistant: ChatMessage | null = null;
-
-      const toolDefs = this._tools.definitions();
-      // `enabledTools` is optional: when omitted/undefined, every registered
-      // tool is available (the pre-settings default). When provided — even as
-      // an empty list — it is authoritative, so a workspace that disables all
-      // of its tools yields `[]` and no tool runs.
-      const tools =
-        enabledTools !== undefined
-          ? toolDefs.filter((t) => enabledTools.includes(t.name))
-          : toolDefs;
       for await (const delta of provider.streamChat({
         messages: requestMessages,
         tools,
@@ -337,7 +361,15 @@ export class AgentRuntime {
       // Execute accumulated tool calls and feed results back to the provider.
       for (const tc of toolCalls) {
         if (signal.aborted) break;
-        const ctx = roots !== undefined ? { cwd, roots } : { cwd };
+        const ctx: ToolExecutionContext = roots !== undefined ? { cwd, roots } : { cwd };
+        if (addWorktree) {
+          // A worktree checked out is in scope for the rest of this batch too.
+          ctx.addWorktree = async (repo, branch) => {
+            const added = await addWorktree(chatId, repo, branch);
+            if (added.ok && added.path) roots?.push(added.path);
+            return added;
+          };
+        }
         const result = await this._tools.execute(tc.name, parseArgs(tc.arguments), ctx);
         const chatNow = this._store.get(chatId);
         if (!chatNow) break;

@@ -279,6 +279,8 @@ export class ExtensionHost {
         ? {
             id: caller.workspace.id,
             roots: () => caller.workspace!.roots(),
+            repositories: () => caller.workspace!.repositories(),
+            addWorktree: (repoName, branch) => caller.workspace!.addWorktree(repoName, branch),
             dataDir: () => caller.workspace!.dataDirFor(extId),
           }
         : null,

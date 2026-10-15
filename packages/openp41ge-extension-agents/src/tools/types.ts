@@ -39,6 +39,15 @@ export interface ToolExecutionContext {
    * (legacy callers / direct tool usage).
    */
   roots?: string[];
+  /**
+   * Check out `branch` of the connected repository `repo` as a worktree of
+   * the chat's workspace (then in `roots`). Absent when the chat has no
+   * workspace to check out in. Resolves in-band, never throws.
+   */
+  addWorktree?(
+    repo: string,
+    branch: string,
+  ): Promise<{ ok: boolean; path?: string; error?: string }>;
 }
 
 /** Result of a tool execution. Errors are reported in-band, never thrown. */

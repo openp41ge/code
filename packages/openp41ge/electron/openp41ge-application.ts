@@ -65,6 +65,11 @@ import { WorkspaceManifestChanges } from "../src/main/services/workspace-manifes
 import { ExtensionHostManager } from "../src/main/services/extension-host-manager.js";
 import { ExtensionConfigService } from "../src/main/services/extension-config-service.js";
 import { callerWorkspace } from "../src/main/services/caller-workspace.js";
+import {
+  migrateWorkspaceFileData,
+  serializeWorkspaceFile,
+  withWorktree,
+} from "../src/layout/workspace-file.js";
 import type { CallerWorkspace } from "openp41ge-sdk";
 
 import {
@@ -597,12 +602,22 @@ export class Openp41geApplication {
     const file = workspacePathForSender(event);
     const workspace = file ? workspaceOfFile(file, this.openp41geDir) : null;
     if (!file || !workspace) return undefined;
+    const git = () => this.repositories.of(workspace).git;
     return callerWorkspace({
       workspace,
       repoNames: () =>
         readWorkspaceFiles(path.dirname(file), this.openp41geDir).find((w) => w.file === file)
           ?.repoNames ?? [],
-      listWorktrees: (repoName) => this.repositories.of(workspace).git.listWorktrees(repoName),
+      isCloned: async (repoName) => (await git().getRepo(repoName)) !== null,
+      listWorktrees: (repoName) => git().listWorktrees(repoName),
+      checkoutWorktree: (repoName, branch) => git().checkoutWorktree(repoName, branch),
+      // Recorded as the explorer records one; the manifest watcher tells the
+      // windows, which merge it into their open workspace.
+      recordWorktree: (repoName, branch) => {
+        const data = migrateWorkspaceFileData(JSON.parse(fs.readFileSync(file, "utf-8")));
+        const next = withWorktree(data, repoName, branch);
+        if (next) fs.writeFileSync(file, serializeWorkspaceFile(next), "utf-8");
+      },
     });
   }
 

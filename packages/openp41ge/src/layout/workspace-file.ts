@@ -243,6 +243,24 @@ function mergeRepos(base: readonly Repo[], mine: readonly Repo[], theirs: readon
 }
 
 /**
+ * `data` with `branch` added to the worktrees of the repo named `repoName`;
+ * null when that repo is not listed or already has it.
+ */
+export function withWorktree(
+  data: WorkspaceFileData,
+  repoName: string,
+  branch: string,
+): WorkspaceFileData | null {
+  const repos = data.repos ?? [];
+  const at = repos.findIndex((r) => deriveRepoName(r.url) === repoName);
+  if (at < 0 || (repos[at].worktrees ?? []).includes(branch)) return null;
+  const next = repos.map((r, i) =>
+    i === at ? { ...r, worktrees: [...(r.worktrees ?? []), branch] } : r,
+  );
+  return { ...data, repos: next };
+}
+
+/**
  * This window's manifest edits (`mine`, made on `base`, the file as last
  * read) merged with the file on disk now (`theirs`), so a save never erases
  * another writer's changes: a field I left alone takes the disk's value, one

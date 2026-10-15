@@ -37,6 +37,8 @@ export {
   type HandlerWorkspace,
   type CallerWorkspace,
   type WorkspaceRoot,
+  type WorkspaceRepository,
+  type WorktreeAddition,
   type GitRequest,
   type GitResult,
   EXTENSION_ID_SEPARATOR,

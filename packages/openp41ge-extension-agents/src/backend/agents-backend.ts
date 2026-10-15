@@ -8,7 +8,8 @@
  *   - "Opened once": a chat is open in at most one window (`ctx.windowId`);
  *     opening it in another is refused and the open state re-announced.
  *   - `send` runs the agent with the provider the extension's config names,
- *     its file tools scoped to the workspace's worktrees.
+ *     its file tools scoped to the workspace's worktrees; it sees every
+ *     repository there and can check out more worktrees.
  *
  * Pushes go out as the extension's topics (`changed`, `delta`, `tool`,
  * `status`, `usage`, `live-rate`, `reasoning`, `open-state`, `highlight`).
@@ -24,7 +25,7 @@ import type {
   ProcessRegistrations,
 } from "openp41ge-sdk";
 import type { ChatSearchOptions } from "../chat/types.js";
-import { AgentRuntime, type ConnectedWorktree } from "./agent-runtime.js";
+import { AgentRuntime, type ConnectedRepository } from "./agent-runtime.js";
 import type { ChatProviderConfig } from "./chat-provider.js";
 import type { ChatProviderRegistry } from "./chat-provider-registry.js";
 import { ChatThreads } from "./chat-threads.js";
@@ -229,6 +230,12 @@ export class AgentsBackend {
     return workspace.id;
   }
 
+  /** The workspace a chat belongs to, when seen. */
+  private _workspaceOf(chatId: string): HandlerWorkspace | undefined {
+    const owner = this._threads.workspaceOf(chatId);
+    return owner ? this._workspaces.get(owner.id) : undefined;
+  }
+
   private _runtimeFor(): AgentRuntime {
     this._runtime ??= new AgentRuntime(
       this._threads,
@@ -247,17 +254,26 @@ export class AgentsBackend {
         getProviderConfig: (providerId) =>
           (this._ctx && this._config(this._ctx).providers?.[providerId]) ?? null,
         // The agent's file tools may only touch the worktrees of the chat's
-        // workspace (checked out, listed by its workspace file).
-        getConnectedWorktrees: async (id): Promise<ConnectedWorktree[]> => {
-          const owner = this._threads.workspaceOf(id);
-          const workspace = owner ? this._workspaces.get(owner.id) : undefined;
+        // workspace (checked out, listed by its workspace file); it sees
+        // every repository there, and checks worktrees out through it.
+        getConnectedRepositories: async (id): Promise<ConnectedRepository[]> => {
+          const workspace = this._workspaceOf(id);
           if (!workspace) return [];
           try {
-            const roots = await workspace.roots();
-            return roots.map((r) => ({ repo: r.repoName, branch: r.branch, path: r.path }));
+            const repos = await workspace.repositories();
+            return repos.map((r) => ({
+              repo: r.repoName,
+              cloned: r.cloned,
+              worktrees: r.worktrees.map((w) => ({ branch: w.branch, path: w.path })),
+            }));
           } catch {
             return [];
           }
+        },
+        addWorktree: async (id, repo, branch) => {
+          const workspace = this._workspaceOf(id);
+          if (!workspace) return { ok: false, error: "the chat has no workspace" };
+          return workspace.addWorktree(repo, branch);
         },
       },
     );

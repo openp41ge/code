@@ -57,12 +57,35 @@ export interface WorkspaceRoot {
   readonly path: string;
 }
 
+/** A repository a workspace lists, with or without a worktree. */
+export interface WorkspaceRepository {
+  /** The repository (`<host>/<org>/<repo>`). */
+  readonly repoName: string;
+  /** Whether it is cloned (a worktree can be checked out of it). */
+  readonly cloned: boolean;
+  /** Its checked-out worktrees. */
+  readonly worktrees: readonly WorkspaceRoot[];
+}
+
+/** A worktree checked out (`path`), or why not (`error`). */
+export interface WorktreeAddition {
+  readonly ok: boolean;
+  readonly path?: string;
+  readonly error?: string;
+}
+
 /** The workspace of the window that dispatched a handler call. */
 export interface HandlerWorkspace {
   /** The workspace's id (stable; key per-workspace state by it). */
   readonly id: string;
   /** Its repositories' checked-out worktrees, read on each call. */
   roots(): Promise<readonly WorkspaceRoot[]>;
+  /** Every repository its workspace file lists, read on each call. */
+  repositories(): Promise<readonly WorkspaceRepository[]>;
+  /** Check out `branch` of the workspace repository `repoName` as a worktree
+   *  (an existing local or remote branch, else a new one from its HEAD) and
+   *  add it to the workspace. Never throws. */
+  addWorktree(repoName: string, branch: string): Promise<WorktreeAddition>;
   /** A folder this extension owns inside the workspace's data folder
    *  (`<workspace data>/extensions/<extensionId>/`), created on first call. */
   dataDir(): Promise<string>;
@@ -73,6 +96,8 @@ export interface HandlerWorkspace {
 export interface CallerWorkspace {
   readonly id: string;
   roots(): Promise<readonly WorkspaceRoot[]>;
+  repositories(): Promise<readonly WorkspaceRepository[]>;
+  addWorktree(repoName: string, branch: string): Promise<WorktreeAddition>;
   /** The extension's folder in the workspace's data folder, created. */
   dataDirFor(extensionId: string): Promise<string>;
 }
