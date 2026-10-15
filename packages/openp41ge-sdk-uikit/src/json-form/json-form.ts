@@ -20,8 +20,9 @@
  * The form scrolls itself (padded by `--jf-padding`), so its drawers cover
  * what is in view: give it a height to fill. A host can give the drawers a
  * larger area to cover (`drawerArea`, e.g. the tab's whole cell, tab bar
- * included); they block it until dismissed, and keep Tab inside the front
- * drawer. `drawersOpen` says whether one is open.
+ * included); they block it until dismissed (Tab does nothing in them).
+ * `drawersOpen` says whether one is open. Nothing in the form is in the tab
+ * order or shows a focus outline.
  *
  * `value` is the user's values only (what is stored); `defaults` the schema's
  * defaults. An unset field shows its default, faded; editing sets it, and
@@ -472,7 +473,9 @@ export class JsonFormElement extends LitElement {
             }}
             @keydown=${(e: KeyboardEvent) => {
               if (e.defaultPrevented) return;
-              if (e.key === "Tab") this._keepTabIn(e);
+              // Nothing in the form is in the tab order, and a drawer blocks
+              // its cell: Tab does nothing.
+              if (e.key === "Tab") e.preventDefault();
               if (e.key !== "Escape") return;
               e.preventDefault();
               e.stopPropagation();
@@ -484,6 +487,7 @@ export class JsonFormElement extends LitElement {
                 <span class="jf-drawer-title">${d.target.label}</span>
               </div>
               <button
+                tabindex="-1"
                 type="button"
                 class="jf-drawer-close"
                 aria-label="Close ${d.target.label}"
@@ -513,6 +517,7 @@ export class JsonFormElement extends LitElement {
   private _jsonToggle(key: string): TemplateResult {
     const on = this._jsonViews.has(key);
     return html`<button
+      tabindex="-1"
       type="button"
       class="jf-foot-btn ${on ? "jf-foot-btn--on" : ""}"
       aria-label="JSON view"
@@ -569,28 +574,6 @@ export class JsonFormElement extends LitElement {
     ></json-editor>`;
   }
 
-  /** Tab from the front drawer's last control goes to its first (Shift+Tab
-   *  the other way): a drawer blocks the rest of its area. */
-  private _keepTabIn(e: KeyboardEvent): void {
-    const drawer = e.currentTarget as HTMLElement;
-    const controls = [
-      ...drawer.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), input:not([disabled]), [tabindex="0"]',
-      ),
-    ];
-    if (controls.length === 0) return;
-    const at = controls.indexOf(this.shadowRoot?.activeElement as HTMLElement);
-    const first = controls[0];
-    const last = controls[controls.length - 1];
-    if (e.shiftKey && at <= 0) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && (at === -1 || at === controls.length - 1)) {
-      e.preventDefault();
-      first.focus();
-    }
-  }
-
   /** A card that opens `key`'s drawer: its title, description and what it
    *  holds, with its own actions (Reset, Remove…) at the right. */
   private _card(
@@ -612,7 +595,7 @@ export class JsonFormElement extends LitElement {
       class="jf-sub"
       data-key=${key}
       role="button"
-      tabindex="0"
+      tabindex="-1"
       aria-haspopup="dialog"
       @click=${open}
       @keydown=${(e: KeyboardEvent) => {
@@ -802,6 +785,7 @@ export class JsonFormElement extends LitElement {
   private _resetButton(f: FormField): TemplateResult | typeof nothing {
     if (this.readonly || f.kind === "unsupported" || !(f.hasDefault || f.set)) return nothing;
     return html`<button
+      tabindex="-1"
       type="button"
       class="jf-icon-btn jf-reset"
       aria-label="Reset ${f.label}"
@@ -827,6 +811,7 @@ export class JsonFormElement extends LitElement {
     switch (f.kind) {
       case "boolean":
         return html`<openp41ge-toggle
+          no-tab
           id=${id}
           .checked=${f.value === true}
           .label=${f.label}
@@ -844,6 +829,7 @@ export class JsonFormElement extends LitElement {
       case "string":
       case "secret":
         return html`<input
+          tabindex="-1"
           class="jf-input"
           id=${id}
           type=${f.kind === "secret" ? "password" : "text"}
@@ -892,6 +878,7 @@ export class JsonFormElement extends LitElement {
     const typed = this._numberText.get(id);
     const invalid = this._notANumber(id, integer);
     return html`<input
+      tabindex="-1"
       class="jf-input jf-number"
       id=${id}
       type="text"
@@ -937,6 +924,7 @@ export class JsonFormElement extends LitElement {
       })),
     ];
     return html`<openp41ge-select
+      no-tab
       class="jf-input jf-select"
       id=${id}
       .options=${choices}
@@ -970,6 +958,7 @@ export class JsonFormElement extends LitElement {
           const control =
             kind.kind === "boolean"
               ? html`<openp41ge-toggle
+                  no-tab
                   id=${id}
                   .checked=${item === true}
                   .label=${`${f.label} item ${i + 1}`}
@@ -987,6 +976,7 @@ export class JsonFormElement extends LitElement {
                 : kind.kind === "enum"
                   ? this._select(id, item, kind.options ?? [], false, (v) => edit(i, v))
                   : html`<input
+                      tabindex="-1"
                       class="jf-input"
                       id=${id}
                       type="text"
@@ -999,6 +989,7 @@ export class JsonFormElement extends LitElement {
           return html`<div class="jf-list-item">
             ${control}
             <button
+              tabindex="-1"
               type="button"
               class="jf-icon-btn jf-x"
               aria-label="Remove item ${i + 1} of ${f.label}"
@@ -1032,6 +1023,7 @@ export class JsonFormElement extends LitElement {
     const control =
       kind.kind === "boolean"
         ? html`<button
+            tabindex="-1"
             type="button"
             class="jf-input jf-new-btn"
             aria-label=${label}
@@ -1048,6 +1040,7 @@ export class JsonFormElement extends LitElement {
                 add(n);
               })
             : html`<input
+                tabindex="-1"
                 class="jf-input"
                 id=${id}
                 type="text"
@@ -1073,6 +1066,7 @@ export class JsonFormElement extends LitElement {
   ): TemplateResult {
     const invalid = this._notANumber(id, integer);
     return html`<input
+      tabindex="-1"
       class="jf-input jf-number"
       id=${id}
       type="text"
@@ -1129,6 +1123,7 @@ export class JsonFormElement extends LitElement {
               errors: fields.reduce((sum, child) => sum + errorCount(child), 0),
               actions: html`
                 <button
+                  tabindex="-1"
                   type="button"
                   class="jf-icon-btn"
                   aria-label="Move item ${n} of ${f.label} up"
@@ -1139,6 +1134,7 @@ export class JsonFormElement extends LitElement {
                   ${UP_ICON}
                 </button>
                 <button
+                  tabindex="-1"
                   type="button"
                   class="jf-icon-btn"
                   aria-label="Move item ${n} of ${f.label} down"
@@ -1149,6 +1145,7 @@ export class JsonFormElement extends LitElement {
                   ${DOWN_ICON}
                 </button>
                 <button
+                  tabindex="-1"
                   type="button"
                   class="jf-icon-btn jf-x"
                   aria-label="Remove item ${n} of ${f.label}"
@@ -1173,7 +1170,7 @@ export class JsonFormElement extends LitElement {
             : html`<div
                 class="jf-sub jf-new"
                 role="button"
-                tabindex="0"
+                tabindex="-1"
                 aria-haspopup="dialog"
                 aria-label="New item of ${f.label}"
                 @click=${add}
@@ -1245,6 +1242,7 @@ export class JsonFormElement extends LitElement {
     };
     const removeButton = (key: string) =>
       html`<button
+        tabindex="-1"
         type="button"
         class="jf-icon-btn jf-x"
         aria-label="Remove ${key} from ${f.label}"
@@ -1260,6 +1258,7 @@ export class JsonFormElement extends LitElement {
       return marked.key === key
         ? html`<span class="jf-pill">Default</span>`
         : html`<button
+            tabindex="-1"
             type="button"
             class="jf-add jf-make"
             aria-label="Make ${key} the ${marked.label.toLowerCase()}"
@@ -1288,6 +1287,7 @@ export class JsonFormElement extends LitElement {
               <div class="jf-field">
                 <label class="jf-label" for=${idFor(`${e.key}.__key`)}>Key</label>
                 <input
+                  tabindex="-1"
                   class="jf-input"
                   id=${idFor(`${e.key}.__key`)}
                   type="text"
@@ -1314,6 +1314,7 @@ export class JsonFormElement extends LitElement {
       ? nothing
       : html`<div class="jf-map-add jf-new">
           <input
+            tabindex="-1"
             class="jf-input"
             type="text"
             spellcheck="false"
@@ -1341,6 +1342,7 @@ export class JsonFormElement extends LitElement {
         >
           <div class="jf-sub-main">
             <input
+              tabindex="-1"
               class="jf-new-key"
               type="text"
               spellcheck="false"
@@ -1381,6 +1383,12 @@ export class JsonFormElement extends LitElement {
   }
 
   static override styles = css`
+    /* Nothing in the form shows a focus outline (nor is it in the tab order:
+       every control has tabindex -1). */
+    *:focus,
+    *:focus-visible {
+      outline: none;
+    }
     :host {
       display: block;
       position: relative;
@@ -1647,10 +1655,6 @@ export class JsonFormElement extends LitElement {
     /* Reset on a card is drawn like Reset in an input's card. */
     .jf-sub-actions > .jf-reset {
       background: transparent;
-    }
-    .jf-sub:focus-visible {
-      outline: 1px solid var(--accent, #569cd6);
-      outline-offset: -1px;
     }
     .jf-sub-main {
       flex: 1;

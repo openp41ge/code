@@ -16,12 +16,14 @@
  *  - `offLabel` (String, default "Off") — label shown when off.
  *  - `label`    (String) — accessible name (aria-label) for the control.
  *  - `disabled` (Boolean, reflected) — shown but not changeable.
+ *  - `noTab`    (Boolean, reflected as `no-tab`) — out of the tab order (a
+ *    click still toggles it).
  *
  * Events (bubbling, composed):
  *  - `change` — fired when the user toggles. `detail.checked` is the new state.
  */
 
-import { LitElement, html, css } from "lit";
+import { LitElement, html, css, nothing } from "lit";
 import { property } from "lit/decorators.js";
 
 export class Openp41geToggle extends LitElement {
@@ -85,6 +87,8 @@ export class Openp41geToggle extends LitElement {
   @property({ type: String }) label = "";
   /** Shown but not changeable. */
   @property({ type: Boolean, reflect: true }) disabled = false;
+  /** Out of the tab order (a click still toggles it). */
+  @property({ type: Boolean, reflect: true, attribute: "no-tab" }) noTab = false;
 
   private _onChange(e: Event): void {
     const checked = (e.target as HTMLInputElement).checked;
@@ -103,6 +107,7 @@ export class Openp41geToggle extends LitElement {
       <label class="toggle">
         <input
           type="checkbox"
+          tabindex=${this.noTab ? "-1" : nothing}
           .checked=${this.checked}
           ?disabled=${this.disabled}
           aria-label=${this.label || "toggle"}

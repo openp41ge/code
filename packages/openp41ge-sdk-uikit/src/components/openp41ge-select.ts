@@ -14,6 +14,8 @@
  *  - `placeholder` (String) — shown when no option has `value`.
  *  - `label`       (String) — accessible name (aria-label) for the control.
  *  - `disabled`    (Boolean, reflected) — shown but not changeable.
+ *  - `noTab`       (Boolean, reflected as `no-tab`) — out of the tab order
+ *                  (still clickable), with no focus ring.
  *  - `alignTo`     (String) — a selector: the list lines up with (is as wide
  *                  as) the closest ancestor matching it, else with the element.
  *
@@ -68,6 +70,9 @@ export class Openp41geSelect extends LitElement {
     }
     .trigger:focus-visible {
       box-shadow: inset 0 0 0 1px var(--accent, #569cd6);
+    }
+    :host([no-tab]) .trigger:focus-visible {
+      box-shadow: none;
     }
     :host([disabled]) .trigger {
       cursor: default;
@@ -124,6 +129,7 @@ export class Openp41geSelect extends LitElement {
   @property({ type: String }) placeholder = "";
   @property({ type: String }) label = "";
   @property({ type: Boolean, reflect: true }) disabled = false;
+  @property({ type: Boolean, reflect: true, attribute: "no-tab" }) noTab = false;
   @property({ type: String, attribute: "align-to" }) alignTo = "";
 
   @state() private _open = false;
@@ -250,6 +256,7 @@ export class Openp41geSelect extends LitElement {
         type="button"
         class="trigger"
         part="trigger"
+        tabindex=${this.noTab ? "-1" : nothing}
         role="combobox"
         aria-haspopup="listbox"
         aria-expanded=${this._open ? "true" : "false"}
