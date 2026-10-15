@@ -391,7 +391,7 @@ export class JsonFormElement extends LitElement {
     };
     walk(fields);
     this._targets = new Map();
-    const form = fields.map((f) => this._field(f));
+    const form = this._fields(fields);
     // Each drawer's card was rendered by the form or by the drawer behind it,
     // so what it opens is known by the time it renders.
     const open: OpenDrawer[] = [];
@@ -677,7 +677,7 @@ export class JsonFormElement extends LitElement {
     const body = (): TemplateResult => {
       const content =
         f.kind === "group"
-          ? html`<div class="jf">${(f.fields ?? []).map((child) => this._field(child))}</div>`
+          ? html`<div class="jf">${this._fields(f.fields ?? [])}</div>`
           : f.kind === "list"
             ? this._list(f)
             : f.kind === "objects"
@@ -698,6 +698,31 @@ export class JsonFormElement extends LitElement {
       },
       { label: f.label, path: f.path, body },
     );
+  }
+
+  /** A list of fields. Object and array settings next to each other whose
+   *  names share a prefix (`editor/*`, `editor/file`…) are one card, a row
+   *  each. */
+  private _fields(fields: readonly FormField[]): TemplateResult[] {
+    const prefix = (f: FormField): string | null => {
+      if (!CARD_KINDS.includes(f.kind)) return null;
+      const at = f.name.indexOf("/");
+      return at > 0 ? f.name.slice(0, at + 1) : null;
+    };
+    const out: TemplateResult[] = [];
+    for (let i = 0; i < fields.length;) {
+      const p = prefix(fields[i]);
+      let j = i + 1;
+      while (p !== null && j < fields.length && prefix(fields[j]) === p) j++;
+      const run = fields.slice(i, j);
+      out.push(
+        run.length > 1
+          ? html`<div class="jf-sub-group">${run.map((f) => this._field(f))}</div>`
+          : this._field(fields[i]),
+      );
+      i = j;
+    }
+    return out;
   }
 
   private _field(f: FormField): TemplateResult {
@@ -1040,7 +1065,7 @@ export class JsonFormElement extends LitElement {
             {
               label: title,
               path: [...f.path, i],
-              body: () => html`<div class="jf">${fields.map((child) => this._field(child))}</div>`,
+              body: () => html`<div class="jf">${this._fields(fields)}</div>`,
             },
           );
         })}
@@ -1176,7 +1201,7 @@ export class JsonFormElement extends LitElement {
                   @change=${(ev: Event) => rename(e.name, ev.target as HTMLInputElement)}
                 />
               </div>
-              ${fields.map((child) => this._field(child))}
+              ${this._fields(fields)}
             </div>`,
         },
       );
@@ -1769,6 +1794,19 @@ export class JsonFormElement extends LitElement {
     }
     .jf-subs > .jf-map-add {
       padding: 0;
+    }
+    /* Grouped settings (editor/*, editor/file…): one card, a row each. */
+    .jf-sub-group {
+      display: flex;
+      flex-direction: column;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .jf-sub-group > .jf-sub {
+      border-radius: 0;
+    }
+    .jf-sub-group > .jf-sub + .jf-sub {
+      border-top: 1px solid var(--divider, #333);
     }
     /* The empty last row (a new item or key): drawn faint until used. Its
        dashed edge is an outline, so it is exactly a card's size. */
