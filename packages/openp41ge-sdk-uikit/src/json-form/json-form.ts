@@ -87,12 +87,6 @@ const RESET_ICON = html`<svg viewBox="0 -960 960 960" fill="currentColor" aria-h
   />
 </svg>`;
 
-/** Form view (the Settings tab's icon). */
-const FORM_ICON = html`<svg viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true">
-  <path
-    d="M240-160 80-320l56-56 64 62v-446h80v446l64-62 56 56-160 160Zm240-40v-80h400v80H480Zm0-240v-80h400v80H480Zm0-240v-80h400v80H480Z"
-  />
-</svg>`;
 /** JSON view, { } (the Settings tab's icon; drawn with stroke). */
 const JSON_ICON = html`<svg
   viewBox="0 0 16 16"
@@ -459,26 +453,26 @@ export class JsonFormElement extends LitElement {
             </div>
             <footer class="jf-drawer-foot">
               <span class="jf-foot-spacer"></span>
-              ${this._viewButton(d.key, false, "Form view", FORM_ICON)}
-              ${this._viewButton(d.key, true, "JSON view", JSON_ICON)}
+              ${this._jsonToggle(d.key)}
             </footer>
           </section>`,
       )}
     </div>`;
   }
 
-  /** A bottom-bar button switching a drawer between its form and JSON views. */
-  private _viewButton(key: string, json: boolean, label: string, icon: TemplateResult) {
-    const on = this._jsonViews.has(key) === json;
+  /** The bottom bar's JSON view toggle: on, the drawer shows its value as
+   *  JSON; off (the default), the form. */
+  private _jsonToggle(key: string): TemplateResult {
+    const on = this._jsonViews.has(key);
     return html`<button
       type="button"
       class="jf-foot-btn ${on ? "jf-foot-btn--on" : ""}"
-      aria-label=${label}
+      aria-label="JSON view"
       aria-pressed=${on ? "true" : "false"}
-      title=${label}
-      @click=${() => this._setView(key, json)}
+      title="JSON view"
+      @click=${() => this._setView(key, !on)}
     >
-      ${icon}
+      ${JSON_ICON}
     </button>`;
   }
 

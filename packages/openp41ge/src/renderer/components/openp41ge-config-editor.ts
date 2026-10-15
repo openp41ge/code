@@ -14,12 +14,12 @@
  * window, the file edited by hand) is picked up.
  *
  * It opens in a Form view of the settings (`<json-form>`, with the schema's
- * problems with the values under their fields); the JSON view (`<json-editor>`)
- * is a switch away, as in the workspace editor. Both edit the same staged
- * values.
+ * problems with the values under their fields); the JSON view toggle turns
+ * the JSON view (`<json-editor>`) on and off, as in the workspace editor.
+ * Both edit the same staged values.
  *
  * Bottom bar: Save and Reset on the left; on the right, in the JSON view, Show
- * default values and Sort keys, then the Form/JSON switch.
+ * default values and Sort keys, then the JSON view toggle.
  */
 
 import { LitElement, html, nothing, type TemplateResult } from "lit";
@@ -41,14 +41,7 @@ import { createLogger } from "openp41ge-core-logger";
 import type { ExtensionConfigBridge } from "../services/extension-configs";
 import { settingsBridge, type PlatformConfigBridge } from "../services/settings-sources";
 import { appServices } from "../app";
-import {
-  formIcon,
-  jsonIcon,
-  resetIcon,
-  saveIcon,
-  showDefaultsIcon,
-  sortKeysIcon,
-} from "./settings-icons";
+import { jsonIcon, resetIcon, saveIcon, showDefaultsIcon, sortKeysIcon } from "./settings-icons";
 
 const log = createLogger("openp41ge", "config-editor");
 
@@ -409,26 +402,26 @@ export class Openp41geConfigEditor extends LitElement {
                   </button>`
               : nothing
           }
-          ${this._viewButton("form", "Form view", formIcon())}
-          ${this._viewButton("json", "JSON view", jsonIcon())}
+          ${this._jsonToggle()}
         </div>
       </div>
     `;
   }
 
   /** A bottom-bar button that opens a view; pressed while it is open. */
-  private _viewButton(mode: "form" | "json", label: string, icon: TemplateResult): TemplateResult {
-    const on = this._mode === mode;
+  /** The JSON view toggle: on, the JSON view; off (the default), the form. */
+  private _jsonToggle(): TemplateResult {
+    const on = this._mode === "json";
     return html`<button
       class="cfe-btn ${on ? "cfe-btn--on" : ""}"
       type="button"
-      aria-label=${label}
+      aria-label="JSON view"
       aria-pressed="${on}"
       ?disabled=${!this._schema}
-      @click=${() => (this._mode = mode)}
-      ${tooltipContent({ type: "simple", text: label })}
+      @click=${() => (this._mode = on ? "form" : "json")}
+      ${tooltipContent({ type: "simple", text: "JSON view" })}
     >
-      ${icon}
+      ${jsonIcon()}
     </button>`;
   }
 
