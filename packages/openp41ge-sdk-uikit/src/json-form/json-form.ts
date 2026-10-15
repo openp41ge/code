@@ -1375,9 +1375,14 @@ export class JsonFormElement extends LitElement {
     .jf-drawer--back {
       width: 90%;
     }
+    /* Hidden only once the drawer in front has widened over it, so it does
+       not vanish in front of the user (showing it again is immediate). */
     .jf-drawer--hidden {
       width: 90%;
       visibility: hidden;
+      transition:
+        width 0.18s ease-out,
+        visibility 0s 0.18s;
     }
     /* Behind the front drawer only a strip shows: it goes back. */
     .jf-drawer.jf-drawer--back {
