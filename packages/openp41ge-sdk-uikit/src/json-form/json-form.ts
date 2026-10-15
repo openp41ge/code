@@ -42,7 +42,17 @@ import { customElement, property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { live } from "lit/directives/live.js";
-import { cloneDeep, getAt, type JsonPath } from "../json-editor/json-tree";
+import {
+  cloneDeep,
+  getAt,
+  mergeDefaults,
+  pinnedPaths,
+  setAt,
+  stripDefaults,
+  type JsonPath,
+} from "../json-editor/json-tree";
+import { schemaAtPath } from "../json-editor/json-tooltip";
+import "../json-editor/json-editor";
 import { renderMarkdown } from "../json-editor/md-render";
 import "../components/openp41ge-toggle";
 import "../components/openp41ge-select";
@@ -77,6 +87,30 @@ const RESET_ICON = html`<svg viewBox="0 -960 960 960" fill="currentColor" aria-h
   />
 </svg>`;
 
+/** Form view (the Settings tab's icon). */
+const FORM_ICON = html`<svg viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true">
+  <path
+    d="M240-160 80-320l56-56 64 62v-446h80v446l64-62 56 56-160 160Zm240-40v-80h400v80H480Zm0-240v-80h400v80H480Zm0-240v-80h400v80H480Z"
+  />
+</svg>`;
+/** JSON view, { } (the Settings tab's icon; drawn with stroke). */
+const JSON_ICON = html`<svg
+  viewBox="0 0 16 16"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="1.2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+  aria-hidden="true"
+>
+  <path
+    d="M6 3.5C5 3.5 4.5 4 4.5 5v1c0 .8-.4 1.2-1.5 1.5 1.1.3 1.5.7 1.5 1.5v1c0 1 .5 1.5 1.5 1.5"
+  />
+  <path
+    d="M10 3.5c1 0 1.5.5 1.5 1.5v1c0 .8.4 1.2 1.5 1.5-1.1.3-1.5.7-1.5 1.5v1c0 1-.5 1.5-1.5 1.5"
+  />
+</svg>`;
+
 /** Settings whose control sits on one row, with Reset at its right. */
 const ROW_KINDS: readonly string[] = ["boolean", "number", "enum", "string", "secret"];
 
@@ -86,6 +120,8 @@ const CARD_KINDS: readonly string[] = ["group", "list", "objects", "map"];
 /** What a card opens: the drawer's title and its body. */
 interface DrawerTarget {
   readonly label: string;
+  /** Where its value is in the settings (for its JSON view). */
+  readonly path: JsonPath;
   readonly body: () => TemplateResult;
 }
 
@@ -168,6 +204,8 @@ export class JsonFormElement extends LitElement {
   /** The open drawers, back to front, by the key of what each shows
    *  (`editor`, `hosts[0]`, `providers.vllm`). */
   @state() private _drawers: readonly string[] = [];
+  /** The open drawers showing their JSON view (the rest show the form). */
+  @state() private _jsonViews: ReadonlySet<string> = new Set();
   /** The key being typed in each map's Add row, by the map's key. */
   @state() private _newKeys: ReadonlyMap<string, string> = new Map();
   /** The maps' paths in the last render (their entries are never pruned). */
@@ -204,6 +242,11 @@ export class JsonFormElement extends LitElement {
   }
 
   override willUpdate(changed: Map<string, unknown>): void {
+    // A closed drawer forgets its view: it opens again as the form.
+    const open = new Set(this._drawers);
+    if ([...this._jsonViews].some((k) => !open.has(k))) {
+      this._jsonViews = new Set([...this._jsonViews].filter((k) => open.has(k)));
+    }
     if (changed.has("value")) {
       const v = this.value;
       this._value =
@@ -261,11 +304,20 @@ export class JsonFormElement extends LitElement {
 
   /** A renamed map entry's drawers follow it. */
   private _renameDrawers(from: string, to: string): void {
-    this._drawers = this._drawers.map((k) =>
+    const follow = (k: string) =>
       k === from || k.startsWith(`${from}.`) || k.startsWith(`${from}[`)
         ? to + k.slice(from.length)
-        : k,
-    );
+        : k;
+    this._drawers = this._drawers.map(follow);
+    this._jsonViews = new Set([...this._jsonViews].map(follow));
+  }
+
+  /** Show `key`'s drawer as JSON or as the form. */
+  private _setView(key: string, json: boolean): void {
+    const views = new Set(this._jsonViews);
+    if (json) views.add(key);
+    else views.delete(key);
+    this._jsonViews = views;
   }
 
   override updated(changed: PropertyValues<this>): void {
@@ -316,7 +368,14 @@ export class JsonFormElement extends LitElement {
     for (const key of this._drawers) {
       const target = this._targets.get(key);
       if (!target) break;
-      open.push({ key, target, body: target.body() });
+      // The form body renders even in the JSON view: it registers the cards
+      // the drawers in front of this one open.
+      const form = target.body();
+      open.push({
+        key,
+        target,
+        body: this._jsonViews.has(key) ? this._drawerJson(target.path) : form,
+      });
     }
     this._shown = open.length;
     return html`
@@ -395,10 +454,77 @@ export class JsonFormElement extends LitElement {
                 ${REMOVE_ICON}
               </button>
             </header>
-            <div class="jf-drawer-body">${d.body}</div>
+            <div class="jf-drawer-body ${this._jsonViews.has(d.key) ? "jf-drawer-body--json" : ""}">
+              ${d.body}
+            </div>
+            <footer class="jf-drawer-foot">
+              <span class="jf-foot-spacer"></span>
+              ${this._viewButton(d.key, false, "Form view", FORM_ICON)}
+              ${this._viewButton(d.key, true, "JSON view", JSON_ICON)}
+            </footer>
           </section>`,
       )}
     </div>`;
+  }
+
+  /** A bottom-bar button switching a drawer between its form and JSON views. */
+  private _viewButton(key: string, json: boolean, label: string, icon: TemplateResult) {
+    const on = this._jsonViews.has(key) === json;
+    return html`<button
+      type="button"
+      class="jf-foot-btn ${on ? "jf-foot-btn--on" : ""}"
+      aria-label=${label}
+      aria-pressed=${on ? "true" : "false"}
+      title=${label}
+      @click=${() => this._setView(key, json)}
+    >
+      ${icon}
+    </button>`;
+  }
+
+  /** A drawer's JSON view: its value with the defaults shown (as the
+   *  Settings tab's JSON view with Show defaults); an edit stores only what
+   *  differs from them, and values the user pinned to a default. */
+  private _drawerJson(path: JsonPath): TemplateResult {
+    const user = getAt(this._value, path);
+    const defaults = getAt(this.defaults, path);
+    const pinned = pinnedPaths(user, defaults);
+    const shown =
+      defaults === undefined ? user : user === undefined ? defaults : mergeDefaults(user, defaults);
+    const store = (value: unknown) => {
+      const kept = defaults === undefined ? value : stripDefaults(value, defaults, pinned);
+      // Nothing left over the defaults (an object with no keys of its own):
+      // the setting goes back to them.
+      const nothingOwn =
+        kept === undefined ||
+        (defaults !== undefined &&
+          kept !== null &&
+          typeof kept === "object" &&
+          !Array.isArray(kept) &&
+          Object.keys(kept).length === 0);
+      if (nothingOwn) this._reset(path);
+      else this._set(path, kept);
+    };
+    return html`<json-editor
+      class="jf-drawer-json"
+      .value=${cloneDeep(shown ?? {})}
+      .defaults=${defaults ?? null}
+      .showDefaults=${true}
+      .explicitPaths=${[...pinned]}
+      .schema=${schemaAtPath(this.schema, path)}
+      ?readonly=${this.readonly}
+      @json-editor-change=${(e: CustomEvent<{ value: unknown }>) => {
+        e.stopPropagation();
+        store(e.detail.value);
+      }}
+      @json-editor-overwrite=${(e: CustomEvent<{ path: JsonPath; value: unknown }>) => {
+        e.stopPropagation();
+        if (!e.detail?.path?.length) return;
+        const next = cloneDeep(user ?? {});
+        setAt(next, e.detail.path, e.detail.value);
+        this._set(path, next);
+      }}
+    ></json-editor>`;
   }
 
   /** Tab from the front drawer's last control goes to its first (Shift+Tab
@@ -549,7 +675,7 @@ export class JsonFormElement extends LitElement {
         error: f.error,
         actions: this._resetButton(f),
       },
-      { label: f.label, body },
+      { label: f.label, path: f.path, body },
     );
   }
 
@@ -851,6 +977,7 @@ export class JsonFormElement extends LitElement {
             },
             {
               label: title,
+              path: [...f.path, i],
               body: () => html`<div class="jf">${fields.map((child) => this._field(child))}</div>`,
             },
           );
@@ -955,6 +1082,7 @@ export class JsonFormElement extends LitElement {
         },
         {
           label: e.name,
+          path: e.path,
           body: () =>
             html`<div class="jf">
               <div class="jf-field">
@@ -1466,6 +1594,59 @@ export class JsonFormElement extends LitElement {
       flex-direction: column;
       gap: 12px;
       padding: 16px;
+    }
+    /* The JSON view: the editor fills the drawer. */
+    .jf-drawer-body--json {
+      padding: 0;
+      overflow: hidden;
+    }
+    .jf-drawer-json {
+      flex: 1;
+      min-height: 0;
+    }
+    /* The bottom bar: as the Settings tab's. */
+    .jf-drawer-foot {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      height: 34px;
+      box-sizing: border-box;
+      border-top: 1px solid var(--divider, #333);
+      background: var(--bg-surface, #161616);
+    }
+    .jf-foot-spacer {
+      flex: 1;
+    }
+    .jf-foot-btn {
+      height: 100%;
+      aspect-ratio: 1 / 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: none;
+      border-left: 1px solid var(--border-divider, #2d2d2d);
+      border-radius: 0;
+      background: transparent;
+      color: var(--text-secondary, #999);
+      cursor: pointer;
+    }
+    .jf-foot-btn:hover {
+      background: var(--bg-active, #37373d);
+      color: var(--text-primary, #ddd);
+    }
+    .jf-foot-btn--on {
+      color: var(--accent, #569cd6);
+    }
+    .jf-foot-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+    /* The corner button: 8px in from the window's rounded corner (the grid
+       and a sidebar publish --grid-edge-right-pad where one is). */
+    .jf-foot-btn:last-child {
+      box-sizing: content-box;
+      padding-right: var(--grid-edge-right-pad, 0px);
     }
     /* Maps: the Add row takes the new key. */
     .jf-map-add {
