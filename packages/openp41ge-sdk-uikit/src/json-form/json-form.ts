@@ -15,7 +15,8 @@
  *
  * `value` is the user's values only (what is stored); `defaults` the schema's
  * defaults. An unset field shows its default, faded; editing sets it, and
- * Reset removes it. Every edit emits `json-form-change` (`JSON_FORM_CHANGE`)
+ * Reset (on every setting with a default, greyed out while unset) removes
+ * it. Every edit emits `json-form-change` (`JSON_FORM_CHANGE`)
  * with the full user values. The form never validates or saves: the host
  * does, and passes problems back as `errors` (`{ path, message }`, `path` as
  * `a.b[0]`), shown under their fields.
@@ -56,6 +57,15 @@ const REMOVE_ICON = html`<svg viewBox="0 -960 960 960" fill="currentColor" aria-
     d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"
   />
 </svg>`;
+
+const RESET_ICON = html`<svg viewBox="0 -960 960 960" fill="currentColor" aria-hidden="true">
+  <path
+    d="M440-122q-121-15-200.5-105.5T160-440q0-66 26-126.5T260-674l57 57q-38 34-57.5 79T240-440q0 88 56 155.5T440-203v81Zm80 0v-81q87-16 143.5-83T720-440q0-100-70-170t-170-70h-3l44 44-56 56-140-140 140-140 56 56-44 44h3q134 0 227 93t93 227q0 121-79.5 211.5T520-122Z"
+  />
+</svg>`;
+
+/** Settings whose control sits on one row, with Reset at its right. */
+const ROW_KINDS: readonly string[] = ["boolean", "number", "enum", "string", "secret"];
 
 /** A DOM id for a field (unique within the form's shadow root). */
 const idFor = (key: string): string => `jf-${key.replace(/[^A-Za-z0-9_-]/g, "-")}`;
@@ -183,6 +193,8 @@ export class JsonFormElement extends LitElement {
     const id = idFor(f.key);
     const faded = !f.set && f.hasDefault;
     const labelled = !["list", "objects", "map", "unsupported"].includes(f.kind);
+    const reset = this._resetButton(f);
+    const inRow = ROW_KINDS.includes(f.kind);
     return html`
       <div class="jf-field ${faded ? "jf-default" : ""}" data-key=${f.key}>
         <div class="jf-head">
@@ -192,24 +204,33 @@ export class JsonFormElement extends LitElement {
               : html`<span class="jf-label" id=${id}>${f.label}</span>`
           }
           ${f.required ? html`<span class="jf-required">Required</span>` : nothing}
-          ${
-            f.set && !this.readonly && f.kind !== "unsupported"
-              ? html`<button
-                  type="button"
-                  class="jf-reset"
-                  aria-label="Reset ${f.label}"
-                  title="Use the default"
-                  @click=${() => this._reset(f.path)}
-                >
-                  Reset
-                </button>`
-              : nothing
-          }
+          ${inRow ? nothing : reset}
         </div>
-        ${this._description(f)} ${this._control(f, id)}
+        ${this._description(f)}
+        ${
+          inRow
+            ? html`<div class="jf-row">${this._control(f, id)}${reset}</div>`
+            : this._control(f, id)
+        }
         ${f.error ? html`<div class="jf-error" role="alert">${f.error}</div>` : nothing}
       </div>
     `;
+  }
+
+  /** Reset: on every setting with a default (greyed out while unset), and
+   *  on a set one without (it clears it). */
+  private _resetButton(f: FormField): TemplateResult | typeof nothing {
+    if (this.readonly || f.kind === "unsupported" || !(f.hasDefault || f.set)) return nothing;
+    return html`<button
+      type="button"
+      class="jf-icon-btn jf-reset"
+      aria-label="Reset ${f.label}"
+      title=${f.hasDefault ? "Use the default" : "Clear"}
+      ?disabled=${!f.set}
+      @click=${() => this._reset(f.path)}
+    >
+      ${RESET_ICON}
+    </button>`;
   }
 
   private _description(f: FormField): TemplateResult | typeof nothing {
@@ -704,20 +725,9 @@ export class JsonFormElement extends LitElement {
       background: color-mix(in srgb, var(--accent, #569cd6) 16%, transparent);
       color: var(--accent, #569cd6);
     }
+    /* Reset sits at the right: of the head, or of the control's row. */
     .jf-reset {
       margin-left: auto;
-      padding: 1px 8px;
-      border: 1px solid var(--divider, #333);
-      border-radius: 4px;
-      background: transparent;
-      color: var(--text-secondary, #999);
-      font: inherit;
-      font-size: 11px;
-      cursor: pointer;
-    }
-    .jf-reset:hover {
-      color: var(--text-primary, #ddd);
-      border-color: var(--text-secondary, #999);
     }
     .jf-description {
       color: var(--text-secondary, #999);
@@ -773,12 +783,21 @@ export class JsonFormElement extends LitElement {
     .jf-input:disabled {
       opacity: 0.6;
     }
+    .jf-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .jf-row > .jf-input {
+      flex: 1;
+      min-width: 0;
+    }
     /* An unset field shows its default, faded. */
-    .jf-default > .jf-input,
-    .jf-default > openp41ge-toggle {
+    .jf-default > .jf-row > .jf-input,
+    .jf-default > .jf-row > openp41ge-toggle {
       opacity: 0.55;
     }
-    .jf-default > .jf-input:focus {
+    .jf-default > .jf-row > .jf-input:focus {
       opacity: 1;
     }
     .jf-error {
