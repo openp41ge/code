@@ -83,6 +83,8 @@ export interface FormField {
   readonly objectValues?: boolean;
   /** map: the value a new entry starts with. */
   readonly newEntry?: unknown;
+  /** map of objects: how many properties an entry has (a new entry's shape). */
+  readonly entryProperties?: number;
   /** map: the keys its defaults have (they come back when removed). */
   readonly defaultKeys?: readonly string[];
   /** map: the entry a sibling `x-keysOf` setting names. */
@@ -284,6 +286,9 @@ function field(
       return {
         ...base,
         objectValues: valueSchema.type === "object" && hasProperties(valueSchema),
+        ...(hasProperties(valueSchema)
+          ? { entryProperties: Object.keys(asSchema(valueSchema.properties)).length }
+          : {}),
         newEntry: blankValue(valueSchema),
         defaultKeys: isObject(defaultValue) ? Object.keys(defaultValue) : [],
         // In a list item there are no per-entry defaults: the item's values

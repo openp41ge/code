@@ -1206,9 +1206,51 @@ export class JsonFormElement extends LitElement {
             @change=${add}
           />
         </div>`;
+    // A map of objects ends in an empty card like its others: the key on the
+    // title line, what a new entry holds below, the chevron greyed until the
+    // key can be added.
+    const addCard = this.readonly
+      ? nothing
+      : html`<div
+          class="jf-sub jf-new jf-new-card"
+          @click=${(e: Event) =>
+            (e.currentTarget as HTMLElement).querySelector<HTMLInputElement>("input")?.focus()}
+        >
+          <div class="jf-sub-main">
+            <input
+              class="jf-new-key"
+              type="text"
+              spellcheck="false"
+              placeholder="New key"
+              aria-label="New key for ${f.label}"
+              aria-invalid=${taken ? "true" : "false"}
+              .value=${live(newKey)}
+              @input=${(e: Event) => setNewKey((e.target as HTMLInputElement).value)}
+              @keydown=${(e: KeyboardEvent) => {
+                if (e.key === "Enter") add();
+              }}
+              @change=${add}
+            />
+            <div class="jf-meta">
+              ${count(f.entryProperties ?? 0, "property", "properties")} · 0 set
+              ${taken ? html`<span class="jf-meta-error">· That key is taken</span>` : nothing}
+            </div>
+          </div>
+          <span
+            class="jf-chev"
+            role="button"
+            aria-label="Add ${newKey.trim() || "the new key"} to ${f.label}"
+            aria-disabled=${canAdd ? "false" : "true"}
+            @click=${(e: Event) => {
+              e.stopPropagation();
+              add();
+            }}
+            >›</span
+          >
+        </div>`;
     return f.objectValues
       ? html`<div class="jf-subs" role="group" aria-label=${f.label}>
-          ${entries.map(card)} ${addRow}
+          ${entries.map(card)} ${addCard}
         </div>`
       : html`<div class="jf-card" role="group" aria-label=${f.label}>
           ${entries.map(row)} ${addRow}
@@ -1728,10 +1770,40 @@ export class JsonFormElement extends LitElement {
     .jf-subs > .jf-map-add {
       padding: 0;
     }
-    /* The empty last row (a new item or key): drawn faint until used. */
+    /* The empty last row (a new item or key): drawn faint until used. Its
+       dashed edge is an outline, so it is exactly a card's size. */
     .jf-sub.jf-new {
       background: transparent;
-      border: 1px dashed var(--divider, #333);
+      outline: 1px dashed var(--divider, #333);
+      outline-offset: -1px;
+    }
+    .jf-sub.jf-new-card {
+      cursor: text;
+    }
+    /* A map's new key, typed on the card's title line. */
+    .jf-new-key {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 0;
+      border: none;
+      outline: none;
+      background: transparent;
+      color: var(--text-primary, #ddd);
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      line-height: inherit;
+    }
+    .jf-new-key::placeholder {
+      font-weight: 400;
+      color: var(--text-secondary, #999);
+    }
+    .jf-new-card .jf-chev {
+      cursor: pointer;
+    }
+    .jf-chev[aria-disabled="true"] {
+      opacity: 0.35;
+      cursor: default;
     }
     .jf-sub.jf-new:hover {
       background: var(--jf-hover, rgba(255, 255, 255, 0.04));
