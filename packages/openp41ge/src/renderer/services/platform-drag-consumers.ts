@@ -35,6 +35,7 @@ type Of<K extends PlatformDragKind> = Extract<PlatformDragPayload, { kind: K }>;
 export const PLATFORM_DRAG_CONSUMERS: readonly PlatformDragConsumer[] = [
   {
     id: "file-viewer",
+    label: "File viewer",
     accepts: ["openp41ge/file-path"],
     placement: ["grid"],
     open: { kind: "app", appType: "file-viewer" },
@@ -42,6 +43,7 @@ export const PLATFORM_DRAG_CONSUMERS: readonly PlatformDragConsumer[] = [
   },
   {
     id: "log-viewer",
+    label: "Log viewer",
     accepts: ["openp41ge/log-stream"],
     placement: ["grid"],
     open: { kind: "app", appType: "log-viewer" },
@@ -49,6 +51,7 @@ export const PLATFORM_DRAG_CONSUMERS: readonly PlatformDragConsumer[] = [
   },
   {
     id: "config-editor",
+    label: "Settings editor",
     accepts: ["openp41ge/config-overrides"],
     placement: ["grid"],
     open: { kind: "app", appType: "config-editor" },

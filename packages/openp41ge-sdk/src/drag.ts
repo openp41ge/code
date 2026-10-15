@@ -83,6 +83,14 @@ export const PLATFORM_DRAG_KINDS: readonly PlatformDragKind[] = platformPayloadS
   (s) => s.shape.kind.value,
 );
 
+/** What each platform kind is called (the settings show it). */
+export const PLATFORM_DRAG_KIND_LABELS: Readonly<Record<PlatformDragKind, string>> = {
+  "openp41ge/file-path": "File",
+  "openp41ge/log-stream": "Log stream",
+  "openp41ge/workspace-config": "Workspace",
+  "openp41ge/config-overrides": "Settings",
+};
+
 /** A payload kind: `namespace/kind` (`openp41ge/file-path`, `<extensionId>/<id>`). */
 export type DragKind = string;
 
@@ -245,6 +253,7 @@ export const dragSourceSchema = z.strictObject({
 
 export const dragConsumerSchema = z.strictObject({
   id: required,
+  label: required.optional(),
   accepts: acceptsSchema,
   placement: z.array(z.enum(["grid", "sidebar"])).min(1),
   open: z.discriminatedUnion("kind", [
@@ -288,6 +297,8 @@ export interface DragSourceDecl {
 /** A component that can OPEN a kind as a tab. */
 export interface DragConsumerDecl {
   readonly id: string;
+  /** What it is called where the user picks what opens a kind (else its id). */
+  readonly label?: string;
   /** Kinds this component can open as a tab. */
   readonly accepts: readonly DragKind[];
   /** Where it can open: a grid cell and/or a sidebar tab. */

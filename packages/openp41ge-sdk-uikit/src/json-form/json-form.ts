@@ -704,10 +704,31 @@ export class JsonFormElement extends LitElement {
     );
   }
 
-  /** A list of fields. Object and array settings next to each other whose
-   *  names share a prefix (`editor/*`, `editor/file`…) are one card, a row
-   *  each. */
+  /** A list of fields. Settings next to each other in one `x-group` are
+   *  under its heading. */
   private _fields(fields: readonly FormField[]): TemplateResult[] {
+    const out: TemplateResult[] = [];
+    for (let i = 0; i < fields.length;) {
+      const group = fields[i].group;
+      let j = i + 1;
+      while (j < fields.length && fields[j].group === group) j++;
+      const run = fields.slice(i, j);
+      out.push(
+        group === undefined
+          ? html`${this._cards(run)}`
+          : html`<section class="jf-section" aria-label=${group}>
+              <h3 class="jf-section-title">${group}</h3>
+              ${this._cards(run)}
+            </section>`,
+      );
+      i = j;
+    }
+    return out;
+  }
+
+  /** Fields, where object and array settings next to each other whose names
+   *  share a prefix (`editor/*`, `editor/file`…) are one card, a row each. */
+  private _cards(fields: readonly FormField[]): TemplateResult[] {
     const prefix = (f: FormField): string | null => {
       if (!CARD_KINDS.includes(f.kind)) return null;
       const at = f.name.indexOf("/");
@@ -836,6 +857,7 @@ export class JsonFormElement extends LitElement {
           "Not set",
           null,
           locked,
+          f.optionLabels,
         );
       case "string":
       case "secret":
@@ -926,13 +948,14 @@ export class JsonFormElement extends LitElement {
     placeholder = "Not set",
     label: string | null = null,
     disabled = this.readonly,
+    optionLabels: readonly string[] = [],
   ): TemplateResult {
     const selected = options.findIndex((o) => JSON.stringify(o) === JSON.stringify(value));
     const choices = [
       ...(withEmpty ? [{ value: "", label: "Not set" }] : []),
       ...options.map((o, i) => ({
         value: String(i),
-        label: typeof o === "string" ? o : JSON.stringify(o),
+        label: optionLabels[i] ?? (typeof o === "string" ? o : JSON.stringify(o)),
       })),
     ];
     return html`<openp41ge-select
@@ -1915,6 +1938,25 @@ export class JsonFormElement extends LitElement {
     }
     .jf-subs > .jf-map-add {
       padding: 0;
+    }
+    /* Settings under a heading (x-group). */
+    .jf-section {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .jf-section + .jf-section {
+      margin-top: 8px;
+    }
+    .jf-section-title {
+      margin: 0;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--divider, #333);
+      color: var(--text-secondary, #999);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
     }
     /* Grouped settings (editor/*, editor/file…): one card, a row each. */
     .jf-sub-group {

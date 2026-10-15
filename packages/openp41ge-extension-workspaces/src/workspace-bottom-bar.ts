@@ -166,18 +166,18 @@ export class WorkspaceBottomBar extends LitElement {
       <div class="wbb-bar">
         ${this.status ? html`<span class="wbb-status">${this.status}</span>` : nothing}
         ${this.buttons.map(
-        (b) => html`
-          <button
-            type="button"
-            class="wbb-btn ${b.highlight ? "is-highlighted" : ""}"
-            title=${b.title ?? ""}
-            ?disabled=${!!b.disabled}
-            @click=${() => b.onClick()}
-          >
-            ${unsafeHTML(b.icon)}
-          </button>
-        `,
-      )}
+          (b) => html`
+            <button
+              type="button"
+              class="wbb-btn ${b.highlight ? "is-highlighted" : ""}"
+              title=${b.title ?? ""}
+              ?disabled=${!!b.disabled}
+              @click=${() => b.onClick()}
+            >
+              ${unsafeHTML(b.icon)}
+            </button>
+          `,
+        )}
       </div>
     `;
   }

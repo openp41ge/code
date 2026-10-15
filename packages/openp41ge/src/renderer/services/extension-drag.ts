@@ -14,6 +14,7 @@ import { createLogger, type ILogger } from "openp41ge-core-logger";
 import {
   assertNoConsumerDropTargetConflicts,
   parseDragRegistrations,
+  PLATFORM_DRAG_KIND_LABELS,
   PLATFORM_DRAG_NAMESPACE,
   qualifyName,
   validateDragDeclSurfaces,
@@ -24,7 +25,7 @@ import {
   type DropTargetDecl,
 } from "openp41ge-sdk";
 import type { PayloadDragData, PayloadOpen } from "../openp41ge-tabs-adapter";
-import { DragConsumerRegistry } from "./drag-consumer-registry";
+import { DragConsumerRegistry, type DragKindChoice } from "./drag-consumer-registry";
 import {
   RendererDragService,
   type PayloadDragPipeline,
@@ -121,6 +122,21 @@ export function createExtensionDragRuntime(opts: ExtensionDragRuntimeOptions) {
     },
 
     unregisterExtension,
+
+    /** The kinds a grid drop can open, with their labels and consumers (the
+     *  settings' `dragConsumers` menus). */
+    consumerChoices: {
+      choices: (): DragKindChoice[] => {
+        const labels = new Map<string, string>(Object.entries(PLATFORM_DRAG_KIND_LABELS));
+        for (const k of service.kinds()) if (k.label !== undefined) labels.set(k.name, k.label);
+        return [...registry.choices()].map(([kind, consumers]) => ({
+          kind,
+          ...(labels.has(kind) ? { label: labels.get(kind)! } : {}),
+          consumers,
+        }));
+      },
+      onChange: (fn: () => void) => registry.onChange(fn),
+    },
 
     /**
      * Register the platform's own drag sources (rows of its sidebar panes),

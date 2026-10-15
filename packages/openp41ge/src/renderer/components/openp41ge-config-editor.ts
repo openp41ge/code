@@ -88,7 +88,7 @@ export class Openp41geConfigEditor extends LitElement {
       ...(platform as unknown as PlatformConfigBridge),
       set: (key: string, value: unknown) => appServices.configService.set(key, value),
     };
-    this.bridge = settingsBridge(extension, platformBridge, extensionDrag.registry);
+    this.bridge = settingsBridge(extension, platformBridge, extensionDrag.consumerChoices);
     return this.bridge;
   }
 

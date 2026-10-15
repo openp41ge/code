@@ -60,6 +60,7 @@ registerDragDecls({
   consumers: [
     {
       id: "chat",
+      label: "Chat",
       accepts: [CHAT_KIND],
       placement: ["grid"],
       open: { kind: "renderer-surface", surface: "grid:chat" },

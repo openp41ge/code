@@ -7,7 +7,9 @@
  * that have no default first. A map (an object whose keys are the user's:
  * `additionalProperties` a schema, no `properties`) has one entry per key,
  * its defaults' and the user's merged (as the platform merges them); a
- * string with `"x-keysOf": "<sibling map>"` offers that map's keys. `setFieldValue` / `resetField` turn an edit
+ * string with `"x-keysOf": "<sibling map>"` offers that map's keys; an enum's
+ * `"x-enumLabels"` name its values; properties next to each other with the
+ * same `"x-group"` are shown under that heading. `setFieldValue` / `resetField` turn an edit
  * into the new user values. No DOM; the element only renders descriptors.
  *
  * Paths are `JsonPath`s; their string form (`key`) is `pathKey`'s
@@ -67,6 +69,10 @@ export interface FormField {
   readonly maximum?: number;
   /** enum: the values offered. */
   readonly options?: readonly unknown[];
+  /** enum: what each option is called (`x-enumLabels`, by position). */
+  readonly optionLabels?: readonly string[];
+  /** The heading it is shown under (`x-group`). */
+  readonly group?: string;
   /** list: its items' kind. */
   readonly item?: ListItemKind;
   /** group: the object's fields. */
@@ -270,6 +276,7 @@ function field(
     error: ctx.errors.get(key) ?? null,
     ...(isNullableString(s) ? { nullable: true } : {}),
     ...(s.readOnly === true ? { readOnly: true } : {}),
+    ...(typeof s["x-group"] === "string" ? { group: s["x-group"] } : {}),
   };
   switch (kind) {
     case "number":
@@ -282,7 +289,13 @@ function field(
     case "enum":
       return typeof s["x-keysOf"] === "string" && !Array.isArray(s.enum)
         ? { ...base, keysOf: s["x-keysOf"], options: [] }
-        : { ...base, options: s.enum as unknown[] };
+        : {
+            ...base,
+            options: s.enum as unknown[],
+            ...(Array.isArray(s["x-enumLabels"])
+              ? { optionLabels: (s["x-enumLabels"] as unknown[]).map(String) }
+              : {}),
+          };
     case "map": {
       const valueSchema = asSchema(s.additionalProperties);
       const entries = isObject(value) ? Object.keys(value) : [];

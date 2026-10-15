@@ -108,12 +108,14 @@ registerDragDecls({
   consumers: [
     {
       id: "repository",
+      label: "Repository",
       accepts: [REPOSITORY_KIND],
       placement: ["grid"],
       open: { kind: "renderer-surface", surface: "grid:repository" },
     },
     {
       id: "commit",
+      label: "Commit",
       accepts: [COMMIT_KIND],
       placement: ["grid"],
       open: { kind: "renderer-surface", surface: "grid:commit" },

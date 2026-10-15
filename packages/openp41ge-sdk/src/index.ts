@@ -90,6 +90,7 @@ export {
   DRAG_CONTEXTS,
   PLATFORM_DRAG_NAMESPACE,
   PLATFORM_DRAG_KINDS,
+  PLATFORM_DRAG_KIND_LABELS,
   validateDragPayload,
   dragSourceSchema,
   dragConsumerSchema,

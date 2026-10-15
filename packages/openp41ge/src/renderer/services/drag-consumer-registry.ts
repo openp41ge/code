@@ -24,6 +24,20 @@ export interface PlatformDragConsumer extends DragConsumerDecl {
   toTabConfig(payload: DragPayload): Record<string, unknown>;
 }
 
+/** A consumer the user can pick for a kind: its id and label. */
+export interface ConsumerChoice {
+  readonly id: string;
+  readonly label?: string;
+}
+
+/** A kind the user can pick a consumer for: its label and its consumers
+ *  (the first: the default). */
+export interface DragKindChoice {
+  readonly kind: DragKind;
+  readonly label?: string;
+  readonly consumers: readonly ConsumerChoice[];
+}
+
 /** What a resolved drop opens. */
 export interface ResolvedConsumerOpen {
   readonly consumerId: string;
@@ -77,17 +91,22 @@ export class DragConsumerRegistry {
     if (this._entries.length !== before) this._changed();
   }
 
-  /** Each kind a grid drop can open, with the ids of the consumers that can
-   *  open it (first registered first: the first is the default), in the
-   *  order the kinds were first registered. The user's override picks one. */
-  choices(): ReadonlyMap<DragKind, readonly string[]> {
-    const out = new Map<DragKind, string[]>();
+  /** Each kind a grid drop can open, with the consumers that can open it
+   *  (first registered first: the first is the default), in the order the
+   *  kinds were first registered. The user's override picks one. */
+  choices(): ReadonlyMap<DragKind, readonly ConsumerChoice[]> {
+    const out = new Map<DragKind, ConsumerChoice[]>();
     for (const e of this._entries) {
       for (const kind of e.decl.accepts) {
         if (!this._canOpen(e, kind, "grid")) continue;
-        const ids = out.get(kind) ?? [];
-        if (!ids.includes(e.qualifiedId)) ids.push(e.qualifiedId);
-        out.set(kind, ids);
+        const list = out.get(kind) ?? [];
+        if (!list.some((c) => c.id === e.qualifiedId)) {
+          list.push({
+            id: e.qualifiedId,
+            ...(e.decl.label !== undefined ? { label: e.decl.label } : {}),
+          });
+        }
+        out.set(kind, list);
       }
     }
     return out;

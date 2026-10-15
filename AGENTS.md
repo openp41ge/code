@@ -267,9 +267,11 @@ may drop there. There is no source-side destination list.
 The user-config override is `dragConsumers` in `config.json`: payload kind →
 consumer id (`<extensionId>/<consumerId>`, or a bare platform id such as
 `file-viewer`), edited from the Settings sidebar tab: the form offers the
-kinds registered now, each with a menu of the consumers registered for it
-(a choice saved for a kind nothing registers now is shown read-only, to
-reset). It applies immediately.
+kinds registered now, under the name of whoever declares the kind (Platform,
+or the extension), each with a menu of the consumers registered for it, by
+their labels (a kind's and a consumer's `label`; the platform's kinds'
+labels are `PLATFORM_DRAG_KIND_LABELS`). A choice saved for a kind nothing
+registers now is shown read-only, to reset. It applies immediately.
 
 #### Settings / configuration overrides
 
@@ -284,7 +286,10 @@ against the schema on save. The extension never manages its own settings file.
 Beyond standard JSON Schema the platform checks one keyword of its own:
 `"x-keysOf": "<sibling>"` on a string — its value must be a key of that
 sibling property's object (e.g. `defaultProviderId` names one of
-`providers`); the form shows it as a menu of those keys.
+`providers`); the form shows it as a menu of those keys. The form also reads two
+display-only keywords: `"x-enumLabels"` (what an enum's values are called,
+by position) and `"x-group"` (properties next to each other with the same
+value are shown under that heading).
 
 The platform's config editor is the `config-editor` grid tab — a form built
 from the schema (the UI kit's `<json-form>`), with a switch to the JSON view —
