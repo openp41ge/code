@@ -34,7 +34,8 @@ export interface SharedEditorSettings {
 
 export interface UserConfig {
   version: number;
-  appTheme: "dark" | "light";
+  /** "system" follows the OS colour scheme. */
+  appTheme: "system" | "dark" | "light";
   /** Auto-update channel — "latest" (stable) or a prerelease track ("alpha"/"beta"/"rc").
    *  The default stable channel never receives prerelease builds. */
   updateChannel: "latest" | "alpha" | "beta" | "rc";

@@ -20,9 +20,7 @@ export class RegisterEventListenersStep implements IStartupStep {
     // Config changes → update theme attribute
     document.addEventListener("openp41ge:config-changed", ((e: CustomEvent) => {
       const detail = e.detail as { key?: string; value?: unknown };
-      if (detail?.key === "appTheme") {
-        document.documentElement.setAttribute("data-app-theme", String(detail.value));
-      }
+      if (detail?.key === "appTheme") context.configService.applyAppTheme();
     }) as EventListener);
 
     // File open events

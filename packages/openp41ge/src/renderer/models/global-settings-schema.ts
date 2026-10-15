@@ -23,9 +23,9 @@ export const GLOBAL_SETTINGS_SCHEMA = {
     },
     appTheme: {
       type: "string",
-      enum: ["dark", "light"],
+      enum: ["system", "dark", "light"],
       description:
-        'The active editor theme: "dark" or "light". Changes are picked up by every editor the next time it renders.',
+        'The app theme: "dark", "light", or "system" to follow the OS (and switch when the OS does).',
     },
     "editor/*": {
       type: "object",

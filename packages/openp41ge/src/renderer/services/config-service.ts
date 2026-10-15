@@ -8,13 +8,16 @@
 
 import { createLogger } from "openp41ge-core-logger";
 
+import { MediaColorScheme, type SystemColorScheme } from "./system-color-scheme";
+
 const log = createLogger("openp41ge", "config-service");
 
 // ─── Config type (mirrors main process types) ────────────────────────────
 
 export interface UserConfig {
   version: number;
-  appTheme: "dark" | "light";
+  /** "system" follows the OS colour scheme. */
+  appTheme: "system" | "dark" | "light";
   /** Auto-update channel — "latest" (stable) or a prerelease track ("alpha"/"beta"/"rc"). */
   updateChannel: "latest" | "alpha" | "beta" | "rc";
   /** Settings every editor follows; `editor/file` / `editor/json` win over
@@ -40,6 +43,11 @@ export interface UserConfig {
 // ─── ConfigService ───────────────────────────────────────────────────────
 
 export class ConfigService {
+  /** Whether the applied theme follows the OS colour scheme's changes yet. */
+  private _followingScheme = false;
+
+  constructor(private readonly _scheme: SystemColorScheme = new MediaColorScheme()) {}
+
   private _config: UserConfig | null = null;
   private _loaded = false;
   private _loadPromise: Promise<void> | null = null;
@@ -200,10 +208,17 @@ export class ConfigService {
     return "openp41ge-dark";
   }
 
-  /** Get the app theme ("dark" | "light"). */
-  getAppTheme(): "dark" | "light" {
-    if (!this._config) return "dark";
-    return this._config.appTheme;
+  /** Get the app theme setting ("system" | "dark" | "light"). */
+  getAppTheme(): UserConfig["appTheme"] {
+    const theme = this._config?.appTheme;
+    return theme === "system" || theme === "light" ? theme : "dark";
+  }
+
+  /** The theme shown: the setting, or for "system" the OS colour scheme's. */
+  getResolvedAppTheme(): "dark" | "light" {
+    const theme = this.getAppTheme();
+    if (theme !== "system") return theme;
+    return this._scheme.isDark() ? "dark" : "light";
   }
 
   /** Subscribe to all config changes. Returns unsubscribe function. */
@@ -221,11 +236,17 @@ export class ConfigService {
     return () => this._keyListeners.get(key)?.delete(callback);
   }
 
-  /** Apply the current app theme to the document. */
+  /** Apply the current app theme to the document. From then on, while the
+   *  setting is "system", the theme changes with the OS colour scheme. */
   applyAppTheme(): void {
-    const theme = this.getAppTheme();
+    const theme = this.getResolvedAppTheme();
     document.documentElement.setAttribute("data-app-theme", theme);
     log.info("app theme applied:", theme);
+    if (this._followingScheme) return;
+    this._followingScheme = true;
+    this._scheme.onChange(() => {
+      if (this.getAppTheme() === "system") this.applyAppTheme();
+    });
   }
 
   // ── Private ──────────────────────────────────────────────────────────
