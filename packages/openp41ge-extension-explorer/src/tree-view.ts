@@ -98,16 +98,20 @@ export interface ExplorerState {
   readonly reposKey?: string;
   /** A row whose menu action failed: shown red, the message on hover. */
   readonly rowError?: { readonly path: string; readonly message: string };
-  /** Add rows whose repository / worktree the platform is still cloning /
-   *  checking out, by `createRowKey`: what was typed and the progress. */
-  readonly pending?: Readonly<Record<string, PendingAdd>>;
+  /** The repositories / worktrees the platform is still cloning / checking
+   *  out, per add row (`createRowKey`): what was typed and the progress. Each
+   *  is its own row above the add row, which stays free for the next one. */
+  readonly pending?: Readonly<Record<string, readonly PendingAdd[]>>;
   /** The create row whose add failed (reopened with what was typed). */
   readonly createError?: { readonly key: string; readonly message: string };
 }
 
 /** A repository / worktree add the platform is working on. */
 export interface PendingAdd {
+  readonly id: number;
   readonly name: string;
+  /** It failed while its add row was being typed in: why. */
+  readonly failed?: string;
   /** Clone progress, 0–100 (repositories only). */
   readonly percent?: number;
 }
@@ -476,28 +480,64 @@ export function setNewEntryName(prev: ExplorerState, name: string): ExplorerStat
   return prev.newEntry ? { ...prev, newEntryName: name, createError: undefined } : prev;
 }
 
-/** Set (or, with `undefined`, drop) the pending add of a create row. */
-function setPending(prev: ExplorerState, key: string, add: PendingAdd | undefined): ExplorerState {
+let nextPendingId = 1;
+
+/** Replace the pending adds of a create row with `update(adds)`. */
+function updatePending(
+  prev: ExplorerState,
+  key: string,
+  update: (adds: readonly PendingAdd[]) => readonly PendingAdd[],
+): ExplorerState {
   const pending = { ...(prev.pending ?? {}) };
-  if (add) pending[key] = add;
+  const next = update(pending[key] ?? []);
+  if (next.length > 0) pending[key] = next;
   else delete pending[key];
   return { ...prev, pending };
 }
 
-/** A failed add: reopen its create row with what was typed, and the error. */
+/** Start a pending add of a create row; returns it with the new state. */
+function startPending(prev: ExplorerState, key: string, name: string): [ExplorerState, PendingAdd] {
+  const add: PendingAdd = { id: nextPendingId++, name };
+  return [updatePending(prev, key, (adds) => [...adds, add]), add];
+}
+
+function dropPending(prev: ExplorerState, key: string, id: number): ExplorerState {
+  return updatePending(prev, key, (adds) => adds.filter((a) => a.id !== id));
+}
+
+/** The create row `target` is being typed in. */
+function isEditing(prev: ExplorerState, target: CreateTarget): boolean {
+  return prev.newEntry?.path === target.path && prev.newEntry.kind === target.kind;
+}
+
+/**
+ * A failed add: reopen its create row with what was typed, and the error;
+ * or, when that row is being typed in, keep the add as a red row.
+ */
 function failAdd(
   prev: ExplorerState,
   target: CreateTarget,
-  name: string,
+  add: PendingAdd,
   message: string,
 ): ExplorerState {
   const key = createRowKey(target);
+  if (isEditing(prev, target)) {
+    return updatePending(prev, key, (adds) =>
+      adds.map((a) => (a.id === add.id ? { ...a, failed: message } : a)),
+    );
+  }
   return {
-    ...setPending(prev, key, undefined),
+    ...dropPending(prev, key, add.id),
     newEntry: { path: target.path, kind: target.kind },
-    newEntryName: name,
+    newEntryName: add.name,
     createError: { key, message },
   };
+}
+
+/** A click on a failed add's row: back into its create row, once that is free. */
+function reopenFailed(prev: ExplorerState, target: CreateTarget, add: PendingAdd): ExplorerState {
+  if (!add.failed || isEditing(prev, target)) return prev;
+  return failAdd(prev, target, add, add.failed);
 }
 
 /** Move the blue focus cursor to the given row (row focus). */
@@ -1047,28 +1087,44 @@ function renderCreateRow(host: ExplorerHost, target: CreateTarget, depth: number
     !!state.newEntry && state.newEntry.path === target.path && state.newEntry.kind === target.kind;
   const padding = 4 + depth * indentUnit(host);
   const key = createRowKey(target);
-  const pending = state.pending?.[key];
-  if (pending) {
-    const status =
-      target.kind === "repo"
-        ? `Cloning${pending.percent ? ` ${pending.percent}%` : "…"}`
+  const pending = (state.pending?.[key] ?? []).map((add) => {
+    const status = add.failed
+      ? "failed"
+      : target.kind === "repo"
+        ? `Cloning${add.percent ? ` ${add.percent}%` : "…"}`
         : "Checking out…";
     return html`
       <div
-        class="row pending-row"
+        class="row pending-row ${add.failed ? "row--error" : ""}"
+        title=${add.failed ?? nothing}
         role="treeitem"
         data-depth=${depth}
         style="padding-left:${padding}px"
-        data-new-entry=${target.kind}
         data-path=${target.path}
+        @click=${(e: MouseEvent) => {
+          e.stopPropagation();
+          host.setState((prev) => reopenFailed(withRoots(host, prev), target, add));
+        }}
       >
         <span class="chevron"></span>
         <span class="icon">${createRowIcon(target.kind)}</span>
-        <span class="label">${pending.name}</span>
+        <span class="label">${add.name}</span>
         <span class="pending-status">${status}</span>
       </div>
     `;
-  }
+  });
+  return html`${pending}${renderCreateRowItself(host, target, depth, key, editing, padding)}`;
+}
+
+function renderCreateRowItself(
+  host: ExplorerHost,
+  target: CreateTarget,
+  depth: number,
+  key: string,
+  editing: boolean,
+  padding: number,
+): TemplateResult {
+  const state = (host.state ?? {}) as Partial<ExplorerState>;
   if (editing) {
     const name = state.newEntryName ?? "";
     const failed = state.createError?.key === key ? state.createError.message : null;
@@ -1416,8 +1472,9 @@ function refreshDir(host: ExplorerHost, path: string): void {
 }
 
 /** `+ add worktree` confirmed: ask the platform to check out the branch and
- *  add it to the open workspace, then show it under the repo. Until then the
- *  create row shows the branch being checked out; a failure reopens it. */
+ *  add it to the open workspace, then show it under the repo. Until then a
+ *  row above the create row shows the branch being checked out; a failure
+ *  reopens the create row (see `failAdd`). */
 function onCreateWorktree(host: ExplorerHost, target: CreateTarget, branch: string): void {
   const repoName = target.path;
   if (!host.workspace) {
@@ -1425,9 +1482,14 @@ function onCreateWorktree(host: ExplorerHost, target: CreateTarget, branch: stri
     return;
   }
   const key = createRowKey(target);
-  host.setState((prev) => setPending(withRoots(host, prev), key, { name: branch }));
+  let add!: PendingAdd;
+  host.setState((prev) => {
+    const [next, started] = startPending(withRoots(host, prev), key, branch);
+    add = started;
+    return next;
+  });
   const fail = (message: string) =>
-    host.setState((prev) => failAdd(withRoots(host, prev), target, branch, message));
+    host.setState((prev) => failAdd(withRoots(host, prev), target, add, message));
   void host.workspace.addWorktree(repoName, branch).then(
     (res) => {
       if (!res.ok || !res.path) {
@@ -1436,7 +1498,7 @@ function onCreateWorktree(host: ExplorerHost, target: CreateTarget, branch: stri
       }
       const path = res.path;
       host.setState((prev) => {
-        const seeded = setPending(withRoots(host, prev), key, undefined);
+        const seeded = dropPending(withRoots(host, prev), key, add.id);
         const repo = findNode(seeded.roots, repoName);
         const current = (repo?.children ?? [])
           .filter((c) => c.nodeType === "worktree")
@@ -1450,21 +1512,29 @@ function onCreateWorktree(host: ExplorerHost, target: CreateTarget, branch: stri
 }
 
 /** `+ add repository` confirmed: ask the platform to clone the URL into the
- *  open workspace, then add it to the tree. Until then the create row shows
- *  the URL and the clone's progress; a failure reopens it. */
+ *  open workspace, then add it to the tree. Until then a row above the create
+ *  row (which stays free for the next one) shows the URL and the clone's
+ *  progress; a failure reopens the create row (see `failAdd`). */
 function onCreateRepository(host: ExplorerHost, target: CreateTarget, url: string): void {
   if (!host.workspace) {
     host.log?.error("explorer: workspace actions unavailable; cannot add repository");
     return;
   }
   const key = createRowKey(target);
-  host.setState((prev) => setPending(withRoots(host, prev), key, { name: url }));
+  let add!: PendingAdd;
+  host.setState((prev) => {
+    const [next, started] = startPending(withRoots(host, prev), key, url);
+    add = started;
+    return next;
+  });
   const fail = (message: string) =>
-    host.setState((prev) => failAdd(withRoots(host, prev), target, url, message));
+    host.setState((prev) => failAdd(withRoots(host, prev), target, add, message));
   const cloning = host.workspace.addRepository(url);
   cloning.onProgress((p) =>
     host.setState((prev) =>
-      prev.pending?.[key] ? setPending(prev, key, { name: url, percent: p.percent }) : prev,
+      updatePending(prev, key, (adds) =>
+        adds.map((a) => (a.id === add.id ? { ...a, percent: p.percent } : a)),
+      ),
     ),
   );
   void cloning.done.then(
@@ -1475,7 +1545,7 @@ function onCreateRepository(host: ExplorerHost, target: CreateTarget, url: strin
       }
       const name = res.repoName ?? deriveRepoName(url);
       host.setState((prev) => {
-        const seeded = setPending(withRoots(host, prev), key, undefined);
+        const seeded = dropPending(withRoots(host, prev), key, add.id);
         return { ...seeded, roots: addRepoNode(seeded.roots, name) };
       });
     },

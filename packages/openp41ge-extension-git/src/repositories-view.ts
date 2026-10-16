@@ -13,7 +13,11 @@
  *   - `+ add repository` / `+ add worktree` rows ask the platform
  *     (`host.workspace`): it clones / checks out and records the change in the
  *     open workspace, and the new rows arrive through `context.workspaceRepos`
- *     (the platform keeps the context live).
+ *     (the platform keeps the context live). Each add in progress is its own
+ *     row above the add row, which stays free for the next one; a failed add
+ *     reopens the add row with what was typed, or, when that row is in use,
+ *     stays as a red row (its error icon opens the output; a click on it
+ *     reopens it once the add row is free).
  *   - Dots after a row's name: amber, uncommitted changes; blue, commits no
  *     remote has. A repo row sums all its local branches. From
  *     `context.repositoryStates`, which the platform keeps up to date.
@@ -61,8 +65,9 @@ export interface RepositoriesState {
   /** The add row being edited, and what is typed in it. */
   readonly editing?: AddTarget | null;
   readonly value?: string;
-  /** An add in flight (clone / checkout), with clone progress. */
-  readonly busy?: { readonly target: AddTarget; readonly percent?: number } | null;
+  /** Adds in flight (clones / checkouts), with clone progress, and failed
+   *  ones kept while their add row was in use. */
+  readonly adding?: readonly AddInFlight[];
   /** Why the last action on a repo / worktree row failed (its key: rowKey). */
   readonly rowError?: {
     readonly key: string;
@@ -84,6 +89,18 @@ export interface RepositoriesState {
     readonly transcript?: GitTranscript;
   } | null;
 }
+
+/** One add the platform is working on (or that failed while its row was in use). */
+export interface AddInFlight {
+  readonly id: number;
+  readonly target: AddTarget;
+  /** What was typed. */
+  readonly value: string;
+  readonly percent?: number;
+  readonly failed?: { readonly message: string; readonly transcript?: GitTranscript };
+}
+
+let nextAddId = 1;
 
 /** The parts of the platform's SurfaceHost the view uses. */
 export interface RepositoriesHost {
@@ -305,38 +322,92 @@ function cancelAdd(host: RepositoriesHost): void {
   host.setState((prev) => ({ ...prev, editing: null, value: "", error: null }));
 }
 
-/** Confirm an add row: validate, then ask the platform; errors stay inline. */
+const withoutAdd = (prev: RepositoriesState, id: number): readonly AddInFlight[] =>
+  (prev.adding ?? []).filter((a) => a.id !== id);
+
+/**
+ * An add failed: reopen its add row with what was typed and the error, or,
+ * when that row is being typed in, keep the add as a red row.
+ */
+function failedAdd(
+  prev: RepositoriesState,
+  add: AddInFlight,
+  message: string,
+  transcript?: GitTranscript,
+): RepositoriesState {
+  const failed = { message, ...(transcript ? { transcript } : {}) };
+  if (sameTarget(prev.editing, add.target)) {
+    return {
+      ...prev,
+      adding: (prev.adding ?? []).map((a) => (a.id === add.id ? { ...a, failed } : a)),
+    };
+  }
+  return {
+    ...prev,
+    adding: withoutAdd(prev, add.id),
+    editing: add.target,
+    value: add.value,
+    error: { target: add.target, ...failed },
+  };
+}
+
+/** A click on a failed add's row: back into its add row, once that is free. */
+function reopenFailed(host: RepositoriesHost, add: AddInFlight): void {
+  host.setState((prev) =>
+    sameTarget(prev.editing, add.target) || !add.failed
+      ? prev
+      : {
+          ...prev,
+          adding: withoutAdd(prev, add.id),
+          editing: add.target,
+          value: add.value,
+          error: { target: add.target, ...add.failed },
+        },
+  );
+}
+
+/** Confirm an add row: validate, then ask the platform. The add gets its own
+ *  row while it runs and the add row closes, free for the next one. */
 function confirmAdd(host: RepositoriesHost, target: AddTarget): void {
   const value = (host.state.value ?? "").trim();
-  if (!value || host.state.busy) return;
-  const fail = (message: string, transcript?: GitTranscript) =>
-    host.setState((prev) => ({
-      ...prev,
-      busy: null,
-      error: { target, message, ...(transcript ? { transcript } : {}) },
-    }));
-  const done = (res: { ok: boolean; error?: string; transcript?: GitTranscript }) => {
-    if (!res.ok) return fail(res.error ?? "Failed", res.transcript);
-    host.setState((prev) => ({ ...prev, busy: null, editing: null, value: "", error: null }));
-  };
-
+  if (!value) return;
   if (target.kind === "repo") {
     const invalid = validateRepoUrl(value);
-    if (invalid) return fail(invalid);
-    host.setState((prev) => ({ ...prev, busy: { target }, error: null }));
+    if (invalid) {
+      host.setState((prev) => ({ ...prev, error: { target, message: invalid } }));
+      return;
+    }
+  }
+  const add: AddInFlight = { id: nextAddId++, target, value };
+  host.setState((prev) => ({
+    ...prev,
+    adding: [...(prev.adding ?? []), add],
+    editing: null,
+    value: "",
+    error: null,
+  }));
+  const done = (res: { ok: boolean; error?: string; transcript?: GitTranscript }) =>
+    host.setState((prev) =>
+      res.ok
+        ? { ...prev, adding: withoutAdd(prev, add.id) }
+        : failedAdd(prev, add, res.error ?? "Failed", res.transcript),
+    );
+  const fail = (err: unknown) => host.setState((prev) => failedAdd(prev, add, String(err)));
+
+  if (target.kind === "repo") {
     const cloning = host.workspace.addRepository(value);
     cloning.onProgress((p) =>
-      host.setState((prev) =>
-        prev.busy ? { ...prev, busy: { target, percent: p.percent } } : prev,
-      ),
+      host.setState((prev) => ({
+        ...prev,
+        adding: (prev.adding ?? []).map((a) =>
+          a.id === add.id ? { ...a, percent: p.percent } : a,
+        ),
+      })),
     );
-    void cloning.done.then(done, (err: unknown) => fail(String(err)));
+    void cloning.done.then(done, fail);
     return;
   }
-  host.setState((prev) => ({ ...prev, busy: { target }, error: null }));
-  void host.workspace
-    .addWorktree(target.repo, value)
-    .then(done, (err: unknown) => fail(String(err)));
+  void host.workspace.addWorktree(target.repo, value).then(done, fail);
 }
 
 /** Identifies a repo row, or a worktree row (repo + branch), for its error. */
@@ -582,14 +653,65 @@ function worktreeRow(
   </div>`;
 }
 
-/** A `+ add repository` / `+ add worktree` row, or its inline input. */
+/** A `+ add repository` / `+ add worktree` row (or its inline input), after
+ *  the rows of its adds in progress. */
 function addRow(host: RepositoriesHost, target: AddTarget, depth: number): TemplateResult {
+  const s = host.state;
+  const error = s.error && sameTarget(s.error.target, target) ? s.error : null;
+  const inFlight = (s.adding ?? [])
+    .filter((a) => sameTarget(a.target, target))
+    .map((a) => addingRow(host, a, depth));
+  return html`${inFlight}${addRowItself(host, target, depth, error)}`;
+}
+
+/** An add in progress (or failed while its add row was in use). */
+function addingRow(host: RepositoriesHost, add: AddInFlight, depth: number): TemplateResult {
+  const kind = add.target.kind;
+  const glyph = unsafeHTML(kind === "repo" ? REPO_ICON : WORKTREE_ICON);
+  const failed = add.failed;
+  const status = failed
+    ? "failed"
+    : kind === "repo"
+      ? `Cloning${add.percent ? ` ${add.percent}%` : "…"}`
+      : "Checking out…";
+  return html`<div
+    class="row adding ${failed ? "row--error" : ""}"
+    title=${failed?.message ?? nothing}
+    style=${pad(depth)}
+    @click=${() => reopenFailed(host, add)}
+  >
+    <span class="chevron"></span><span class="icon">${glyph}</span
+    ><span class="label">${add.value}</span><span class="busy">${status}</span>
+    ${
+      failed
+        ? html`<button
+            type="button"
+            class="error-btn"
+            data-error
+            title=${failed.message}
+            aria-label="Show what went wrong"
+            @click=${(e: MouseEvent) => {
+              e.stopPropagation();
+              openErrorOutput(host, kind, failed);
+            }}
+          >
+            ${unsafeHTML(ERROR_ICON)}
+          </button>`
+        : nothing
+    }
+  </div>`;
+}
+
+function addRowItself(
+  host: RepositoriesHost,
+  target: AddTarget,
+  depth: number,
+  error: RepositoriesState["error"],
+): TemplateResult {
   const s = host.state;
   const kind = target.kind;
   const label = kind === "repo" ? "add repository" : "add worktree";
   const glyph = unsafeHTML(kind === "repo" ? REPO_ICON : WORKTREE_ICON);
-  const error = s.error && sameTarget(s.error.target, target) ? s.error : null;
-  const busy = s.busy && sameTarget(s.busy.target, target) ? s.busy : null;
   if (!sameTarget(s.editing, target)) {
     return html`<div
       class="row add-row"
@@ -612,10 +734,9 @@ function addRow(host: RepositoriesHost, target: AddTarget, depth: number): Templ
       class="add-input"
       data-new-entry=${kind}
       .value=${s.value ?? ""}
-      ?disabled=${!!busy}
       placeholder=${kind === "repo" ? "git@github.com:org/repo.git" : "branch name"}
       ${ref((el) => {
-        if (el instanceof HTMLInputElement && !busy) queueMicrotask(() => el.focus());
+        if (el instanceof HTMLInputElement) queueMicrotask(() => el.focus());
       })}
       @input=${(e: Event) =>
         host.setState((prev) => ({
@@ -632,17 +753,6 @@ function addRow(host: RepositoriesHost, target: AddTarget, depth: number): Templ
         }
       }}
     />
-    ${
-      busy
-        ? html`<span class="busy"
-            >${
-              kind === "repo"
-                ? `Cloning${busy.percent ? ` ${busy.percent}%` : "…"}`
-                : "Checking out…"
-            }</span
-          >`
-        : nothing
-    }
     ${
       error
         ? html`<button
