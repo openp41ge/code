@@ -33,6 +33,7 @@ import {
   type SurfaceSpec,
   type SurfaceWorkspaceHost,
   type ContextMenuEntry,
+  type OpenKindDef,
 } from "openp41ge-sdk";
 import {
   beginExtensionScope,
@@ -40,6 +41,7 @@ import {
   getScopedRenderers,
   getScopedDragDecls,
   getScopedConfigSchema,
+  getScopedOpenKinds,
 } from "openp41ge-core-extension-host/scope";
 import type { AppTypeRegistration, SystemTabRegistration } from "../controllers/types";
 import type { MountDragBinding, SurfaceDragBinder } from "./extension-drag-service";
@@ -211,6 +213,8 @@ export interface LoadedRendererSet {
   readonly drag: DragDecls;
   /** The schema captured from `registerConfigSchema` (null when none). */
   readonly configSchema: ConfigSchema | null;
+  /** The open kinds captured from `registerOpenKinds` (empty when none). */
+  readonly openKinds: readonly OpenKindDef[];
   /** Set when the module could not be loaded or its registrations captured. */
   readonly error?: string;
 }
@@ -232,7 +236,13 @@ export async function loadExtensionRenderers(
   try {
     beginExtensionScope(identity.id, identity.version);
   } catch (err) {
-    return { renderers: [], drag: noDrag, configSchema: null, error: errorMessage(err) };
+    return {
+      renderers: [],
+      drag: noDrag,
+      configSchema: null,
+      openKinds: [],
+      error: errorMessage(err),
+    };
   }
   try {
     await loadEntry();
@@ -241,9 +251,16 @@ export async function loadExtensionRenderers(
       renderers: renderers ?? [],
       drag: getScopedDragDecls() ?? noDrag,
       configSchema: getScopedConfigSchema(),
+      openKinds: getScopedOpenKinds() ?? [],
     };
   } catch (err) {
-    return { renderers: [], drag: noDrag, configSchema: null, error: errorMessage(err) };
+    return {
+      renderers: [],
+      drag: noDrag,
+      configSchema: null,
+      openKinds: [],
+      error: errorMessage(err),
+    };
   } finally {
     endExtensionScope();
   }
@@ -470,6 +487,7 @@ export function deriveSurfaceCatalog(
         description,
         ...(spec.tabLabel ? { tabLabel: spec.tabLabel } : {}),
         ...(spec.workspace ? { workspace: spec.workspace } : {}),
+        ...(spec.opens ? { opens: spec.opens } : {}),
         createController: (tabId) => new RendererAppController(tabId, id, spec, deps),
       });
     } else {

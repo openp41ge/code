@@ -14,6 +14,8 @@
  *   - `config.ts`        — the config schema an extension registers, its
  *                          defaults, validation and merge.
  *   - `drag.ts`          — the drag & drop vocabulary, declarations + schemas.
+ *   - `open.ts`          — what the open palette opens (open kinds) and the
+ *                          search providers that find it.
  *
  * Extensions depend on this package (plus the shared packages they use) and
  * never on each other or on the platform itself.
@@ -76,7 +78,29 @@ export {
   registerDragDecls,
   registerConfigSchema,
   registerDispose,
+  registerOpenKinds,
+  registerSearchProvider,
 } from "./registration";
+
+export {
+  PLATFORM_OPEN_NAMESPACE,
+  PLATFORM_OPEN_KINDS,
+  parseOpenKinds,
+  findOpenKind,
+  validateOpenParams,
+  parseSearchItems,
+  openItemKey,
+  type OpenKind,
+  type OpenParamType,
+  type OpenParamsSchema,
+  type OpenKindDecl,
+  type OpenKindDef,
+  type OpenRegistrations,
+  type SearchOpenItem,
+  type SearchCreateItem,
+  type SearchItem,
+  type SearchProvider,
+} from "./open";
 
 export {
   validateConfigSchema,

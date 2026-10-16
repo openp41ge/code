@@ -30,7 +30,6 @@
     "openp41ge-core-extension-host": "workspace:*",
     "openp41ge-core-filesystem": "workspace:*",
     "openp41ge-core-logger": "workspace:*",
-    "openp41ge-core-scrollbar": "workspace:*",
     "openp41ge-sdk-uikit": "workspace:*",
     "ts-node": "^10.9.2",
     "typescript": "^7.0.2",

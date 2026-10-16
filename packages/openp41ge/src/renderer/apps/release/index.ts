@@ -15,6 +15,7 @@ const RELEASE_ICON =
 
 export const releaseAppRegistration: AppTypeRegistration = {
   id: RELEASE_APP_TYPE,
+  opens: ["openp41ge/release"],
   label: "Release",
   icon: RELEASE_ICON,
   description: "A release of the app",

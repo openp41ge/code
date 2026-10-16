@@ -76,6 +76,12 @@ export interface AppTypeRegistration {
   /** Whether it needs a workspace open (default "required"): a window with
    *  no workspace opens only "none" app types. */
   workspace?: SurfaceWorkspace;
+  /**
+   * The open kinds it opens from the palette (SDK `GridSurfaceSpec.opens`):
+   * an item's params become the tab's config. Without any, it takes no
+   * config and the palette offers it on its own; `[]`: not from the palette.
+   */
+  opens?: readonly string[];
 }
 
 // ─── System Tab Registration ──────────────────────────────────────────────

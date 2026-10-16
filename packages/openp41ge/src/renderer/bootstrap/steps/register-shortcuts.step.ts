@@ -9,6 +9,7 @@ import type { IStartupStep } from "../startup-step";
 import type { StartupContext } from "../startup-context";
 import { emitEvent } from "../../app";
 import { resolveCmdWTarget } from "../../services/cmd-w-target";
+import { showOpenPalette } from "../../services/open-palette/show";
 import { createLogger } from "openp41ge-core-logger";
 
 const log = createLogger("openp41ge", "register-shortcuts");
@@ -19,14 +20,16 @@ export class RegisterShortcutsStep implements IStartupStep {
   async run(context: StartupContext): Promise<void> {
     const km = context.keyboardManager;
 
-    // ── Window ──────────────────────────────────────────────────────
+    // ── Open ────────────────────────────────────────────────────────
+    // Cmd+N: the open palette. A new window is Cmd+Shift+N (the Window
+    // menu's accelerator).
     km.register({
       modifiers: 8, // Meta
       key: "n",
       code: "KeyN",
-      handler: () => window.openp41ge.workspace.cmdNewWindow(),
-      description: "New Window",
-      category: "Window",
+      handler: () => showOpenPalette(km, () => context.workspaceState.getWorkspace()),
+      description: "Open…",
+      category: "Tab",
     });
 
     // ── Tab ─────────────────────────────────────────────────────────
@@ -67,28 +70,6 @@ export class RegisterShortcutsStep implements IStartupStep {
       },
       description: "Close Tab",
       category: "Tab",
-    });
-
-    // ── Pane ────────────────────────────────────────────────────────
-    km.register({
-      modifiers: 8,
-      key: "p",
-      code: "KeyP",
-      handler: () => {
-        try {
-          // showPanePicker — opens the pane picker overlay
-          // Dispatches the pane-picker event for the grid to handle
-          const panePickerEvent = new CustomEvent("openp41ge:show-pane-picker", {
-            bubbles: true,
-            composed: true,
-          });
-          document.dispatchEvent(panePickerEvent);
-        } catch (err) {
-          log.error("Pane picker handler error:", err, { skipToast: true });
-        }
-      },
-      description: "Show Pane Picker",
-      category: "Pane",
     });
 
     // ── View: Sidebar toggles ───────────────────────────────────────

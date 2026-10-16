@@ -11,6 +11,8 @@ import { FileEditorController } from "./file-editor-controller";
 
 export const fileViewerAppRegistration: AppTypeRegistration = {
   id: "file-viewer",
+  // Opens a file from the open palette (Cmd+N).
+  opens: ["openp41ge/file"],
   label: "File Viewer",
   icon: "\uD83D\uDCC4",
   description: "View file contents",

@@ -14,4 +14,7 @@ export {
   type ExtensionConfigStore,
   type LoadedExtension,
   type ActiveExtensionSummary,
+  type SearchOutcome,
+  type CreateOutcome,
+  SEARCH_TIMEOUT_MS,
 } from "./host";

@@ -13,5 +13,5 @@
     "declaration": false,
     "sourceMap": true
   },
-  "include": ["electron", "src/layout", "src/main"]
+  "include": ["electron", "src/layout", "src/main", "src/shared"]
 }

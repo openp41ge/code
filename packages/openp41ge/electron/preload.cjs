@@ -826,6 +826,26 @@ contextBridge.exposeInMainWorld("openp41ge", {
       ipcRenderer.invoke("dialog:deleteWorkspaceFile", filePath, deleteData),
   },
 
+  /** The open palette (Cmd+N): search providers, files, new paths, history. */
+  palette: {
+    /** The extensions' search providers: [{ extensionId, id }]. */
+    providers: () => ipcRenderer.invoke("palette:providers"),
+    /** Ask one provider; resolves { ok, items } | { ok: false, error }. */
+    search: (extensionId, providerId, query) =>
+      ipcRenderer.invoke("palette:search", extensionId, providerId, query),
+    /** Run a provider's create action; resolves { ok, item } | { ok: false, error }. */
+    create: (extensionId, providerId, create, query) =>
+      ipcRenderer.invoke("palette:create", extensionId, providerId, create, query),
+    /** The workspace's files best matching `query` (at most `limit`). */
+    files: (query, limit) => ipcRenderer.invoke("palette:files", query, limit),
+    /** Create a file or folder ("file" | "folder") inside a worktree. */
+    createPath: (target, what) => ipcRenderer.invoke("palette:create-path", target, what),
+    /** What was opened, and in which tab type. */
+    history: () => ipcRenderer.invoke("palette:history"),
+    /** Remember a pick; resolves the history after it. */
+    record: (pick) => ipcRenderer.invoke("palette:record", pick),
+  },
+
   /** Extension host (main-process capabilities). */
   extension: {
     /** Active extensions (id, version, renderer entry). */

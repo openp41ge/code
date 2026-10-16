@@ -23,6 +23,9 @@ import type {
   HandlerPayload,
   HandlerWorkspace,
   ProcessRegistrations,
+  SearchItem,
+  SearchOpenItem,
+  SearchProvider,
 } from "openp41ge-sdk";
 import type { ChatSearchOptions } from "../chat/types.js";
 import { AgentRuntime, type ConnectedRepository } from "./agent-runtime.js";
@@ -63,6 +66,34 @@ function chatId(payload: HandlerPayload): string {
 /** The runtime's window events (`chat:<topic>`) as extension topics. */
 function topicOf(event: string): string {
   return event.replace(/^chat:/, "");
+}
+
+/** The open kind of a chat (`registerOpenKinds` in the renderer entry). */
+export const CHAT_OPEN_KIND = "openp41ge-extension-agents/chat";
+
+/** How many chats the palette is offered. */
+const PALETTE_CHATS = 50;
+
+/** `query`'s letters appear in `text` in order (ignoring case). */
+function hasInOrder(query: string, text: string): boolean {
+  const t = text.toLowerCase();
+  let i = 0;
+  for (const ch of query.toLowerCase()) {
+    i = t.indexOf(ch, i);
+    if (i < 0) return false;
+    i++;
+  }
+  return true;
+}
+
+function chatItem(chat: { id: string; title: string }): SearchOpenItem {
+  return {
+    kind: CHAT_OPEN_KIND,
+    params: { chatId: chat.id },
+    title: chat.title || "Untitled chat",
+    description: "Chat",
+    key: chat.id,
+  };
 }
 
 export class AgentsBackend {
@@ -200,6 +231,45 @@ export class AgentsBackend {
         const owner = this._threads.getOpenWin(id);
         if (owner) ctx.publish("highlight", { chatId: id, windowId: owner });
       }),
+    };
+  }
+
+  /**
+   * The palette's search provider: "New chat", then the calling workspace's
+   * chats whose title has the query's letters in order, newest first (not
+   * those open in another window, which a chat can be in only one of).
+   */
+  searchProvider(): SearchProvider {
+    const use = async (ctx: HandlerContext) => {
+      this._ctx = ctx;
+      useLog(ctx.log);
+      return this._useWorkspace(ctx.workspace);
+    };
+    return {
+      id: "chats",
+      search: async (query, ctx): Promise<SearchItem[]> => {
+        const ws = await use(ctx);
+        const q = query.trim();
+        const chats = this._threads
+          .listSummaries(ws)
+          .filter((c) => !(ctx.windowId && this._threads.isOpenElsewhere(c.id, ctx.windowId)))
+          .filter((c) => !q || hasInOrder(q, c.title))
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+          .slice(0, PALETTE_CHATS);
+        return [
+          { create: "new-chat", title: "New chat", description: "Agents" },
+          ...chats.map(chatItem),
+        ];
+      },
+      create: async (create, _query, ctx) => {
+        if (create !== "new-chat") return null;
+        const ws = await use(ctx);
+        const chat = this._threads.create(ws, {
+          providerId: this._config(ctx).defaultProviderId ?? DEFAULT_PROVIDER_ID,
+        });
+        ctx.publish("changed", {});
+        return chatItem(chat);
+      },
     };
   }
 

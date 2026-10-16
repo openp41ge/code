@@ -26,7 +26,6 @@ import "./components/openp41ge-migrations-pane";
 import "./components/openp41ge-titlebar";
 import "./components/openp41ge-topbar";
 import "./components/openp41ge-contextmenu";
-import "./components/openp41ge-pane-picker";
 import "./components/openp41ge-sidebar";
 import "./components/openp41ge-confirm-mask";
 import "./components/focus-section";

@@ -32,6 +32,13 @@ import type { ILogger } from "openp41ge-core-logger";
 import type { HandlerFn, HandlerPayload } from "./context";
 import { validateConfigSchema, type ConfigSchema, type ExtensionConfig } from "./config";
 import {
+  parseOpenKinds,
+  type OpenKind,
+  type OpenKindDef,
+  type OpenRegistrations,
+  type SearchProvider,
+} from "./open";
+import {
   assertNoConsumerDropTargetConflicts,
   parseDragRegistrations,
   type DragKindDef,
@@ -88,6 +95,12 @@ export interface GridSurfaceSpec {
   readonly tabLabel?: (params: Readonly<Record<string, unknown>>) => TabLabel;
   /** Whether it needs a workspace open (default `"required"`). */
   readonly workspace?: SurfaceWorkspace;
+  /**
+   * The open kinds this surface opens (`open.ts`): a palette item of one of
+   * them can open here, its params becoming the tab's. Without any, the
+   * surface takes no params and the palette offers it on its own.
+   */
+  readonly opens?: readonly OpenKind[];
   readonly render: RendererFn;
 }
 
@@ -381,6 +394,8 @@ interface ExtensionScope {
     consumers: DragConsumerDecl[];
     dropTargets: DropTargetDecl[];
   };
+  open: { kinds: OpenKindDef[] };
+  searchProviders: SearchProvider[];
   config: ConfigSchema | null;
   disposers: Array<() => void | Promise<void>>;
 }
@@ -487,4 +502,47 @@ export function registerDispose(fn: () => void | Promise<void>): void {
     throw new Error("registerDispose called outside an extension scope");
   }
   scope.disposers.push(fn);
+}
+
+/**
+ * Register the kinds of things this extension's surfaces open from the
+ * palette (`open.ts`). Called at renderer-entry load; each kind is named
+ * `<extensionId>/<id>`. An invalid declaration or a duplicate id throws.
+ */
+export function registerOpenKinds(regs: OpenRegistrations): void {
+  const scope = currentScope();
+  if (!scope) {
+    throw new Error("registerOpenKinds called outside an extension scope");
+  }
+  const next = [...scope.open.kinds, ...parseOpenKinds(regs, scope.id)];
+  assertUniqueIds(
+    "open kind",
+    next.map((k) => ({ id: k.name })),
+  );
+  scope.open.kinds = next;
+}
+
+/**
+ * Register a search provider for the palette (`open.ts`). Called at
+ * backend-entry load. A provider without a `search` function, or with an id
+ * already registered, throws.
+ */
+export function registerSearchProvider(provider: SearchProvider): void {
+  const scope = currentScope();
+  if (!scope) {
+    throw new Error("registerSearchProvider called outside an extension scope");
+  }
+  if (typeof provider?.id !== "string" || provider.id === "") {
+    throw new Error("a search provider needs an id");
+  }
+  if (typeof provider.search !== "function") {
+    throw new Error(`search provider '${provider.id}' has no search function`);
+  }
+  if (provider.create !== undefined && typeof provider.create !== "function") {
+    throw new Error(`search provider '${provider.id}': create must be a function`);
+  }
+  if (scope.searchProviders.some((p) => p.id === provider.id)) {
+    throw new Error(`duplicate search provider id '${provider.id}'`);
+  }
+  scope.searchProviders.push(provider);
 }

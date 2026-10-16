@@ -90,9 +90,6 @@ importers:
       openp41ge-core-logger:
         specifier: workspace:*
         version: link:../openp41ge-core-logger
-      openp41ge-core-scrollbar:
-        specifier: workspace:*
-        version: link:../openp41ge-core-scrollbar
       openp41ge-sdk:
         specifier: workspace:*
         version: link:../openp41ge-sdk

@@ -10,6 +10,7 @@ import { LogViewerController } from "./log-viewer-controller";
 
 export const logViewerAppRegistration: AppTypeRegistration = {
   id: "log-viewer",
+  opens: ["openp41ge/log-stream"],
   label: "Logs",
   icon: "\u2318",
   description: "Application log viewer",

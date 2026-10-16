@@ -29,6 +29,7 @@ import type {
   HandlerContext,
   HandlerFn,
   HandlerPayload,
+  SearchProvider,
 } from "openp41ge-sdk";
 import { EXTENSION_API_VERSION, qualifyName } from "openp41ge-sdk";
 import { DefaultsConfigStore, type ExtensionConfigStore } from "./config-store";
@@ -39,6 +40,7 @@ import {
   getScopedConfigSchema,
   getScopedDisposers,
   getScopedProcesses,
+  getScopedSearchProviders,
 } from "./scope";
 export type { ActiveExtensionSummary } from "openp41ge-sdk";
 import { discoverExtensions, type DiscoveredExtension } from "./discovery";
@@ -55,6 +57,8 @@ export interface LoadedExtension {
   /** false when activation failed (the extension was skipped). */
   readonly active: boolean;
   readonly handlers: ReadonlyMap<string, HandlerFn>;
+  /** Its backend's search providers (`registerSearchProvider`). */
+  readonly searchProviders: readonly SearchProvider[];
   /** Activation error message when `active` is false. */
   readonly error?: string;
   /** Internal: disposers + deactivate for lifecycle teardown. */
@@ -78,6 +82,22 @@ export interface ExtensionHostOptions {
   readonly onPublish?: (topic: string, payload?: HandlerPayload) => void;
   /** The platform's extension config store. Defaults to schema defaults only. */
   readonly config?: ExtensionConfigStore;
+}
+
+/** What a search provider's `search` resolved to: its raw items, or why not. */
+export type SearchOutcome =
+  | { readonly ok: true; readonly items: readonly unknown[] }
+  | { readonly ok: false; readonly error: string };
+
+/** What a provider's `create` resolved to: the item to open (or null), or why not. */
+export type CreateOutcome =
+  { readonly ok: true; readonly item: unknown } | { readonly ok: false; readonly error: string };
+
+/** How long `search` waits for a provider by default. */
+export const SEARCH_TIMEOUT_MS = 1500;
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 export class ExtensionHost {
@@ -139,6 +159,7 @@ export class ExtensionHost {
 
     const handlers = new Map<string, HandlerFn>();
     const disposers: Array<() => void | Promise<void>> = [];
+    const searchProviders: SearchProvider[] = [];
     let error: string | undefined;
 
     // The backend entry self-registers at import time, inside its scope.
@@ -157,6 +178,7 @@ export class ExtensionHost {
         procs = getScopedProcesses();
         configSchema = getScopedConfigSchema();
         disposers.push(...(getScopedDisposers() ?? []));
+        searchProviders.push(...(getScopedSearchProviders() ?? []));
       } finally {
         endExtensionScope();
       }
@@ -188,6 +210,7 @@ export class ExtensionHost {
       root: d.root,
       active: !error,
       handlers,
+      searchProviders,
       error,
       _dispose: dispose,
     };
@@ -287,6 +310,85 @@ export class ExtensionHost {
       windowId: caller?.windowId ?? null,
       log: this._loggerFor(extId),
     };
+  }
+
+  /** Every active extension's search providers, in activation order. */
+  searchProviders(): { extensionId: string; id: string }[] {
+    return this._order.flatMap((extId) =>
+      this._loaded.get(extId)!.searchProviders.map((p) => ({ extensionId: extId, id: p.id })),
+    );
+  }
+
+  private _provider(extId: string, providerId: string): SearchProvider | undefined {
+    return this._loaded.get(extId)?.searchProviders.find((p) => p.id === providerId);
+  }
+
+  /**
+   * Ask the provider `providerId` of `extId` for what matches `query`, in the
+   * calling window's context. Never rejects: an unknown provider, one that
+   * throws, and one slower than `timeoutMs` resolve `ok: false` (and the
+   * last two are logged to the extension's stream). The items are as the
+   * provider returned them; the caller validates them.
+   */
+  async search(
+    extId: string,
+    providerId: string,
+    query: string,
+    caller: HandlerCaller | undefined,
+    timeoutMs = SEARCH_TIMEOUT_MS,
+  ): Promise<SearchOutcome> {
+    const provider = this._provider(extId, providerId);
+    if (!provider) return { ok: false, error: `no search provider '${extId}/${providerId}'` };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`search provider '${providerId}' took longer than ${timeoutMs} ms`)),
+        timeoutMs,
+      );
+    });
+    try {
+      const items = await Promise.race([
+        Promise.resolve().then(() => provider.search(query, this._contextFor(extId, caller))),
+        timeout,
+      ]);
+      return { ok: true, items: Array.isArray(items) ? items : [] };
+    } catch (err) {
+      const error = errorMessage(err);
+      this._loggerFor(extId).warn(`search provider '${providerId}' failed: ${error}`);
+      return { ok: false, error };
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * Run the create action `create` of the provider `providerId` of `extId`
+   * (the palette's query was `query`). Never rejects; a failure resolves
+   * `ok: false` and is logged.
+   */
+  async createFromSearch(
+    extId: string,
+    providerId: string,
+    create: string,
+    query: string,
+    caller: HandlerCaller | undefined,
+  ): Promise<CreateOutcome> {
+    const provider = this._provider(extId, providerId);
+    if (!provider) return { ok: false, error: `no search provider '${extId}/${providerId}'` };
+    if (!provider.create) {
+      return { ok: false, error: `search provider '${extId}/${providerId}' creates nothing` };
+    }
+    try {
+      const item = await provider.create(create, query, this._contextFor(extId, caller));
+      return { ok: true, item: item ?? null };
+    } catch (err) {
+      const error = errorMessage(err);
+      this._loggerFor(extId).error(
+        `search provider '${providerId}' create '${create}' failed:`,
+        err,
+      );
+      return { ok: false, error };
+    }
   }
 
   /** True when a handler is registered for `commandId`. */

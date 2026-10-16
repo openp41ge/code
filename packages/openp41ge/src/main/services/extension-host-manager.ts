@@ -22,6 +22,8 @@ import {
   type ActiveExtensionSummary,
   type ExtensionConfigStore,
   type ExtensionHostOptions,
+  type SearchOutcome,
+  type CreateOutcome,
 } from "openp41ge-core-extension-host";
 import type { HandlerCaller, HandlerPayload } from "openp41ge-sdk";
 
@@ -114,6 +116,38 @@ export class ExtensionHostManager {
 
   hasHandler(commandId: string): boolean {
     return this._host?.hasHandler(commandId) ?? false;
+  }
+
+  /** The active extensions' palette search providers. */
+  searchProviders(): { extensionId: string; id: string }[] {
+    return this._host?.searchProviders() ?? [];
+  }
+
+  /** Ask one search provider for what matches `query` (never rejects). */
+  search(
+    extensionId: string,
+    providerId: string,
+    query: string,
+    caller?: HandlerCaller,
+  ): Promise<SearchOutcome> {
+    return (
+      this._host?.search(extensionId, providerId, query, caller) ??
+      Promise.resolve({ ok: false, error: "no extension host" })
+    );
+  }
+
+  /** Run a search provider's create action (never rejects). */
+  createFromSearch(
+    extensionId: string,
+    providerId: string,
+    create: string,
+    query: string,
+    caller?: HandlerCaller,
+  ): Promise<CreateOutcome> {
+    return (
+      this._host?.createFromSearch(extensionId, providerId, create, query, caller) ??
+      Promise.resolve({ ok: false, error: "no extension host" })
+    );
   }
 
   // ── Internals ────────────────────────────────────────────────────────

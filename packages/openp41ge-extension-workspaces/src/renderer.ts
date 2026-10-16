@@ -32,6 +32,8 @@ registerRenderers([
     description: "Edit a workspace's `.openp41ge-workspace` config (JSON / UI).",
     // Edits a workspace by its file, so it needs none open.
     workspace: "none",
+    // A workspace found in the palette opens as its editor.
+    opens: ["openp41ge/workspace"],
     // Titled by the workspace's name (a Workspaces row's, or a dropped one's).
     tabLabel: (params) => ({
       title: typeof params.name === "string" && params.name ? params.name : "Workspace editor",

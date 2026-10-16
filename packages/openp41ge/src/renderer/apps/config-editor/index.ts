@@ -10,6 +10,7 @@ import { CONFIG_EDITOR_APP_TYPE } from "./title";
 
 export const configEditorAppRegistration: AppTypeRegistration = {
   id: CONFIG_EDITOR_APP_TYPE,
+  opens: ["openp41ge/settings"],
   label: "Settings",
   icon: "⚙",
   description: "An extension's settings",

@@ -8,7 +8,7 @@
  * Repository tab, dropped commits (`git-commit`) as the Commit tab.
  */
 
-import { registerDragDecls, registerRenderers } from "openp41ge-sdk";
+import { registerDragDecls, registerOpenKinds, registerRenderers } from "openp41ge-sdk";
 import {
   REPOSITORY_DRAG_SOURCE_ID,
   renderRepositories,
@@ -37,6 +37,8 @@ registerRenderers([
     kind: "grid",
     id: "git-output",
     title: "Git output",
+    // Opened with a transcript, never from the palette.
+    opens: [],
     render: (host) => renderGitOutput(host),
   },
   {
@@ -45,6 +47,7 @@ registerRenderers([
     kind: "grid",
     id: "repository",
     title: "Repository",
+    opens: ["openp41ge-extension-git/repository"],
     tabLabel: repositoryTabLabel,
     render: (host) => renderRepository(host as unknown as RepositoryHost),
   },
@@ -54,6 +57,7 @@ registerRenderers([
     kind: "grid",
     id: "file-diff",
     title: "File diff",
+    opens: [],
     tabLabel: fileDiffTabLabel,
     render: (host) => renderFileDiff(host),
   },
@@ -62,6 +66,7 @@ registerRenderers([
     kind: "grid",
     id: "commit",
     title: "Commit",
+    opens: ["openp41ge-extension-git/commit"],
     tabLabel: commitTabLabel,
     render: (host) => renderCommit(host as unknown as CommitHost),
   },
@@ -74,6 +79,34 @@ registerRenderers([
     render: (host) => renderHistorySearch(host as unknown as HistorySearchHost),
   },
 ]);
+
+// What the palette opens here (the backend's search provider finds them).
+registerOpenKinds({
+  kinds: [
+    {
+      id: "repository",
+      label: "Repository",
+      params: {
+        type: "object",
+        properties: { repoName: { type: "string" }, branch: { type: "string" } },
+        required: ["repoName"],
+      },
+    },
+    {
+      id: "commit",
+      label: "Commit",
+      params: {
+        type: "object",
+        properties: {
+          repoName: { type: "string" },
+          hash: { type: "string" },
+          shortHash: { type: "string" },
+        },
+        required: ["repoName", "hash"],
+      },
+    },
+  ],
+});
 
 /** This extension's payload kinds: a repository (or worktree) and a commit. */
 const REPOSITORY_KIND = "openp41ge-extension-git/repository";

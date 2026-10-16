@@ -1,5 +1,6 @@
 import type { ActiveExtensionSummary, RepositoryState } from "openp41ge-sdk";
 import type { ExtensionConfigBridge } from "./services/extension-configs";
+import type { PaletteHistory, PalettePick } from "../shared/open-palette-ranking";
 
 /** Something the repository cleanup kept because it holds work (main
  *  process `CleanupItem`). */
@@ -8,6 +9,14 @@ interface CleanupItem {
   readonly path: string;
   readonly name: string;
   readonly repositories: ReadonlyArray<RepositoryState & { readonly stashed: boolean }>;
+}
+
+/** A workspace file the open palette found (main process `IndexedFile`). */
+interface PaletteFile {
+  readonly path: string;
+  readonly relPath: string;
+  readonly repoName: string;
+  readonly branch: string;
 }
 
 export {};
@@ -208,6 +217,29 @@ declare global {
       };
 
       /** Extension host (main-process capabilities). */
+      /** The open palette (Cmd+N). */
+      palette: {
+        providers: () => Promise<{ extensionId: string; id: string }[]>;
+        search: (
+          extensionId: string,
+          providerId: string,
+          query: string,
+        ) => Promise<{ ok: true; items: unknown[] } | { ok: false; error: string }>;
+        create: (
+          extensionId: string,
+          providerId: string,
+          create: string,
+          query: string,
+        ) => Promise<{ ok: true; item: unknown } | { ok: false; error: string }>;
+        files: (query: string, limit?: number) => Promise<PaletteFile[]>;
+        createPath: (
+          target: string,
+          what: "file" | "folder",
+        ) => Promise<{ ok: true; path: string } | { ok: false; error: string }>;
+        history: () => Promise<PaletteHistory>;
+        record: (pick: PalettePick) => Promise<PaletteHistory>;
+      };
+
       extension: {
         /** Active extensions (id, version, renderer entry). */
         getActive: () => Promise<ActiveExtensionSummary[]>;

@@ -37,6 +37,7 @@ import { Openp41geTabsEventHandler } from "./openp41ge-tabs-event-handler";
 import { RepositoryStates } from "./repository-states";
 import { extensionConfigs } from "./extension-configs";
 import { CONFIG_EDITOR_APP_TYPE } from "../apps/config-editor/title";
+import { setExtensionOpenKinds } from "./open-kinds";
 
 const EXTENSION_PROTOCOL = "openp41ge-ext";
 
@@ -361,6 +362,8 @@ export async function registerRendererExtensions(): Promise<void> {
       extensionDrag.unregisterExtension(ext.id);
       log.error(`drag declarations for '${ext.id}' rejected:`, err, { skipToast: true });
     }
+    // What its surfaces open from the palette (Cmd+N).
+    setExtensionOpenKinds(ext.id, result.openKinds);
     const catalog = deriveSurfaceCatalog(ext.id, result.renderers, {
       ...createRendererSurfaceDeps(ext.id, buildWorkspaceContext),
       drag: extensionDrag.binderFor(ext.id),

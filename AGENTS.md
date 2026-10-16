@@ -191,6 +191,8 @@ display kinds. That model is **gone**:
 > and the platform's renderer drag service; the explorer's file rows use it.
 > Configuration (`registerConfigSchema`, `host.config`, `ctx.config`) is in
 > `openp41ge-sdk` (`config.ts`) and the platform's `ExtensionConfigService`.
+> The open palette (`registerOpenKinds`, `opens`, `registerSearchProvider`)
+> is in `openp41ge-sdk` (`open.ts`) and the platform's `services/open-palette/`.
 > Check `openp41ge-sdk` before assuming an API exists.
 
 Beyond the two sides above (backend `registerProcesses`, view
@@ -298,6 +300,35 @@ from the schema (the UI kit's `<json-form>`), with a switch to the JSON view —
 platform's consumer for a dropped `config-overrides` payload (`settingsId` is
 the extension id), registered through the _same_ registration system
 extensions use.
+
+#### Opening from the palette (Cmd+N)
+
+The open palette searches everything that can be opened as a tab and shows,
+per result, the tab type it opens in (Tab cycles the others). Like drag & drop
+it is **kind-driven**, but with its own vocabulary (`open.ts` in the
+contract package), not drag payloads:
+
+- **Open kinds** — `namespace/kind`, each with a schema of its params. The
+  platform's are a closed set (`PLATFORM_OPEN_KINDS`: file, log stream,
+  settings, release, workspace); an extension declares its own with
+  `registerOpenKinds` (renderer entry), named `<extensionId>/<id>`.
+- **Surfaces say what they open** — `GridSurfaceSpec.opens` lists kinds; an
+  item's params become the tab's params unchanged. A grid surface without
+  `opens` takes no params and is offered on its own (as is every sidebar
+  surface); `opens: []` is never offered. Platform app types declare `opens`
+  the same way.
+- **Search providers** — a backend registers `registerSearchProvider`
+  (`search(query, ctx)`, optional `create(...)`), run in the calling
+  window's context with a timeout. Items are open items (kind, params, title)
+  or create items (`create`), validated by the platform.
+
+The platform itself offers files of the workspace's worktrees (`git ls-files`,
+indexed in the main process), sidebar tabs, settings, log streams, releases,
+workspaces, and New file / New folder. What was opened, and in which tab type
+per kind, is remembered in `<data>/.config/open-palette.json`: each pick's
+score halves weekly and the latest is boosted heavily
+(`src/shared/open-palette-ranking.ts`). It ranks the palette only; drops keep
+`dragConsumers`.
 
 #### Surface host additions
 

@@ -5,7 +5,8 @@
  *
  * The host opens a scope immediately before loading an extension entry module
  * so that module's `registerProcesses` / `registerRenderers` /
- * `registerDragDecls` / `registerConfigSchema` / `registerDispose` calls (from `openp41ge-sdk`) are captured against that
+ * `registerDragDecls` / `registerOpenKinds` / `registerSearchProvider` /
+ * `registerConfigSchema` / `registerDispose` calls (from `openp41ge-sdk`) are captured against that
  * extension, then reads the captured registrations and closes the scope:
  *
  *   beginExtensionScope(id, version);
@@ -31,6 +32,8 @@ import type {
   DragSourceDecl,
   DropTargetDecl,
   HandlerFn,
+  OpenKindDef,
+  SearchProvider,
   SurfaceSpec,
 } from "openp41ge-sdk";
 
@@ -45,6 +48,8 @@ interface ExtensionScope {
     consumers: DragConsumerDecl[];
     dropTargets: DropTargetDecl[];
   };
+  open: { kinds: OpenKindDef[] };
+  searchProviders: SearchProvider[];
   config: ConfigSchema | null;
   disposers: Array<() => void | Promise<void>>;
 }
@@ -69,6 +74,8 @@ export function beginExtensionScope(id: string, version: string): void {
     processes: new Map(),
     renderers: [],
     drag: { kinds: [], sources: [], consumers: [], dropTargets: [] },
+    open: { kinds: [] },
+    searchProviders: [],
     config: null,
     disposers: [],
   };
@@ -102,6 +109,18 @@ export function getScopedDragDecls(): DragDecls | null {
     consumers: [...consumers],
     dropTargets: [...dropTargets],
   };
+}
+
+/** The open kinds registered during the current scope, or null when none open. */
+export function getScopedOpenKinds(): readonly OpenKindDef[] | null {
+  const scope = currentScope();
+  return scope ? [...scope.open.kinds] : null;
+}
+
+/** The search providers registered during the current scope, or null when none open. */
+export function getScopedSearchProviders(): readonly SearchProvider[] | null {
+  const scope = currentScope();
+  return scope ? [...scope.searchProviders] : null;
 }
 
 /** The config schema registered during the current scope, or null (none

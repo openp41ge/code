@@ -70,7 +70,7 @@ import {
   serializeWorkspaceFile,
   withWorktree,
 } from "../src/layout/workspace-file.js";
-import type { CallerWorkspace } from "openp41ge-sdk";
+import type { CallerWorkspace, GitRequest } from "openp41ge-sdk";
 
 import {
   registerExtensionSchemePrivileges,
@@ -117,6 +117,13 @@ import { registerLogHandlers } from "./ipc-handlers/log-handlers.js";
 import { registerUpdaterHandlers } from "./ipc-handlers/updater-handlers.js";
 import { registerReleasesHandlers } from "./ipc-handlers/releases-handlers.js";
 import { registerExtensionHandlers } from "./ipc-handlers/extension-handlers.js";
+import { registerPaletteHandlers } from "./ipc-handlers/palette-handlers.js";
+import {
+  FilePaletteHistoryStore,
+  PALETTE_HISTORY_FILE,
+} from "../src/main/services/palette-history-store.js";
+import { WorkspaceFileIndex } from "../src/main/services/workspace-file-index.js";
+import { GitFileLister } from "../src/main/services/git-file-lister.js";
 import { registerCleanupHandlers } from "./ipc-handlers/cleanup-handlers.js";
 import { runExtensionGit, type ExtensionGitScope } from "../src/main/services/extension-git.js";
 import { registerDataMigrationsHandlers } from "./ipc-handlers/data-migrations-handlers.js";
@@ -187,6 +194,8 @@ export class Openp41geApplication {
   private logStore!: LogFileStore;
   private openp41geDir!: string;
   private extensionManager!: ExtensionHostManager;
+  /** The open palette's files (every window's workspaces). */
+  private readonly fileIndex = new WorkspaceFileIndex(new GitFileLister());
   /** Watch each repositories folder in use, so the Explorer auto-updates on
    *  external changes. */
   private readonly reposWatchers = new Map<string, ReposWatcher>();
@@ -650,6 +659,7 @@ export class Openp41geApplication {
           dir,
           (changedPath) => {
             this._broadcastTreeChanged(changedPath);
+            this.fileIndex.invalidate(changedPath);
             this._repositoryChanged(dir, changedPath);
           },
           (changedPath) => this._repositoryChanged(dir, changedPath),
@@ -874,11 +884,22 @@ export class Openp41geApplication {
     // An extension backend's git (ctx.git) runs in the calling window's
     // workspace: its repositories folder, and only the repos it lists. Its
     // ctx.workspace is that workspace (worktrees, a data folder).
-    registerExtensionHandlers(this.extensionManager, (event) => ({
-      git: (request) => runExtensionGit(this._gitScopeFor(event), request),
+    const callerFor = (event: { sender: Electron.WebContents }) => ({
+      git: (request: GitRequest) => runExtensionGit(this._gitScopeFor(event), request),
       workspace: this._callerWorkspaceFor(event),
       windowId: windowIdForSender(event) ?? undefined,
-    }));
+    });
+    registerExtensionHandlers(this.extensionManager, callerFor);
+    // The open palette (Cmd+N): providers run as the calling window, as
+    // dispatches do; what it remembers is shared by every window.
+    registerPaletteHandlers({
+      manager: this.extensionManager,
+      callerFor,
+      history: new FilePaletteHistoryStore(
+        path.join(this.openp41geDir, ".config", PALETTE_HISTORY_FILE),
+      ),
+      files: this.fileIndex,
+    });
     registerCleanupHandlers(this.cleanup, (folder) => shell.showItemInFolder(folder));
     registerDataMigrationsHandlers(this.openp41geDir);
     registerLifecycleHandlers(this.lifecycle);

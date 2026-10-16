@@ -9,7 +9,7 @@
  * the chat tab.
  */
 
-import { registerDragDecls, registerRenderers } from "openp41ge-sdk";
+import { registerDragDecls, registerOpenKinds, registerRenderers } from "openp41ge-sdk";
 import type { ChatPaneHost } from "./views/chat-pane.js";
 import { renderChat } from "./views/chat-pane-element.js";
 import { renderChatSearch } from "./views/chat-search-sidebar.js";
@@ -38,9 +38,26 @@ registerRenderers([
     kind: "grid",
     id: "chat",
     title: "Agent",
+    // A chat found in the palette opens here.
+    opens: ["openp41ge-extension-agents/chat"],
     render: (host) => renderChat(host as unknown as ChatPaneHost),
   },
 ]);
+
+// What a chat is to the palette: the backend's search provider finds them.
+registerOpenKinds({
+  kinds: [
+    {
+      id: "chat",
+      label: "Chat",
+      params: {
+        type: "object",
+        properties: { chatId: { type: "string" }, cwd: { type: "string" } },
+        required: ["chatId"],
+      },
+    },
+  ],
+});
 
 /** This extension's chat payload kind (`openp41ge-extension-agents/chat-thread`). */
 const CHAT_KIND = "openp41ge-extension-agents/chat-thread";
