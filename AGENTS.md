@@ -1,7 +1,7 @@
 # Openp41ge — Design Plan
 
 Status: live design document
-Updated: 2026-10-11
+Updated: 2026-10-16
 
 This document is the **design plan for the entire repository**. It describes what
 the system is, how it is structured, and where it is heading. It doubles as the
@@ -286,10 +286,11 @@ against the schema on save. The extension never manages its own settings file.
 Beyond standard JSON Schema the platform checks one keyword of its own:
 `"x-keysOf": "<sibling>"` on a string — its value must be a key of that
 sibling property's object (e.g. `defaultProviderId` names one of
-`providers`); the form shows it as a menu of those keys. The form also reads two
+`providers`); the form shows it as a menu of those keys. The form also reads
 display-only keywords: `"x-enumLabels"` (what an enum's values are called,
-by position) and `"x-group"` (properties next to each other with the same
-value are shown under that heading).
+by position), `"x-group"` (properties next to each other with the same
+value are shown under that heading), `"secret": true` on a string (a masked
+field) and `readOnly` (shown greyed, not edited; Reset still removes it).
 
 The platform's config editor is the `config-editor` grid tab — a form built
 from the schema (the UI kit's `<json-form>`), with a switch to the JSON view —
