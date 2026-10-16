@@ -2049,6 +2049,15 @@ class AgentsChat extends LitElement {
   }
 
   // ─── Mouse selection on the visible composer content ───────────────
+  /** Focus the hidden textarea, and cancel mousedown's default: this div
+   *  can't take focus, so the browser would move focus to <body> right
+   *  after, leaving a caret drawn with nothing to type into. */
+  private _onContentMouseDown = (e: MouseEvent): void => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    this._focusComposer();
+  };
+
   private _onContentPointerDown = (e: PointerEvent): void => {
     if (e.button !== 0) return;
     // Do NOT preventDefault: canceling pointerdown would suppress the compat
@@ -3393,7 +3402,7 @@ class AgentsChat extends LitElement {
       <div class="composer ${this._menuOpen ? "menu-open" : ""}">
         <div
           class="composer-content"
-          @mousedown=${() => this._focusComposer()}
+          @mousedown=${this._onContentMouseDown}
           @pointerdown=${this._onContentPointerDown}
           @pointermove=${this._onContentPointerMove}
           @pointerup=${this._onContentPointerUp}
