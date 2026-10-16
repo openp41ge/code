@@ -1,7 +1,7 @@
 /**
- * git-types.ts — the git data the extension's queries return (commit log,
- * branches, diff stats, commit search). The extension's own types: core
- * libraries are not shared with extensions (AGENTS.md §3).
+ * git-types.ts — the git data `GitQueries` returns (commit log, branches,
+ * diff stats, commit search, history: filtered commits, patches, blame,
+ * local branches).
  */
 
 export interface CommitEntry {
@@ -89,4 +89,69 @@ export interface CommitSearchOptions {
    * one it is on (`worktree`), when it is on one.
    */
   worktrees?: readonly string[];
+}
+
+/** Which commits `findCommits` lists. */
+export interface CommitFilter {
+  /** Whose history (default HEAD). */
+  readonly ref?: string;
+  /** Only commits that change this path. */
+  readonly path?: string;
+  /** Author name or email (a substring, any case). */
+  readonly author?: string;
+  /** Dates as git reads them (`2026-01-31`, `2 weeks ago`). */
+  readonly since?: string;
+  readonly until?: string;
+  readonly search?: string;
+  /** Where `search` looks: the message (default), code added or removed
+   *  (`code`), or added / removed lines matching a regex (`code_regex`). */
+  readonly searchIn?: "message" | "code" | "code_regex";
+  readonly maxCount?: number;
+  readonly skip?: number;
+}
+
+/** What `getPatch` diffs: a commit, a range, or a worktree's changes. */
+export interface PatchRequest {
+  readonly commit?: string;
+  readonly from?: string;
+  readonly to?: string;
+  /** A worktree (its branch): its uncommitted changes. */
+  readonly worktree?: string;
+  /** With `worktree`: the staged changes, not the unstaged ones. */
+  readonly staged?: boolean;
+  readonly path?: string;
+  /** `<status>\t<path>` lines instead of the patch. */
+  readonly namesOnly?: boolean;
+}
+
+/** One line of `getBlame`. */
+export interface BlameLine {
+  readonly line: number;
+  readonly hash: string;
+  readonly shortHash: string;
+  readonly author: string;
+  /** ISO date of the author's change. */
+  readonly date: string;
+  /** The commit's subject. */
+  readonly summary: string;
+  readonly text: string;
+  /** Not committed yet (a worktree's own change). */
+  readonly uncommitted?: true;
+}
+
+/** A local branch (`getLocalBranches`). */
+export interface LocalBranch {
+  readonly name: string;
+  readonly upstream?: string;
+  /** Its upstream branch no longer exists on the remote. */
+  readonly upstreamGone: boolean;
+  readonly ahead: number;
+  readonly behind: number;
+  readonly lastCommit: {
+    readonly hash: string;
+    readonly shortHash: string;
+    readonly authorName: string;
+    readonly date: string;
+    readonly message: string;
+  };
 }

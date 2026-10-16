@@ -10,6 +10,8 @@
  * tools (read_file, search_files, …) and the agent runtime share.
  */
 
+import type { GitRequest, GitResult } from "openp41ge-sdk";
+
 /** JSON Schema for a tool's parameters (subset of JSON Schema that vLLM/OpenAI accept). */
 export interface ToolParameters {
   type: "object";
@@ -48,6 +50,12 @@ export interface ToolExecutionContext {
     repo: string,
     branch: string,
   ): Promise<{ ok: boolean; path?: string; error?: string }>;
+  /**
+   * Run git in a repository of the chat's workspace (the platform's
+   * `ctx.git`: by name, no shell). Absent when the chat has no workspace.
+   * Resolves in-band, never throws.
+   */
+  git?(request: GitRequest): Promise<GitResult>;
 }
 
 /** Result of a tool execution. Errors are reported in-band, never thrown. */

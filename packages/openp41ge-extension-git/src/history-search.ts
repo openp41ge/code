@@ -39,7 +39,7 @@ import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import "openp41ge-sdk-uikit/drop-indicator";
 import { tooltipContent } from "openp41ge-sdk-uikit/tooltip";
 import type { OpenTabRequest } from "openp41ge-sdk";
-import type { SearchResultCommit } from "./git-types.js";
+import type { SearchResultCommit } from "openp41ge-sdk-git";
 import {
   DEPTH_LIMITS,
   HistorySearchModel,

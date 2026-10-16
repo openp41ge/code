@@ -358,7 +358,9 @@ package (`registration.ts`), which also carries `surface`, `context`,
 - **The SDK** — the public API extensions build against: the extension API
   **contract** (`openp41ge-sdk`: types, manifest schema, registration
   signatures; the platform builds against it too) and the public libraries
-  (`openp41ge-sdk-*`), notably the **shared UI toolkit**.
+  (`openp41ge-sdk-*`), notably the **shared UI toolkit**, and the git queries
+  extension backends share (`openp41ge-sdk-git`: backend-only — a renderer
+  entry may use its types, not its values).
 - **Official extensions** — systems shipped as extensions, built against the
   SDK exactly like a third-party extension would be (e.g. the explorer, git,
   workspaces and agents).

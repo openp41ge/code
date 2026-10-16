@@ -4,7 +4,7 @@
  * injected `CommitCellApi` (the extension's backend). No DOM.
  */
 
-import type { CommitEntry, DiffStatEntry } from "./git-types.js";
+import type { CommitEntry, DiffStatEntry } from "openp41ge-sdk-git";
 import { newPath } from "./repository-cell-model.js";
 
 /** Git, for one repository. Every call may reject with git's error. */

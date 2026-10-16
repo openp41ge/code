@@ -19,7 +19,7 @@ import type {
   SurfaceWorkspaceHost,
 } from "openp41ge-sdk";
 import { OverlayScrollbar } from "openp41ge-sdk-uikit";
-import type { BranchEntry, CommitEntry, DiffStatEntry } from "./git-types.js";
+import type { BranchEntry, CommitEntry, DiffStatEntry } from "openp41ge-sdk-git";
 import { REPO_ICON, WORKTREE_ICON } from "./icons.js";
 import { RepositoryCellModel, type RepositoryCellApi } from "./repository-cell-model.js";
 import { renderRepositoryCell, type RepositoryCellActions } from "./repository-cell-view.js";

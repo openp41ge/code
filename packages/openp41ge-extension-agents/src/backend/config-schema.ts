@@ -40,7 +40,7 @@ export const AGENTS_CONFIG_SCHEMA: ConfigSchema = {
           title: "Enabled tools",
           items: { type: "string" },
           description:
-            "The tool names chats may use (e.g. `read_file`, `search_files`, `edit_file`, `create_or_replace_file`, `create_worktree`). When unset, every tool is available.",
+            "The tool names chats may use (e.g. `read_file`, `search_files`, `edit_file`, `create_or_replace_file`, `create_worktree`, and the read-only git tools `git_log`, `git_show`, `git_diff`, `git_blame`, `git_branches`). When unset, every tool is available.",
         },
       },
     },

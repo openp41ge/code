@@ -16,7 +16,7 @@
  */
 
 import type { RepositoryState } from "openp41ge-sdk";
-import type { BranchEntry, CommitEntry, DiffStatEntry } from "./git-types.js";
+import type { BranchEntry, CommitEntry, DiffStatEntry } from "openp41ge-sdk-git";
 
 /** Git, for one repository. Every call may reject with git's error. */
 export interface RepositoryCellApi {

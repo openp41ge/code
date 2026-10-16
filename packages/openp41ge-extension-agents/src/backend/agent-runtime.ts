@@ -16,6 +16,7 @@
  * (Dependency Inversion).
  */
 
+import type { GitRequest, GitResult } from "openp41ge-sdk";
 import { logFor } from "./log.js";
 import type {
   ChatMessage,
@@ -57,6 +58,9 @@ export interface WorktreeResult {
 /** The tool that checks out a worktree (named in the system prompt). */
 const CREATE_WORKTREE_TOOL = "create_worktree";
 
+/** The git tools (named in the system prompt when enabled). */
+const GIT_TOOL_PREFIX = "git_";
+
 export interface AgentRuntimeConfig {
   /** Resolve the persisted config for a provider id, or null when unconfigured. */
   getProviderConfig(providerId: string): ChatProviderConfig | null;
@@ -70,6 +74,8 @@ export interface AgentRuntimeConfig {
   getConnectedRepositories?(chatId: string): Promise<ConnectedRepository[]>;
   /** Check out `branch` of `repo` as a worktree of the chat's workspace. */
   addWorktree?(chatId: string, repo: string, branch: string): Promise<WorktreeResult>;
+  /** Run git in a repository of the chat's workspace (the git tools). */
+  git?(chatId: string, request: GitRequest): Promise<GitResult>;
 }
 
 /**
@@ -81,6 +87,7 @@ export interface AgentRuntimeConfig {
 function buildSystemPrompt(
   connected: ConnectedRepository[] | undefined,
   canCheckOut: boolean,
+  gitTools: readonly string[] = [],
 ): string {
   if (connected === undefined) return DEFAULT_SYSTEM_PROMPT;
   if (connected.length === 0) {
@@ -104,7 +111,11 @@ function buildSystemPrompt(
   const checkOut = canCheckOut
     ? ` To work in a repository with no worktree, or on another branch, check one out with ${CREATE_WORKTREE_TOOL}; it is then in scope.`
     : "";
-  return `${DEFAULT_SYSTEM_PROMPT}\n\nConnected repositories you may read and search (file tools are scoped to their worktrees):\n\n${blocks.join("\n")}\n\nEach repository has one or more worktree checkouts (one per branch) — they are the same repository at different branches. To read or search a repository, use any one of its worktree paths; do not repeat the same file across sibling worktrees.${checkOut}`;
+  const git =
+    gitTools.length > 0
+      ? ` To read a repository's history, commits, changes and blame, use the git tools (${gitTools.join(", ")}) with the repository's name; they only read. A worktree is named by its branch.`
+      : "";
+  return `${DEFAULT_SYSTEM_PROMPT}\n\nConnected repositories you may read and search (file tools are scoped to their worktrees):\n\n${blocks.join("\n")}\n\nEach repository has one or more worktree checkouts (one per branch) — they are the same repository at different branches. To read or search a repository, use any one of its worktree paths; do not repeat the same file across sibling worktrees.${checkOut}${git}`;
 }
 
 /** A tool call accumulated from streamed deltas, awaiting execution. */
@@ -254,6 +265,7 @@ export class AgentRuntime {
     thinkingLevel?: string,
   ): Promise<void> {
     const addWorktree = this._config.addWorktree;
+    const git = this._config.git;
     while (!signal.aborted) {
       const chat = this._store.get(chatId);
       if (!chat) return;
@@ -282,6 +294,7 @@ export class AgentRuntime {
       const systemContent = buildSystemPrompt(
         connected,
         !!addWorktree && tools.some((t) => t.name === CREATE_WORKTREE_TOOL),
+        git ? tools.map((t) => t.name).filter((n) => n.startsWith(GIT_TOOL_PREFIX)) : [],
       );
 
       const system: ChatMessage = {
@@ -370,6 +383,7 @@ export class AgentRuntime {
             return added;
           };
         }
+        if (git) ctx.git = (request) => git(chatId, request);
         const result = await this._tools.execute(tc.name, parseArgs(tc.arguments), ctx);
         const chatNow = this._store.get(chatId);
         if (!chatNow) break;

@@ -298,6 +298,9 @@ importers:
       openp41ge-sdk:
         specifier: workspace:*
         version: link:../openp41ge-sdk
+      openp41ge-sdk-git:
+        specifier: workspace:*
+        version: link:../openp41ge-sdk-git
       openp41ge-sdk-uikit:
         specifier: workspace:*
         version: link:../openp41ge-sdk-uikit
@@ -333,6 +336,9 @@ importers:
       openp41ge-sdk:
         specifier: workspace:*
         version: link:../openp41ge-sdk
+      openp41ge-sdk-git:
+        specifier: workspace:*
+        version: link:../openp41ge-sdk-git
       openp41ge-sdk-uikit:
         specifier: workspace:*
         version: link:../openp41ge-sdk-uikit
@@ -374,6 +380,15 @@ importers:
       zod:
         specifier: ^4.4.3
         version: 4.4.3
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.3(@types/node@24.13.2)(jiti@2.7.0)(tsx@4.23.1)(yaml@2.9.0)
+
+  packages/openp41ge-sdk-git:
     devDependencies:
       typescript:
         specifier: ^7.0.2

@@ -14,7 +14,7 @@
 import { html, LitElement, nothing, type TemplateResult } from "lit";
 import type { OpenTabRequest } from "openp41ge-sdk";
 import { OverlayScrollbar } from "openp41ge-sdk-uikit";
-import type { CommitEntry, DiffStatEntry } from "./git-types.js";
+import type { CommitEntry, DiffStatEntry } from "openp41ge-sdk-git";
 import { CommitCellModel, type CommitCellState } from "./commit-cell-model.js";
 import {
   REPOSITORY_CELL_STYLES,

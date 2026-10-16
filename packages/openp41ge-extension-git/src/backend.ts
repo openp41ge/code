@@ -25,8 +25,7 @@
  */
 
 import type { HandlerContext, HandlerFn, HandlerPayload } from "openp41ge-sdk";
-import { GitQueries } from "./git-queries.js";
-import type { CommitSearchOptions } from "./git-types.js";
+import { GitQueries, type CommitSearchOptions } from "openp41ge-sdk-git";
 
 type Answer = { ok: true; result: unknown } | { ok: false; error: string };
 

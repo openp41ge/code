@@ -13,7 +13,7 @@
  * one's results. No DOM.
  */
 
-import type { CommitSearchOptions, SearchResultCommit } from "./git-types.js";
+import type { CommitSearchOptions, SearchResultCommit } from "openp41ge-sdk-git";
 
 /** Git, for the search. May reject with git's error. */
 export interface HistorySearchApi {

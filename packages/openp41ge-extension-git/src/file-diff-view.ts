@@ -12,7 +12,7 @@
 import { html, LitElement, type PropertyValues, type TemplateResult } from "lit";
 import "openp41ge-sdk-uikit/file-editor";
 import { PieceTreeTextContentModel, type FileEditorElement } from "openp41ge-sdk-uikit/file-editor";
-import type { InlineDiffFile } from "./build-inline-diff-file.js";
+import type { InlineDiffFile } from "openp41ge-sdk-git";
 
 /** What the backend's `file-diff` command is asked. */
 export interface FileDiffRequest {
