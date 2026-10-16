@@ -279,7 +279,11 @@ export class Openp41geOpenPalette extends LitElement {
                 : this._ranked.map((r, i) => this._row(r, i))
             }
           </div>
-          <div class="op-hint">↵ open · ⌘↵ new column · ⇥ other tab type · esc close</div>
+          <div class="op-hint">
+            ↵ open · ⌘↵ new
+            column${this._ranked.some((r) => r.tabTypes.length > 1) ? " · ⇥ other tab type" : ""} ·
+            esc close
+          </div>
         </div>
       </div>
     `;
