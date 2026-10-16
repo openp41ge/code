@@ -20,7 +20,14 @@
     "bundle-extensions": {
       "executor": "nx:run-commands",
       "outputs": ["{projectRoot}/dist-extensions"],
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build",
+        {
+          "target": "build",
+          "projects": ["openp41ge-extension-*"],
+          "dependencies": true
+        }
+      ],
       "options": {
         "command": "node scripts/bundle-extensions.ts --out dist-extensions",
         "cwd": "{projectRoot}"
