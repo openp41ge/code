@@ -9,7 +9,8 @@
  *   - A **tab** entry is a tab type offered on its own (a sidebar tab, or a
  *     grid tab that takes no params); it is remembered under the kind `""`.
  *   - A **create** entry is a create action: a provider's (ranked by its
- *     title) or the platform's new file / new folder (always last).
+ *     title) or the platform's new file / new folder (always last). With
+ *     nothing typed, new file / new folder ask for a name (`ask`).
  */
 
 import { openItemKey, type SearchOpenItem } from "openp41ge-sdk";
@@ -57,7 +58,16 @@ export type PaletteEntry =
       };
       /** The platform's new file / new folder. */
       readonly path?: { readonly target: string; readonly what: "file" | "folder" };
+      /** New file / new folder that asks for its name first, in `target`. */
+      readonly ask?: { readonly what: "file" | "folder"; readonly target: CreateTarget };
     };
+
+/** Where a new file / folder goes: a worktree folder, and what to call it. */
+export interface CreateTarget {
+  readonly root: string;
+  /** e.g. `gh/org/repo · main`. */
+  readonly label: string;
+}
 
 /** The registries, as the model needs them (only types available in this window). */
 export interface PaletteCatalog {
@@ -86,9 +96,11 @@ export function entryKey(entry: PaletteEntry): string {
     case "tab":
       return `tab:${entry.tabType}`;
     case "create":
-      return entry.provider
-        ? `create:${entry.provider.extensionId}/${entry.provider.providerId}/${entry.provider.create}`
-        : `create:${entry.path?.what}:${entry.path?.target}`;
+      if (entry.provider) {
+        return `create:${entry.provider.extensionId}/${entry.provider.providerId}/${entry.provider.create}`;
+      }
+      if (entry.ask) return `create:ask:${entry.ask.what}`;
+      return `create:${entry.path?.what}:${entry.path?.target}`;
   }
 }
 
@@ -109,7 +121,7 @@ export function rankEntries(
     if (seen.has(key)) continue;
     seen.add(key);
     if (entry.type === "create") {
-      if (entry.path) {
+      if (entry.path || entry.ask) {
         last.push({ entry, key, kind: "", tabTypes: [], score: -Infinity });
         continue;
       }
@@ -156,30 +168,33 @@ export function pickFor(entry: PaletteEntry, tabType: string): PalettePick | nul
     kind: entry.type === "open" ? entry.item.kind : "",
     tabType,
     item: entryKey(entry),
-    details: { ...entry },
   };
 }
 
-function isEntry(value: unknown): value is PaletteEntry {
-  const v = value as Record<string, unknown> | null;
-  if (typeof v !== "object" || v === null) return false;
-  if (v.type === "tab") return typeof v.tabType === "string" && typeof v.title === "string";
-  if (v.type !== "open") return false;
-  const item = v.item as Record<string, unknown> | null;
-  return (
-    typeof item === "object" &&
-    item !== null &&
-    typeof item.kind === "string" &&
-    typeof item.title === "string" &&
-    typeof item.params === "object" &&
-    item.params !== null
-  );
+/** New file / new folder named `name` in `target` (none for an empty or `..` name). */
+export function namedPathEntries(
+  name: string,
+  target: CreateTarget | null,
+  what: readonly ("file" | "folder")[] = ["file", "folder"],
+): PaletteEntry[] {
+  const rel = name.trim().replace(/^\/+/, "");
+  if (!target || rel === "" || rel.split("/").includes("..")) return [];
+  const full = `${target.root.replace(/\/+$/, "")}/${rel}`;
+  return what.map((w) => ({
+    type: "create",
+    title: `New ${w} “${rel}”`,
+    description: `in ${target.label}`,
+    path: { target: full, what: w },
+  }));
 }
 
-/** What was opened before, most remembered first (for an empty query). */
-export function entriesFromHistory(history: PaletteHistory, now = Date.now()): PaletteEntry[] {
-  return Object.values(history.items)
-    .filter((u) => isEntry(u.details))
-    .sort((a, b) => frecency(b, now) - frecency(a, now))
-    .map((u) => u.details as unknown as PaletteEntry);
+/** With nothing typed: new file / new folder, each asking for its name. */
+export function askPathEntries(target: CreateTarget | null): PaletteEntry[] {
+  if (!target) return [];
+  return (["file", "folder"] as const).map((what) => ({
+    type: "create",
+    title: `New ${what}…`,
+    description: `in ${target.label}`,
+    ask: { what, target },
+  }));
 }

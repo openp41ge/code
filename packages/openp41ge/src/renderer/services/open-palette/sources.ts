@@ -28,16 +28,9 @@ import {
   type PlatformConfigBridge,
 } from "../settings-sources";
 import { workspaceFileService } from "../workspace-file-service";
-import type { PaletteEntry } from "./model";
+import { askPathEntries, namedPathEntries, type CreateTarget, type PaletteEntry } from "./model";
 
 const log = createLogger("openp41ge", "open-palette");
-
-/** Where a new file / folder goes: a worktree folder, and what to call it. */
-export interface CreateTarget {
-  readonly root: string;
-  /** e.g. `gh/org/repo · main`. */
-  readonly label: string;
-}
 
 export interface SourceOptions {
   /** Where new files and folders go (null: no worktree, none offered). */
@@ -166,7 +159,11 @@ function providerEntry(extensionId: string, providerId: string, item: SearchItem
   return { type: "open", item };
 }
 
-async function providerSearches(query: string, onEntries: OnEntries): Promise<void> {
+async function providerSearches(
+  query: string,
+  onEntries: OnEntries,
+  createsOnly: boolean,
+): Promise<void> {
   const palette = window.openp41ge?.palette;
   if (!palette) return;
   const providers = await palette.providers();
@@ -178,42 +175,35 @@ async function providerSearches(query: string, onEntries: OnEntries): Promise<vo
       if (problems.length > 0) {
         log.warn(`search provider '${extensionId}/${id}' returned items it should not:`, problems);
       }
-      onEntries(items.map((item) => providerEntry(extensionId, id, item)));
+      onEntries(
+        items
+          .filter((item) => !createsOnly || "create" in item)
+          .map((item) => providerEntry(extensionId, id, item)),
+      );
     }),
   );
-}
-
-function createEntries(query: string, target: CreateTarget | null): PaletteEntry[] {
-  const rel = query.trim().replace(/^\/+/, "");
-  if (!target || rel === "" || rel.split("/").includes("..")) return [];
-  const full = `${target.root.replace(/\/+$/, "")}/${rel}`;
-  const where = `in ${target.label}`;
-  return [
-    {
-      type: "create",
-      title: `New file “${rel}”`,
-      description: where,
-      path: { target: full, what: "file" },
-    },
-    {
-      type: "create",
-      title: `New folder “${rel}”`,
-      description: where,
-      path: { target: full, what: "folder" },
-    },
-  ];
 }
 
 /**
  * Gather everything matching `query`, reporting each source's entries as
  * they arrive. Resolves once every source has answered (or failed — a
- * failing source is logged and contributes nothing).
+ * failing source is logged and contributes nothing). With nothing typed,
+ * only the create actions (the providers', new file / new folder).
  */
 export async function gatherEntries(
   query: string,
   options: SourceOptions,
   onEntries: OnEntries,
 ): Promise<void> {
+  if (query.trim() === "") {
+    onEntries(askPathEntries(options.createTarget));
+    try {
+      await providerSearches("", onEntries, true);
+    } catch (err) {
+      log.warn("palette source 'providers' failed:", err);
+    }
+    return;
+  }
   onEntries([...tabEntries(), ...logEntries()]);
   const settled = async (what: string, run: () => Promise<PaletteEntry[] | void>) => {
     try {
@@ -227,10 +217,10 @@ export async function gatherEntries(
     settled("settings", settingsEntries),
     settled("releases", releaseEntries),
     settled("workspaces", workspaceEntries),
-    query.trim() ? settled("files", () => fileEntries(query.trim())) : Promise.resolve(),
-    settled("providers", () => providerSearches(query, onEntries)),
+    settled("files", () => fileEntries(query.trim())),
+    settled("providers", () => providerSearches(query, onEntries, false)),
   ]);
-  onEntries(createEntries(query, options.createTarget));
+  onEntries(namedPathEntries(query, options.createTarget));
 }
 
 /**

@@ -38,8 +38,7 @@ function isPick(value: unknown): value is PalettePick {
     typeof p.tabType === "string" &&
     p.tabType !== "" &&
     typeof p.item === "string" &&
-    p.item !== "" &&
-    (p.details === undefined || (typeof p.details === "object" && p.details !== null))
+    p.item !== ""
   );
 }
 

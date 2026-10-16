@@ -7,7 +7,9 @@
  *   - Enter opens it in the focused column, Cmd+Enter in a new column;
  *   - Escape, or a click outside, closes with nothing opened.
  *
- * With nothing typed it lists what was opened before. Results arrive per
+ * With nothing typed it lists only the create actions (New chat, New file…,
+ * New folder…); New file… / New folder… then ask for a name (Escape goes
+ * back). Results arrive per
  * source (`services/open-palette/sources.ts`) and are ranked by
  * `services/open-palette/model.ts`. Renders into its light DOM, with its
  * styles added once to the document.
@@ -17,8 +19,9 @@ import { LitElement, html, nothing, type TemplateResult } from "lit";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { emptyPaletteHistory, type PaletteHistory } from "../../shared/open-palette-ranking";
 import {
-  entriesFromHistory,
+  namedPathEntries,
   rankEntries,
+  type CreateTarget,
   type PaletteCatalog,
   type PaletteEntry,
   type RankedEntry,
@@ -61,6 +64,7 @@ export class Openp41geOpenPalette extends LitElement {
     _ranked: { state: true },
     _selected: { state: true },
     _cycle: { state: true },
+    _naming: { state: true },
   };
 
   /** Set before it connects. */
@@ -73,6 +77,8 @@ export class Openp41geOpenPalette extends LitElement {
   declare private _selected: number;
   /** Per result key: how far Tab moved its tab type from the default. */
   declare private _cycle: ReadonlyMap<string, number>;
+  /** New file… / New folder… was chosen: the field takes its name. */
+  declare private _naming: { what: "file" | "folder"; target: CreateTarget } | null;
 
   private _history: PaletteHistory = emptyPaletteHistory();
   private _entries: PaletteEntry[] = [];
@@ -85,6 +91,7 @@ export class Openp41geOpenPalette extends LitElement {
     this._ranked = [];
     this._selected = 0;
     this._cycle = new Map();
+    this._naming = null;
   }
 
   protected override createRenderRoot(): HTMLElement {
@@ -126,9 +133,14 @@ export class Openp41geOpenPalette extends LitElement {
 
   private _search(query: string): void {
     const generation = ++this._generation;
-    this._entries = query.trim() === "" ? entriesFromHistory(this._history, this.deps.now()) : [];
+    this._entries = [];
     this._cycle = new Map();
     this._selected = 0;
+    if (this._naming) {
+      this._entries = namedPathEntries(query, this._naming.target, [this._naming.what]);
+      this._rerank();
+      return;
+    }
     this._rerank();
     void this.deps
       .gather(query, (entries) => {
@@ -165,6 +177,11 @@ export class Openp41geOpenPalette extends LitElement {
     const r = this._ranked[index];
     if (!r) return;
     const query = this._query;
+    if (r.entry.type === "create" && r.entry.ask) {
+      this._naming = r.entry.ask;
+      this._setQuery("");
+      return;
+    }
     this.close();
     if (r.entry.type === "create") {
       void this.deps.create(r.entry, query);
@@ -181,7 +198,12 @@ export class Openp41geOpenPalette extends LitElement {
     switch (e.key) {
       case "Escape":
         e.preventDefault();
-        this.close();
+        if (this._naming) {
+          this._naming = null;
+          this._setQuery("");
+        } else {
+          this.close();
+        }
         return;
       case "ArrowDown":
         e.preventDefault();
@@ -207,6 +229,13 @@ export class Openp41geOpenPalette extends LitElement {
         this._choose(this._selected, e.metaKey || e.ctrlKey);
         return;
     }
+  }
+
+  private _setQuery(query: string): void {
+    this._query = query;
+    const input = this.querySelector<HTMLInputElement>(".op-input");
+    if (input) input.value = query;
+    this._search(query);
   }
 
   private _scrollSelectedIntoView(): void {
@@ -263,7 +292,11 @@ export class Openp41geOpenPalette extends LitElement {
         <div class="op-panel" role="dialog" aria-label="Open">
           <input
             class="op-input"
-            placeholder="Open a file, tab, chat, setting…"
+            placeholder=${
+              this._naming
+                ? `Name the new ${this._naming.what} (in ${this._naming.target.label})…`
+                : "Open a file, tab, chat, setting…"
+            }
             spellcheck="false"
             .value=${this._query}
             @input=${(e: Event) => {
@@ -275,7 +308,9 @@ export class Openp41geOpenPalette extends LitElement {
           <div class="op-list" role="listbox">
             ${
               this._ranked.length === 0
-                ? html`<div class="op-empty">Nothing to open matches.</div>`
+                ? html`<div class="op-empty">
+                    ${this._naming ? `Type the new ${this._naming.what}'s name.` : "Nothing to open matches."}
+                  </div>`
                 : this._ranked.map((r, i) => this._row(r, i))
             }
           </div>

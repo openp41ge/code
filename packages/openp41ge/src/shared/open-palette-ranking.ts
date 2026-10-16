@@ -18,17 +18,12 @@ export interface Usage {
   readonly at: number;
 }
 
-/** A remembered item: its use, and what it was (to show it again). */
-export interface RememberedItem extends Usage {
-  readonly details?: Readonly<Record<string, unknown>>;
-}
-
 /** Everything the palette remembers. */
 export interface PaletteHistory {
   /** kind → tab type → use. A tab type offered on its own uses the kind `""`. */
   readonly tabTypes: Readonly<Record<string, Readonly<Record<string, Usage>>>>;
   /** item key → use. */
-  readonly items: Readonly<Record<string, RememberedItem>>;
+  readonly items: Readonly<Record<string, Usage>>;
 }
 
 /** One pick: the item's kind and key, and the tab type it opened in. */
@@ -36,8 +31,6 @@ export interface PalettePick {
   readonly kind: string;
   readonly tabType: string;
   readonly item: string;
-  /** What the item was (its title, params…), kept with its use. */
-  readonly details?: Readonly<Record<string, unknown>>;
 }
 
 export const HALF_LIFE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -88,11 +81,9 @@ export function recordPick(
     ...history.tabTypes,
     [pick.kind]: { ...forKind, [pick.tabType]: recordUse(forKind[pick.tabType], now) },
   };
-  const prev = history.items[pick.item];
-  const details = pick.details ?? prev?.details;
-  let items: Record<string, RememberedItem> = {
+  let items: Record<string, Usage> = {
     ...history.items,
-    [pick.item]: { ...recordUse(prev, now), ...(details ? { details } : {}) },
+    [pick.item]: recordUse(history.items[pick.item], now),
   };
   const keys = Object.keys(items);
   if (keys.length > MAX_REMEMBERED_ITEMS) {
@@ -119,25 +110,13 @@ export function parsePaletteHistory(value: unknown): PaletteHistory {
             .map(([k, u]) => [k, { score: u.score, at: u.at }]),
         )
       : {};
-  const remembered = (o: unknown): Record<string, RememberedItem> =>
-    typeof o === "object" && o !== null
-      ? Object.fromEntries(
-          Object.entries(o)
-            .filter(([, u]) => isUsage(u))
-            .map(([k, u]) => {
-              const d = (u as RememberedItem).details;
-              const details = typeof d === "object" && d !== null && !Array.isArray(d) ? d : null;
-              return [k, { score: u.score, at: u.at, ...(details ? { details } : {}) }];
-            }),
-        )
-      : {};
   if (typeof value !== "object" || value === null) return emptyPaletteHistory();
   const v = value as Record<string, unknown>;
   const tabTypes =
     typeof v.tabTypes === "object" && v.tabTypes !== null
       ? Object.fromEntries(Object.entries(v.tabTypes).map(([k, o]) => [k, usages(o)]))
       : {};
-  return { tabTypes, items: remembered(v.items) };
+  return { tabTypes, items: usages(v.items) };
 }
 
 const BOUNDARY = /[\s/\\._\-:]/;
