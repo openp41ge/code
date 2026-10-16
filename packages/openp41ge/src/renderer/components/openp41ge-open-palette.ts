@@ -243,7 +243,7 @@ export class Openp41geOpenPalette extends LitElement {
         }}
         @click=${(ev: MouseEvent) => this._choose(i, ev.metaKey || ev.ctrlKey)}
       >
-        <span class="op-icon">${this._icon(icon)}</span>
+        ${icon ? html`<span class="op-icon">${this._icon(icon)}</span>` : nothing}
         <span class="op-title">${title}</span>
         <span class="op-desc">${description ?? ""}</span>
         ${r.tabTypes.length > 1 ? html`<span class="op-more" title="Tab: open in another tab type">⇥</span>` : nothing}
