@@ -351,7 +351,9 @@ a command runs without a tab open. A full terminal may come later.
 - **No shell, non-interactive.** A typed line is split into arguments
   (quotes, `\`); a run has no stdin, pagers and editors off
   (`COMMAND_ENV`), a timeout and an output cap (`terminal` in
-  `config.json`), in a worktree of the caller's workspace.
+  `config.json`; smaller for a run an agent asks for), in a worktree of the
+  caller's workspace. Agents have no git tools of their own: they run git
+  this way, under the git extension's rules.
 - **Callers**: any backend's `ctx.commands.run({ binary, args, repo,
 worktree })` (the agents' `run_command`), or the tab's prompt. Every run is
   recorded per workspace (`command-runs.json` in its data folder) and is the

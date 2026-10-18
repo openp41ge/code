@@ -13,17 +13,15 @@
 
 import { ipcMain } from "electron";
 import type { CommandRequest } from "openp41ge-sdk";
-import type {
-  CommandRun,
-  CommandRunFilter,
-  CommandScope,
-  CommandService,
+import {
+  PROMPT_RUNNER,
+  type CommandRun,
+  type CommandRunFilter,
+  type CommandScope,
+  type CommandService,
 } from "../../src/main/services/command-service.js";
 
 type Sender = { sender: Electron.WebContents };
-
-/** Who runs a line typed at a terminal's prompt. */
-export const PROMPT_RUNNER = "you";
 
 export function registerCommandHandlers(
   service: CommandService,

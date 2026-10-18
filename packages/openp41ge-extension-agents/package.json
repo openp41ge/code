@@ -21,7 +21,6 @@
   "dependencies": {
     "lit": "^3.3.3",
     "openp41ge-sdk": "workspace:*",
-    "openp41ge-sdk-git": "workspace:*",
     "openp41ge-sdk-uikit": "workspace:*"
   },
   "devDependencies": {

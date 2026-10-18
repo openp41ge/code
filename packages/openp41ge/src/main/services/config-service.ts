@@ -71,8 +71,10 @@ export interface UserConfig {
   terminal: {
     /** A run is stopped after this many seconds. */
     timeoutSeconds: number;
-    /** Output past this many KB is dropped. */
+    /** Output past this many KB is dropped (a command typed at the prompt). */
     maxOutputKb: number;
+    /** The same for a command an agent runs (its output goes into the model's context). */
+    agentMaxOutputKb: number;
   };
 }
 
@@ -113,7 +115,7 @@ const DEFAULT_CONFIG: UserConfig = {
   "editor/json": {},
   dragConsumers: {},
   commandBinaries: {},
-  terminal: { timeoutSeconds: 60, maxOutputKb: 256 },
+  terminal: { timeoutSeconds: 60, maxOutputKb: 256, agentMaxOutputKb: 32 },
 };
 
 /** The agents extension's id: its config section takes the retired

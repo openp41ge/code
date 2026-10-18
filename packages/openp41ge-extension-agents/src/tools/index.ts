@@ -11,7 +11,6 @@ import { register as registerSearchFiles } from "./search-files.js";
 import { register as registerEditFile } from "./edit-file.js";
 import { register as registerWriteFile } from "./write-file.js";
 import { register as registerCreateWorktree } from "./create-worktree.js";
-import { register as registerGitTools } from "./git.js";
 import { register as registerRunCommand } from "./run-command.js";
 import type { AgentToolRegistry } from "./types.js";
 
@@ -22,6 +21,5 @@ export function registerBuiltinTools(registry: AgentToolRegistry): void {
   registerEditFile(registry);
   registerWriteFile(registry);
   registerCreateWorktree(registry);
-  registerGitTools(registry);
   registerRunCommand(registry);
 }

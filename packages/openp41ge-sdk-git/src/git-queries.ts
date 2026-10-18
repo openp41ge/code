@@ -11,10 +11,6 @@
 
 import { buildInlineDiffFile, type InlineDiffFile } from "./build-inline-diff-file.js";
 import type {
-  BlameLine,
-  CommitFilter,
-  LocalBranch,
-  PatchRequest,
   BranchEntry,
   CommitEntry,
   CommitSearchOptions,
@@ -62,51 +58,6 @@ const WHOLE_FILE = "--unified=1000000";
 /** Failures here are expected and handled (a missing branch, no HEAD, …);
  *  nothing is logged from the queries themselves. */
 const log = { debug: (..._details: unknown[]): void => undefined };
-
-/** A ref git is given: refused when it would read as an option. */
-function assertRef(ref: string): string {
-  if (!ref || ref.startsWith("-")) throw new Error(`'${ref}' is not a ref`);
-  return ref;
-}
-
-/** A path git is given (after `--`): refused when it would read as an option. */
-function assertPath(p: string): string {
-  if (!p || p.startsWith("-")) throw new Error(`'${p}' is not a path`);
-  return p;
-}
-
-/** `git blame --porcelain` output, one entry per line. */
-function parseBlame(output: string): BlameLine[] {
-  const info = new Map<string, { author: string; date: string; summary: string }>();
-  const lines: BlameLine[] = [];
-  const rows = output.split("\n");
-  for (let i = 0; i < rows.length; i++) {
-    const head = /^([0-9a-f]{40}) \d+ (\d+)/.exec(rows[i]);
-    if (!head) continue;
-    const [, hash, final] = head;
-    const meta = info.get(hash) ?? { author: "", date: "", summary: "" };
-    for (i++; i < rows.length && !rows[i].startsWith("\t"); i++) {
-      const row = rows[i];
-      if (row.startsWith("author ")) meta.author = row.slice(7);
-      else if (row.startsWith("author-time ")) {
-        meta.date = new Date(Number(row.slice(12)) * 1000).toISOString();
-      } else if (row.startsWith("summary ")) meta.summary = row.slice(8);
-    }
-    info.set(hash, meta);
-    const uncommitted = /^0+$/.test(hash);
-    lines.push({
-      line: Number(final),
-      hash,
-      shortHash: hash.slice(0, 7),
-      author: meta.author,
-      date: meta.date,
-      summary: meta.summary,
-      text: (rows[i] ?? "\t").slice(1),
-      ...(uncommitted ? { uncommitted: true } : {}),
-    });
-  }
-  return lines;
-}
 
 export class GitQueries {
   constructor(private readonly _run: GitRunner) {}
@@ -898,121 +849,6 @@ export class GitQueries {
       log.debug("getCommitFileContent failed; no content:", repoName, hash, path, err);
       return null;
     }
-  }
-
-  // ── History (read-only, never the network) ──────────────────────────
-
-  /**
-   * Commits of `filter.ref` (default HEAD), newest first, filtered by path,
-   * author, dates and a search: in messages (`--grep`), or in code added or
-   * removed (`-S`, or `-G` for a regex). Never fetches: an unknown ref is
-   * git's error.
-   */
-  async findCommits(repoName: string, filter: CommitFilter): Promise<CommitEntry[]> {
-    const args = [
-      "log",
-      `--max-count=${Math.max(1, Math.min(filter.maxCount ?? 30, 1000))}`,
-      `--skip=${Math.max(0, filter.skip ?? 0)}`,
-      `--format=%H|%h|%an|%ae|%aI|%ar|%s%n%b%n---BODY_END---%n%P%n%D%n---ENTRY_END---`,
-    ];
-    if (filter.author) args.push(`--author=${filter.author}`, "-i");
-    if (filter.since) args.push(`--since=${filter.since}`);
-    if (filter.until) args.push(`--until=${filter.until}`);
-    if (filter.search) {
-      const mode = filter.searchIn ?? "message";
-      if (mode === "message") args.push(`--grep=${filter.search}`, "-i");
-      else if (mode === "code") args.push(`-S${filter.search}`);
-      else args.push(`-G${filter.search}`);
-    }
-    args.push(assertRef(filter.ref ?? "HEAD"), "--");
-    if (filter.path) args.push(assertPath(filter.path));
-    const output = await this._execGit(args, repoName);
-    return output ? this._parseCommitLog(output) : [];
-  }
-
-  /**
-   * A unified patch: of `commit` (its change), of `from`..`to`, or of
-   * `worktree`'s uncommitted changes (unstaged, or `staged`). Only `path`'s,
-   * when given; with `namesOnly`, `<status>\t<path>` lines instead.
-   */
-  async getPatch(repoName: string, request: PatchRequest): Promise<string> {
-    const shape = request.namesOnly ? ["--name-status"] : ["--patch"];
-    const tail = ["--", ...(request.path ? [assertPath(request.path)] : [])];
-    if (request.commit) {
-      return this._execGit(
-        ["show", "--format=", ...shape, assertRef(request.commit), ...tail],
-        repoName,
-      );
-    }
-    if (request.from || request.to) {
-      const from = assertRef(request.from ?? "HEAD");
-      const to = assertRef(request.to ?? "HEAD");
-      return this._execGit(["diff", ...shape, from, to, ...tail], repoName);
-    }
-    if (!request.worktree) throw new Error("a commit, a range or a worktree is needed");
-    return this._execGit(
-      ["diff", ...shape, ...(request.staged ? ["--staged"] : []), ...tail],
-      repoName,
-      request.worktree,
-    );
-  }
-
-  /**
-   * Who last changed lines `start`–`end` of `path`: at `ref` (default HEAD),
-   * or in `worktree` (its file as it is, uncommitted lines included).
-   */
-  async getBlame(
-    repoName: string,
-    path: string,
-    range: { ref?: string; worktree?: string; start: number; end: number },
-  ): Promise<BlameLine[]> {
-    assertPath(path);
-    const lines = `-L${Math.max(1, range.start)},${Math.max(range.start, range.end)}`;
-    const args = range.worktree
-      ? ["blame", "--porcelain", lines, "--", path]
-      : ["blame", "--porcelain", lines, assertRef(range.ref ?? "HEAD"), "--", path];
-    const output = await this._execGit(args, repoName, range.worktree);
-    return parseBlame(output);
-  }
-
-  /** Local branches with their upstream, ahead/behind and last commit. */
-  async getLocalBranches(repoName: string): Promise<LocalBranch[]> {
-    const output = await this._execGit(
-      [
-        "for-each-ref",
-        "--format=%(refname:short)%00%(upstream:short)%00%(upstream:track)%00%(objectname)%00%(objectname:short)%00%(authorname)%00%(authordate:iso-strict)%00%(contents:subject)",
-        "refs/heads/",
-      ],
-      repoName,
-    );
-    return output
-      .split("\n")
-      .filter(Boolean)
-      .map((line) => {
-        const [name, upstream, track, hash, shortHash, author, date, subject] = line.split("\0");
-        const ahead = /ahead (\d+)/.exec(track ?? "");
-        const behind = /behind (\d+)/.exec(track ?? "");
-        return {
-          name,
-          ...(upstream ? { upstream } : {}),
-          upstreamGone: track === "[gone]",
-          ahead: ahead ? Number(ahead[1]) : 0,
-          behind: behind ? Number(behind[1]) : 0,
-          lastCommit: { hash, shortHash, authorName: author, date, message: subject ?? "" },
-        };
-      });
-  }
-
-  /** Remote-tracking branches, as they were last fetched. */
-  async getRemoteBranches(repoName: string): Promise<string[]> {
-    const output = await this._execGit(
-      ["for-each-ref", "--format=%(refname)", "refs/remotes/"],
-      repoName,
-    );
-    return output
-      .split("\n")
-      .filter((ref) => ref && !ref.endsWith("/HEAD"))
-      .map((ref) => ref.slice("refs/remotes/".length));
   }
 
   /**

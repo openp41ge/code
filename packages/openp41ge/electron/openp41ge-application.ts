@@ -735,10 +735,12 @@ export class Openp41geApplication {
         const t = (this.configService.get("terminal") ?? {}) as {
           timeoutSeconds?: number;
           maxOutputKb?: number;
+          agentMaxOutputKb?: number;
         };
         return {
           timeoutMs: (t.timeoutSeconds ?? 60) * 1000,
           maxOutputBytes: (t.maxOutputKb ?? 256) * 1024,
+          agentMaxOutputBytes: (t.agentMaxOutputKb ?? 32) * 1024,
         };
       },
       process: new NodeCommandProcess(),

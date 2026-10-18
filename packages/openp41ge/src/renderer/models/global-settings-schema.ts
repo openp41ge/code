@@ -138,7 +138,15 @@ export const GLOBAL_SETTINGS_SCHEMA = {
           minimum: 1,
           maximum: 10240,
           default: 256,
-          description: "Output past this many KB is dropped.",
+          description: "Output past this many KB is dropped, for a command typed in the terminal.",
+        },
+        agentMaxOutputKb: {
+          type: "number",
+          minimum: 1,
+          maximum: 10240,
+          default: 32,
+          description:
+            "Output past this many KB is dropped, for a command an agent runs (it goes into the model's context; the agent is told to narrow the command).",
         },
       },
     },

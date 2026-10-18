@@ -58,7 +58,9 @@ export const RUN_COMMAND_TOOL: AgentTool = {
         ...(run ? { run } : {}),
       };
     }
-    const cut = result.truncated ? "\n[the output was cut; narrow the command]" : "";
+    const cut = result.truncated
+      ? "\n[the output was cut; narrow the command: a path, fewer results (e.g. `-n 20`), or a summary option (e.g. `--stat`)]"
+      : "";
     const output = result.output === "" ? "(no output)\n" : `${result.output}\n`;
     return { content: `${output}[exit ${result.exitCode}]${cut}`, ...(run ? { run } : {}) };
   },

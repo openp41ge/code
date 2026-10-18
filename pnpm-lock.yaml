@@ -298,9 +298,6 @@ importers:
       openp41ge-sdk:
         specifier: workspace:*
         version: link:../openp41ge-sdk
-      openp41ge-sdk-git:
-        specifier: workspace:*
-        version: link:../openp41ge-sdk-git
       openp41ge-sdk-uikit:
         specifier: workspace:*
         version: link:../openp41ge-sdk-uikit

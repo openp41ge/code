@@ -19,8 +19,6 @@
  */
 
 import type {
-  GitRequest,
-  GitResult,
   HandlerCommands,
   HandlerContext,
   HandlerPayload,
@@ -108,8 +106,6 @@ export class AgentsBackend {
   private _ctx: HandlerContext | null = null;
   /** Each workspace seen, for its chats' worktrees. */
   private readonly _workspaces = new Map<string, HandlerWorkspace>();
-  /** Each chat's git, from the call that last ran it (its window's workspace). */
-  private readonly _gitOf = new Map<string, (request: GitRequest) => Promise<GitResult>>();
   /** Each chat's commands, from the call that last ran it (its window's workspace). */
   private readonly _commandsOf = new Map<string, HandlerCommands>();
   /** Each workspace's data folder, once made. */
@@ -180,8 +176,7 @@ export class AgentsBackend {
         const id = chatId(p);
         const windowId = ctx.windowId ?? this._threads.getOpenWin(id) ?? "";
         if (!windowId) return;
-        // The git tools run as this call does: in the sending window's workspace.
-        this._gitOf.set(id, (request) => ctx.git(request));
+        // run_command runs as this call does: in the sending window's workspace.
         this._commandsOf.set(id, ctx.commands);
         // The config's enabled tools gate what a chat asks for (absent: all).
         const enabled = this._config(ctx).tools?.enabled;
@@ -362,14 +357,6 @@ export class AgentsBackend {
               error: "the chat has no workspace to run commands in",
             },
         },
-        git: async (id, request) =>
-          this._gitOf.get(id)?.(request) ?? {
-            ok: false,
-            exitCode: null,
-            stdout: "",
-            stderr: "",
-            error: "the chat has no workspace to run git in",
-          },
         addWorktree: async (id, repo, branch) => {
           const workspace = this._workspaceOf(id);
           if (!workspace) return { ok: false, error: "the chat has no workspace" };

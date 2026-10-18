@@ -10,7 +10,9 @@
  * against the binary's current rules before anything starts, then runs with
  * its argument list (no shell, no stdin, pagers and editors off) in a
  * worktree of the caller's workspace, with a timeout and an output cap, and
- * is recorded per workspace (the latest `MAX_RUNS`).
+ * is recorded per workspace (the latest `MAX_RUNS`). A run an extension asks
+ * for (an agent's) has a smaller output cap than one typed at the prompt:
+ * its output goes into a model's context.
  */
 
 import { randomUUID } from "crypto";
@@ -24,6 +26,9 @@ import type { HostCommandBinary } from "openp41ge-core-extension-host";
 import type { CommandRun } from "../../shared/command-run.js";
 
 export type { CommandRun } from "../../shared/command-run.js";
+
+/** Who runs a line typed at a terminal's prompt. */
+export const PROMPT_RUNNER = "you";
 
 /** How many runs a workspace keeps. */
 export const MAX_RUNS = 200;
@@ -98,7 +103,9 @@ export interface CommandServiceDeps {
   chosen(): Readonly<Record<string, string>>;
   /** Whether an extension is one the app ships. */
   isOfficial(extensionId: string): boolean;
-  limits(): { timeoutMs: number; maxOutputBytes: number };
+  /** Every run's timeout; the output cap of a run typed at the prompt, and
+   *  the smaller one of a run an extension (an agent) asked for. */
+  limits(): { timeoutMs: number; maxOutputBytes: number; agentMaxOutputBytes: number };
   process: CommandProcess;
   store: CommandRunStore;
   /** A run started, printed, or ended. */
@@ -225,7 +232,10 @@ export class CommandService {
     };
     update(run);
 
-    const { timeoutMs, maxOutputBytes } = this._deps.limits();
+    const limits = this._deps.limits();
+    const { timeoutMs } = limits;
+    const maxOutputBytes =
+      by === PROMPT_RUNNER ? limits.maxOutputBytes : limits.agentMaxOutputBytes;
     const ended = await this._deps.process.run(binary, args, {
       cwd,
       env: { ...process.env, ...COMMAND_ENV },
