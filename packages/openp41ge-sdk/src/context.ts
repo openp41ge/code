@@ -1,11 +1,12 @@
 /**
  * context.ts — what a backend handler receives: its payload and its
- * `HandlerContext` (publish, git, config, workspace, window, log), plus the
+ * `HandlerContext` (publish, git, commands, config, workspace, window, log), plus the
  * active-extension summary the platform sends the renderer. Handlers are
  * registered with `registerProcesses` (registration.ts).
  */
 
 import type { ILogger } from "openp41ge-core-logger";
+import type { CommandBinaryInfo, CommandRequest, CommandResult } from "./commands";
 
 /** Payload passed to a main-process handler. Tagged open so the platform can
  *  evolve the shape without a contract bump. */
@@ -102,11 +103,35 @@ export interface CallerWorkspace {
   dataDirFor(extensionId: string): Promise<string>;
 }
 
+/**
+ * The binaries extensions define (`commands.ts`), run by the platform. A
+ * run is checked against the binary's current rules, runs with `args` (no
+ * shell, no stdin, pagers and editors off, a timeout, an output cap) in the
+ * named worktree of the calling window's workspace, and is recorded (its
+ * `runId` opens it in a terminal). Refused (`ok: false`, never thrown): no
+ * calling workspace, a binary nothing defines, a worktree that workspace
+ * does not have, and a line its rules do not allow.
+ */
+export interface HandlerCommands {
+  /** The binaries that can run now, with their current rules. */
+  binaries(): Promise<readonly CommandBinaryInfo[]>;
+  run(request: CommandRequest): Promise<CommandResult>;
+}
+
+/** The caller's commands, as the platform provides them to the host (which
+ *  names the extension running them). */
+export interface CallerCommands {
+  binaries(): Promise<readonly CommandBinaryInfo[]>;
+  run(request: CommandRequest, extensionId: string): Promise<CommandResult>;
+}
+
 /** What the platform provides about the caller of a handler (the window
  *  that dispatched the command). */
 export interface HandlerCaller {
   /** Run git in a repository of the caller's workspace. */
   git?(request: GitRequest): Promise<GitResult>;
+  /** Run defined binaries in the caller's workspace (`HandlerContext.commands`). */
+  commands?: CallerCommands;
   /** The caller's workspace (absent for a window without one). */
   workspace?: CallerWorkspace;
   /** The dispatching window's id (absent for a call not from a window). */
@@ -130,6 +155,9 @@ export interface HandlerContext {
    * `--config-env`).
    */
   git(request: GitRequest): Promise<GitResult>;
+  /** Run the binaries extensions define (the platform's scoped terminal),
+   *  in the calling window's workspace. */
+  readonly commands: HandlerCommands;
   /** The extension's config: its registered schema's defaults plus the
    *  user's values (read on each call, so it is always current). */
   readonly config: { get(): Readonly<Record<string, unknown>> };

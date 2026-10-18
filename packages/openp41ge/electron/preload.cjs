@@ -424,45 +424,23 @@ contextBridge.exposeInMainWorld("openp41ge", {
     },
   },
 
-  terminal: {
-    /** Spawn a shell for the given pane ID. */
-    spawn: (paneId) => {
-      ipcRenderer.send("terminal:spawn", paneId);
-    },
-
-    /** Write data to the shell's stdin. */
-    write: (paneId, data) => {
-      ipcRenderer.send("terminal:write", JSON.stringify({ paneId, data }));
-    },
-
-    /** Resize the terminal (cols, rows). */
-    resize: (paneId, cols, rows) => {
-      ipcRenderer.send("terminal:resize", JSON.stringify({ paneId, cols, rows }));
-    },
-
-    /** Kill the shell process for the given pane ID. */
-    kill: (paneId) => {
-      ipcRenderer.send("terminal:kill", paneId);
-    },
-
-    /** Subscribe to shell output for a specific pane. Returns unsubscribe. */
-    onData: (paneId, callback) => {
-      const handler = (_event, payload) => {
-        const parsed = JSON.parse(payload);
-        if (parsed.paneId === paneId) callback(parsed.data);
-      };
-      ipcRenderer.on("terminal:data", handler);
-      return () => ipcRenderer.removeListener("terminal:data", handler);
-    },
-
-    /** Subscribe to shell exit for a specific pane. Returns unsubscribe. */
-    onExit: (paneId, callback) => {
-      const handler = (_event, payload) => {
-        const parsed = JSON.parse(payload);
-        if (parsed.paneId === paneId) callback(parsed.code);
-      };
-      ipcRenderer.on("terminal:exit", handler);
-      return () => ipcRenderer.removeListener("terminal:exit", handler);
+  /** The scoped terminal: binaries extensions define, run in this window's workspace. */
+  commands: {
+    /** The binaries that can run now: [{ binary, label, extensionId, allow, deny }]. */
+    binaries: () => ipcRenderer.invoke("commands:binaries"),
+    /** The binaries several extensions define: [{ binary, extensionIds, chosen }]. */
+    conflicts: () => ipcRenderer.invoke("commands:conflicts"),
+    /** Run a line typed at a prompt ({ binary, args, repo, worktree }); resolves the result. */
+    run: (request) => ipcRenderer.invoke("commands:run", request),
+    /** This workspace's runs, newest first, filtered by { binary, repo, worktree }. */
+    runs: (filter) => ipcRenderer.invoke("commands:runs", filter),
+    /** One run of this workspace, or null. */
+    getRun: (runId) => ipcRenderer.invoke("commands:get-run", runId),
+    /** A run of this workspace started, printed or ended ({ append, run }). Returns unsubscribe. */
+    onRun: (callback) => {
+      const handler = (_event, payload) => callback(payload);
+      ipcRenderer.on("commands:run-changed", handler);
+      return () => ipcRenderer.removeListener("commands:run-changed", handler);
     },
   },
 

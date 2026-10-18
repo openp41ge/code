@@ -29,9 +29,6 @@ export interface IOperationDispatcher {
   /** Register a broadcast callback for state updates. */
   setBroadcast(fn: BroadcastFn): void;
 
-  /** Register a callback for terminal cleanup on pane removal. */
-  setTerminalCleanup(fn: (paneId: string) => void): void;
-
   /** Register a callback invoked after every successful apply(). */
   setSaveHandler(fn: (ws: Workspace) => void): void;
 }

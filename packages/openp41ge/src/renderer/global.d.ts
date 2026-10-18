@@ -1,4 +1,11 @@
-import type { ActiveExtensionSummary, RepositoryState } from "openp41ge-sdk";
+import type {
+  ActiveExtensionSummary,
+  CommandBinaryInfo,
+  CommandRequest,
+  CommandResult,
+  RepositoryState,
+} from "openp41ge-sdk";
+import type { CommandRun as CommandRunRecord } from "../shared/command-run";
 import type { ExtensionConfigBridge } from "./services/extension-configs";
 import type { PaletteHistory, PalettePick } from "../shared/open-palette-ranking";
 
@@ -137,13 +144,15 @@ declare global {
         onDragState: (callback: (state: { active: boolean; type: string | null }) => void) => void;
       };
 
-      terminal: {
-        spawn: (paneId: string) => void;
-        write: (paneId: string, data: string) => void;
-        resize: (paneId: string, cols: number, rows: number) => void;
-        kill: (paneId: string) => void;
-        onData: (paneId: string, callback: (data: string) => void) => () => void;
-        onExit: (paneId: string, callback: (code: number | null) => void) => () => void;
+      commands: {
+        binaries: () => Promise<CommandBinaryInfo[]>;
+        conflicts: () => Promise<{ binary: string; extensionIds: string[]; chosen: string | null }[]>;
+        run: (request: CommandRequest) => Promise<CommandResult>;
+        runs: (filter: { binary?: string; repo?: string; worktree?: string }) => Promise<CommandRunRecord[]>;
+        getRun: (runId: string) => Promise<CommandRunRecord | null>;
+        onRun: (
+          callback: (event: { append: boolean; run: CommandRunRecord }) => void,
+        ) => () => void;
       };
 
       workspaceController: {

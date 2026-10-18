@@ -8,6 +8,9 @@
  * `git-repository` and `git-commit` are the git extension's (its Repository
  * and Commit tabs); `chat-thread` is the agents extension's (its chat tab).
  *
+ * `command-run` opens the platform's scoped terminal for the run's binary
+ * and worktree, the run marked.
+ *
  * `config-overrides` opens the JSON config editor for the extension named by
  * `settingsId`.
  *
@@ -56,5 +59,14 @@ export const PLATFORM_DRAG_CONSUMERS: readonly PlatformDragConsumer[] = [
     placement: ["grid"],
     open: { kind: "app", appType: "config-editor" },
     toTabConfig: (p) => ({ extensionId: (p as Of<"openp41ge/config-overrides">).settingsId }),
+  },
+  {
+    id: "terminal",
+    label: "Terminal",
+    accepts: ["openp41ge/command-run"],
+    placement: ["grid"],
+    open: { kind: "app", appType: "terminal" },
+    toTabConfig: (p) =>
+      pick(p as Of<"openp41ge/command-run">, ["binary", "repo", "worktree", "runId"]),
   },
 ];

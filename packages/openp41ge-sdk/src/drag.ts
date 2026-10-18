@@ -70,6 +70,15 @@ const platformPayloadSchemas = [
     settingsId: required,
     label: optional,
   }),
+  // A command a scoped terminal ran (`commands.ts`); `args` is a JSON array.
+  z.strictObject({
+    kind: z.literal("openp41ge/command-run"),
+    binary: required,
+    repo: required,
+    worktree: required,
+    args: required,
+    runId: required,
+  }),
 ] as const;
 
 const platformPayloadSchema = z.discriminatedUnion("kind", [...platformPayloadSchemas]);
@@ -89,6 +98,7 @@ export const PLATFORM_DRAG_KIND_LABELS: Readonly<Record<PlatformDragKind, string
   "openp41ge/log-stream": "Log stream",
   "openp41ge/workspace-config": "Workspace",
   "openp41ge/config-overrides": "Settings",
+  "openp41ge/command-run": "Command",
 };
 
 /** A payload kind: `namespace/kind` (`openp41ge/file-path`, `<extensionId>/<id>`). */

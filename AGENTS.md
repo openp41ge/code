@@ -193,6 +193,8 @@ display kinds. That model is **gone**:
 > `openp41ge-sdk` (`config.ts`) and the platform's `ExtensionConfigService`.
 > The open palette (`registerOpenKinds`, `opens`, `registerSearchProvider`)
 > is in `openp41ge-sdk` (`open.ts`) and the platform's `services/open-palette/`.
+> The scoped terminal (`registerCommandBinaries`, `ctx.commands`) is in
+> `openp41ge-sdk` (`commands.ts`) and the platform's `CommandService`.
 > Check `openp41ge-sdk` before assuming an API exists.
 
 Beyond the two sides above (backend `registerProcesses`, view
@@ -329,6 +331,32 @@ per kind, is remembered in `<data>/.config/open-palette.json`: each pick's
 score halves weekly and the latest is boosted heavily
 (`src/shared/open-palette-ranking.ts`). It ranks the palette only; drops keep
 `dragConsumers`.
+
+#### Commands: the scoped terminal
+
+The terminal is a **platform** tab type (`terminal`, like the file editor),
+always locked to **one binary** in one worktree — the git terminal, never a
+shell. It is mainly how agents run command-line tools and get an answer, so
+a command runs without a tab open. A full terminal may come later.
+
+- **Extensions define the binaries** (`registerCommandBinaries`, backend
+  entry), each naming where in the extension's **own config** its rules live
+  (`{ allow, deny }`; the schema must give a default there, or the extension
+  fails to load). A binary nothing defines cannot run. Two extensions
+  defining one binary: the user picks (`commandBinaries` in `config.json`),
+  else an official extension's, else it stays off.
+- **Rules** (`commands.ts`) match the whole argument list (without the
+  binary): a word, `*` (one argument; inside a word, any characters), `**`
+  (any number), `a|b`. A run needs an allow match and no deny match.
+- **No shell, non-interactive.** A typed line is split into arguments
+  (quotes, `\`); a run has no stdin, pagers and editors off
+  (`COMMAND_ENV`), a timeout and an output cap (`terminal` in
+  `config.json`), in a worktree of the caller's workspace.
+- **Callers**: any backend's `ctx.commands.run({ binary, args, repo,
+worktree })` (the agents' `run_command`), or the tab's prompt. Every run is
+  recorded per workspace (`command-runs.json` in its data folder) and is the
+  platform kind `openp41ge/command-run` (open and drag): a tool call dragged
+  from a chat opens the terminal with that run marked.
 
 #### Surface host additions
 

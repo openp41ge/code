@@ -15,6 +15,7 @@ import { renderChat } from "./views/chat-pane-element.js";
 import { renderChatSearch } from "./views/chat-search-sidebar.js";
 import type { ChatSearchHost } from "./views/chat-search-model.js";
 import { CHAT_DRAG_SOURCE_ID, renderChats, type ChatsSidebarHost } from "./views/chats-sidebar.js";
+import { COMMAND_RUN_DRAG_SOURCE_ID } from "./chat/ui/agents-chat.js";
 
 registerRenderers([
   {
@@ -84,6 +85,21 @@ registerDragDecls({
     },
   ],
   sources: [
+    // A tool call that ran a command: the platform's terminal opens the run.
+    {
+      id: COMMAND_RUN_DRAG_SOURCE_ID,
+      label: "Command",
+      kind: "openp41ge/command-run",
+      attrs: {
+        binary: "data-run-binary",
+        repo: "data-run-repo",
+        worktree: "data-run-worktree",
+        args: "data-run-args",
+        runId: "data-run-id",
+      },
+      contexts: ["workspace"],
+      crossWindow: true,
+    },
     {
       id: CHAT_DRAG_SOURCE_ID,
       label: "Chat",

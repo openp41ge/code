@@ -61,6 +61,19 @@ export interface UserConfig {
    * platform id). Unset kinds use the first registered consumer.
    */
   dragConsumers: Record<string, string>;
+  /**
+   * Which extension's definition of a binary the scoped terminal runs, when
+   * more than one defines it: binary → extension id. Unset binaries use an
+   * official extension's definition (or the only one).
+   */
+  commandBinaries: Record<string, string>;
+  /** The scoped terminal's limits for every run. */
+  terminal: {
+    /** A run is stopped after this many seconds. */
+    timeoutSeconds: number;
+    /** Output past this many KB is dropped. */
+    maxOutputKb: number;
+  };
 }
 
 /** Default max file size the editor opens: 50 MB (VSCode's files.maxFileSize default). */
@@ -99,6 +112,8 @@ const DEFAULT_CONFIG: UserConfig = {
   },
   "editor/json": {},
   dragConsumers: {},
+  commandBinaries: {},
+  terminal: { timeoutSeconds: 60, maxOutputKb: 256 },
 };
 
 /** The agents extension's id: its config section takes the retired

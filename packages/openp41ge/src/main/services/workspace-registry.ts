@@ -10,8 +10,6 @@ export interface WorkspaceRegistryOptions {
   broadcast: (workspacePath: string, serialized: string) => void;
   /** Persist this workspace's layout session to its `.openp41ge-workspace` file. */
   save: (workspacePath: string, ws: Workspace) => void;
-  /** Kill terminals owned by a pane when it is removed. */
-  terminalCleanup: (paneId: string) => void;
 }
 
 /**
@@ -39,7 +37,6 @@ export class WorkspaceRegistry {
       d = new OperationDispatcher();
       d.setBroadcast((serialized) => this._opts.broadcast(workspacePath, serialized));
       d.setSaveHandler((ws) => this._opts.save(workspacePath, ws));
-      d.setTerminalCleanup(this._opts.terminalCleanup);
       this._dispatchers.set(workspacePath, d);
       log.info("registry-created", { workspacePath });
     }

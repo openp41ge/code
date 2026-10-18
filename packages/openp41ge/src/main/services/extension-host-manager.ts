@@ -15,7 +15,7 @@
  * Electron.
  */
 
-import { join } from "node:path";
+import path, { join } from "node:path";
 import { createLogger, type ILogger } from "openp41ge-core-logger";
 import {
   ExtensionHost,
@@ -24,6 +24,7 @@ import {
   type ExtensionHostOptions,
   type SearchOutcome,
   type CreateOutcome,
+  type HostCommandBinary,
 } from "openp41ge-core-extension-host";
 import type { HandlerCaller, HandlerPayload } from "openp41ge-sdk";
 
@@ -116,6 +117,22 @@ export class ExtensionHostManager {
 
   hasHandler(commandId: string): boolean {
     return this._host?.hasHandler(commandId) ?? false;
+  }
+
+  /** Every active extension's command binaries, with their current rules. */
+  commandBinaries(): HostCommandBinary[] {
+    return this._host?.commandBinaries() ?? [];
+  }
+
+  /** Whether `extensionId` is one the app ships: loaded from an extra
+   *  discovery dir (the app's resources, or the repo's packages in dev). */
+  isOfficial(extensionId: string): boolean {
+    const root = this._host?.loadedExtensions().find((e) => e.id === extensionId)?.root;
+    if (!root) return false;
+    return (this._extraDiscoveryDirs ?? []).some((dir) => {
+      const rel = path.relative(dir, root);
+      return !rel.startsWith("..") && !path.isAbsolute(rel);
+    });
   }
 
   /** The active extensions' palette search providers. */

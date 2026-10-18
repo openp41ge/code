@@ -7,6 +7,7 @@
  *   - Tabs on their own: every sidebar tab, every grid tab without `opens`.
  *   - Settings (the platform's, each extension's with a schema), log streams,
  *     releases and workspaces, as items of the platform's kinds.
+ *   - A terminal for each binary extensions define, in each worktree.
  *   - Files of the workspace's worktrees (for a non-empty query).
  *   - Each extension search provider's items.
  *   - New file / new folder for the typed path (for a non-empty query).
@@ -127,6 +128,35 @@ async function workspaceEntries(): Promise<PaletteEntry[]> {
   });
 }
 
+/** The worktrees of the window's workspace: repository, branch, folder. */
+async function worktrees(): Promise<{ repo: string; branch: string; path: string }[]> {
+  const ctx = await buildWorkspaceContext();
+  const repos =
+    (ctx.workspaceRepos as
+      | ReadonlyArray<{ name: string; worktrees: ReadonlyArray<{ name: string; path: string }> }>
+      | undefined) ?? [];
+  return repos.flatMap((r) =>
+    r.worktrees.map((w) => ({ repo: r.name, branch: w.name, path: w.path })),
+  );
+}
+
+async function terminalEntries(): Promise<PaletteEntry[]> {
+  const binaries = (await window.openp41ge?.commands?.binaries()) ?? [];
+  if (binaries.length === 0) return [];
+  const roots = await worktrees();
+  return binaries.flatMap((b) =>
+    roots.map((w): PaletteEntry => ({
+      type: "open",
+      item: {
+        kind: "openp41ge/command-run",
+        params: { binary: b.binary, repo: w.repo, worktree: w.branch },
+        title: `${b.label} terminal`,
+        description: `${w.repo} · ${w.branch}`,
+      },
+    })),
+  );
+}
+
 async function fileEntries(query: string): Promise<PaletteEntry[]> {
   const files = (await window.openp41ge?.palette?.files(query, 200)) ?? [];
   return files.map((f): PaletteEntry => {
@@ -217,6 +247,7 @@ export async function gatherEntries(
     settled("settings", settingsEntries),
     settled("releases", releaseEntries),
     settled("workspaces", workspaceEntries),
+    settled("terminals", terminalEntries),
     settled("files", () => fileEntries(query.trim())),
     settled("providers", () => providerSearches(query, onEntries, false)),
   ]);
@@ -230,14 +261,10 @@ export async function gatherEntries(
 export async function resolveCreateTarget(
   focusedFile: string | null,
 ): Promise<CreateTarget | null> {
-  const ctx = await buildWorkspaceContext();
-  const repos =
-    (ctx.workspaceRepos as
-      | ReadonlyArray<{ name: string; worktrees: ReadonlyArray<{ name: string; path: string }> }>
-      | undefined) ?? [];
-  const all = repos.flatMap((r) =>
-    r.worktrees.map((w) => ({ root: w.path, label: `${r.name} · ${w.name}` })),
-  );
+  const all = (await worktrees()).map((w) => ({
+    root: w.path,
+    label: `${w.repo} · ${w.branch}`,
+  }));
   if (focusedFile) {
     const holding = all
       .filter((t) => focusedFile.startsWith(t.root.replace(/\/+$/, "") + "/"))

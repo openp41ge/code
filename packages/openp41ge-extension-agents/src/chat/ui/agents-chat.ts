@@ -16,7 +16,7 @@
  *     "View log" link.
  */
 
-import { LitElement, html, type TemplateResult, type PropertyValues } from "lit";
+import { LitElement, html, nothing, type TemplateResult, type PropertyValues } from "lit";
 import { state, query } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { OverlayScrollbar } from "openp41ge-sdk-uikit";
@@ -117,6 +117,10 @@ function formatTokens(n?: number): string {
   if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
   return `${n}`;
 }
+
+/** `data-drag-source-id` of a tool call that ran a command (the
+ *  `openp41ge/command-run` source the renderer entry declares). */
+export const COMMAND_RUN_DRAG_SOURCE_ID = "command-run";
 
 // The bottom-bar find icon matches the Explorer sidebar's magnifier+list glyph
 // (same as the log viewer) so in-tab search looks consistent app-wide.
@@ -3963,6 +3967,8 @@ class AgentsChat extends LitElement {
   }
 
   private _renderToolCallItem(tc: ToolCall, _index = 0): TemplateResult {
+    // A call that ran a command drags as that run (it opens in a terminal).
+    const run = tc.run;
     return html`
       <details
         class="tool-call-details"
@@ -3970,7 +3976,15 @@ class AgentsChat extends LitElement {
         ?open=${this._openToolCalls.has(tc.id)}
         @toggle=${this._onToolCallToggle}
       >
-        <summary class="tool-call-row">
+        <summary
+          class="tool-call-row"
+          data-drag-source-id=${run ? COMMAND_RUN_DRAG_SOURCE_ID : nothing}
+          data-run-binary=${run?.binary ?? nothing}
+          data-run-repo=${run?.repo ?? nothing}
+          data-run-worktree=${run?.worktree ?? nothing}
+          data-run-args=${run ? JSON.stringify(run.args) : nothing}
+          data-run-id=${run?.runId ?? nothing}
+        >
           <span class="tool-call-chevron">${unsafeHTML(ICON_REASONING_CHEVRON)}</span>
           <span class="tool-call-label">Tool</span>
           <span class="tool-call-name">${tc.name}</span>

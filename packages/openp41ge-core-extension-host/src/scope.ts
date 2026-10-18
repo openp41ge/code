@@ -6,7 +6,7 @@
  * The host opens a scope immediately before loading an extension entry module
  * so that module's `registerProcesses` / `registerRenderers` /
  * `registerDragDecls` / `registerOpenKinds` / `registerSearchProvider` /
- * `registerConfigSchema` / `registerDispose` calls (from `openp41ge-sdk`) are captured against that
+ * `registerCommandBinaries` / `registerConfigSchema` / `registerDispose` calls (from `openp41ge-sdk`) are captured against that
  * extension, then reads the captured registrations and closes the scope:
  *
  *   beginExtensionScope(id, version);
@@ -25,6 +25,7 @@
  */
 
 import type {
+  CommandBinaryDef,
   ConfigSchema,
   DragConsumerDecl,
   DragDecls,
@@ -50,6 +51,7 @@ interface ExtensionScope {
   };
   open: { kinds: OpenKindDef[] };
   searchProviders: SearchProvider[];
+  commands: { binaries: CommandBinaryDef[] };
   config: ConfigSchema | null;
   disposers: Array<() => void | Promise<void>>;
 }
@@ -76,6 +78,7 @@ export function beginExtensionScope(id: string, version: string): void {
     drag: { kinds: [], sources: [], consumers: [], dropTargets: [] },
     open: { kinds: [] },
     searchProviders: [],
+    commands: { binaries: [] },
     config: null,
     disposers: [],
   };
@@ -121,6 +124,12 @@ export function getScopedOpenKinds(): readonly OpenKindDef[] | null {
 export function getScopedSearchProviders(): readonly SearchProvider[] | null {
   const scope = currentScope();
   return scope ? [...scope.searchProviders] : null;
+}
+
+/** The command binaries defined during the current scope, or null when none open. */
+export function getScopedCommandBinaries(): readonly CommandBinaryDef[] | null {
+  const scope = currentScope();
+  return scope ? [...scope.commands.binaries] : null;
 }
 
 /** The config schema registered during the current scope, or null (none

@@ -36,6 +36,8 @@ export {
   type HandlerFn,
   type HandlerContext,
   type HandlerCaller,
+  type HandlerCommands,
+  type CallerCommands,
   type HandlerWorkspace,
   type CallerWorkspace,
   type WorkspaceRoot,
@@ -80,7 +82,24 @@ export {
   registerDispose,
   registerOpenKinds,
   registerSearchProvider,
+  registerCommandBinaries,
 } from "./registration";
+
+export {
+  splitCommandLine,
+  matchCommandRule,
+  checkCommand,
+  commandRulesAt,
+  parseCommandBinaries,
+  type CommandBinaryDecl,
+  type CommandBinaryRegistrations,
+  type CommandBinaryDef,
+  type CommandBinaryInfo,
+  type CommandRules,
+  type CommandCheck,
+  type CommandRequest,
+  type CommandResult,
+} from "./commands";
 
 export {
   PLATFORM_OPEN_NAMESPACE,

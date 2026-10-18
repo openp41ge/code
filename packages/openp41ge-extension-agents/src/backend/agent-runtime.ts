@@ -16,7 +16,14 @@
  * (Dependency Inversion).
  */
 
-import type { GitRequest, GitResult } from "openp41ge-sdk";
+import type {
+  CommandBinaryInfo,
+  CommandRequest,
+  CommandResult,
+  GitRequest,
+  GitResult,
+} from "openp41ge-sdk";
+import { RUN_COMMAND_TOOL_NAME } from "../tools/run-command.js";
 import { logFor } from "./log.js";
 import type {
   ChatMessage,
@@ -76,6 +83,25 @@ export interface AgentRuntimeConfig {
   addWorktree?(chatId: string, repo: string, branch: string): Promise<WorktreeResult>;
   /** Run git in a repository of the chat's workspace (the git tools). */
   git?(chatId: string, request: GitRequest): Promise<GitResult>;
+  /** The binaries extensions define, run in the chat's workspace (run_command). */
+  commands?: {
+    binaries(chatId: string): Promise<readonly CommandBinaryInfo[]>;
+    run(chatId: string, request: CommandRequest): Promise<CommandResult>;
+  };
+}
+
+/** What the system prompt says about run_command: the binaries and their rules. */
+function commandsPrompt(binaries: readonly CommandBinaryInfo[] | undefined): string {
+  if (binaries === undefined) return "";
+  if (binaries.length === 0) {
+    return `\n\n${RUN_COMMAND_TOOL_NAME} can run nothing now: no binary is defined.`;
+  }
+  const quote = (rules: readonly string[]) => rules.map((r) => `\`${r}\``).join(", ");
+  const lines = binaries.map(
+    (b) =>
+      `- ${b.binary}: allow ${quote(b.allow)}${b.deny.length ? `; deny ${quote(b.deny)}` : ""}`,
+  );
+  return `\n\nTo run a command-line tool, use ${RUN_COMMAND_TOOL_NAME} with the repository and the branch whose worktree it runs in. There is no shell. These binaries can run; an argument list runs when an allow rule matches all of it and no deny rule does (\`*\` is one argument, \`**\` any number, \`a|b\` either):\n${lines.join("\n")}`;
 }
 
 /**
@@ -266,6 +292,7 @@ export class AgentRuntime {
   ): Promise<void> {
     const addWorktree = this._config.addWorktree;
     const git = this._config.git;
+    const commands = this._config.commands;
     while (!signal.aborted) {
       const chat = this._store.get(chatId);
       if (!chat) return;
@@ -291,11 +318,17 @@ export class AgentRuntime {
       // Roots = the connected worktree paths; undefined when no scope is
       // configured (legacy behaviour). Empty when nothing is connected (deny).
       const roots = connected?.flatMap((r) => r.worktrees.map((w) => w.path));
-      const systemContent = buildSystemPrompt(
-        connected,
-        !!addWorktree && tools.some((t) => t.name === CREATE_WORKTREE_TOOL),
-        git ? tools.map((t) => t.name).filter((n) => n.startsWith(GIT_TOOL_PREFIX)) : [],
-      );
+      const binaries =
+        commands && tools.some((t) => t.name === RUN_COMMAND_TOOL_NAME)
+          ? await commands.binaries(chatId)
+          : undefined;
+      if (signal.aborted) return;
+      const systemContent =
+        buildSystemPrompt(
+          connected,
+          !!addWorktree && tools.some((t) => t.name === CREATE_WORKTREE_TOOL),
+          git ? tools.map((t) => t.name).filter((n) => n.startsWith(GIT_TOOL_PREFIX)) : [],
+        ) + commandsPrompt(binaries);
 
       const system: ChatMessage = {
         id: this._id("sys"),
@@ -384,6 +417,12 @@ export class AgentRuntime {
           };
         }
         if (git) ctx.git = (request) => git(chatId, request);
+        if (commands) {
+          ctx.commands = {
+            binaries: () => commands.binaries(chatId),
+            run: (request) => commands.run(chatId, request),
+          };
+        }
         const result = await this._tools.execute(tc.name, parseArgs(tc.arguments), ctx);
         const chatNow = this._store.get(chatId);
         if (!chatNow) break;
@@ -392,6 +431,7 @@ export class AgentRuntime {
         this._store.updateToolCall(chatId, tc.id, (t) => {
           t.status = result.error ? "error" : "done";
           if (result.error) t.error = result.error;
+          if (result.run) t.run = result.run;
         });
         this._store.appendMessage(chatId, {
           id: this._id("msg"),

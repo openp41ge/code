@@ -22,6 +22,8 @@ export interface ToolCall {
   status: ToolCallStatus;
   /** Set when status === "error". */
   error?: string;
+  /** The command it ran (`run_command`): its tool call opens it in a terminal. */
+  run?: { binary: string; args: string[]; repo: string; worktree: string; runId: string };
 }
 
 /** An ordered slice of an assistant message: streamed text, a tool call, or

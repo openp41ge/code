@@ -16,5 +16,6 @@ export {
   type ActiveExtensionSummary,
   type SearchOutcome,
   type CreateOutcome,
+  type HostCommandBinary,
   SEARCH_TIMEOUT_MS,
 } from "./host";

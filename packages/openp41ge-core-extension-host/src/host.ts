@@ -1,7 +1,7 @@
 /**
  * host.ts — the extension host: loads installed extensions' backend entries,
  * which self-register (`registerProcesses`, `registerConfigSchema`,
- * `registerDispose`) inside an extension scope, and unloads them.
+ * `registerCommandBinaries`, `registerDispose`) inside an extension scope, and unloads them.
  *
  * Runs in the **main process**. Responsibilities:
  *
@@ -23,6 +23,9 @@ import { pathToFileURL } from "node:url";
 import { createLogger, registerLogStream, type ILogger } from "openp41ge-core-logger";
 import type {
   ActiveExtensionSummary,
+  CommandBinaryDef,
+  CommandResult,
+  CommandRules,
   ConfigSchema,
   ExtensionManifest,
   HandlerCaller,
@@ -31,12 +34,13 @@ import type {
   HandlerPayload,
   SearchProvider,
 } from "openp41ge-sdk";
-import { EXTENSION_API_VERSION, qualifyName } from "openp41ge-sdk";
+import { EXTENSION_API_VERSION, commandRulesAt, configDefaults, qualifyName } from "openp41ge-sdk";
 import { DefaultsConfigStore, type ExtensionConfigStore } from "./config-store";
 export type { ExtensionConfigStore } from "./config-store";
 import {
   beginExtensionScope,
   endExtensionScope,
+  getScopedCommandBinaries,
   getScopedConfigSchema,
   getScopedDisposers,
   getScopedProcesses,
@@ -59,6 +63,8 @@ export interface LoadedExtension {
   readonly handlers: ReadonlyMap<string, HandlerFn>;
   /** Its backend's search providers (`registerSearchProvider`). */
   readonly searchProviders: readonly SearchProvider[];
+  /** The binaries its backend defines (`registerCommandBinaries`). */
+  readonly commandBinaries: readonly CommandBinaryDef[];
   /** Activation error message when `active` is false. */
   readonly error?: string;
   /** Internal: disposers + deactivate for lifecycle teardown. */
@@ -92,6 +98,15 @@ export type SearchOutcome =
 /** What a provider's `create` resolved to: the item to open (or null), or why not. */
 export type CreateOutcome =
   { readonly ok: true; readonly item: unknown } | { readonly ok: false; readonly error: string };
+
+/** A binary an active extension defines, with its rules as its config has
+ *  them now (null when the user's config made them malformed). */
+export interface HostCommandBinary {
+  readonly extensionId: string;
+  readonly binary: string;
+  readonly label: string;
+  readonly rules: CommandRules | null;
+}
 
 /** How long `search` waits for a provider by default. */
 export const SEARCH_TIMEOUT_MS = 1500;
@@ -160,6 +175,7 @@ export class ExtensionHost {
     const handlers = new Map<string, HandlerFn>();
     const disposers: Array<() => void | Promise<void>> = [];
     const searchProviders: SearchProvider[] = [];
+    const commandBinaries: CommandBinaryDef[] = [];
     let error: string | undefined;
 
     // The backend entry self-registers at import time, inside its scope.
@@ -179,8 +195,18 @@ export class ExtensionHost {
         configSchema = getScopedConfigSchema();
         disposers.push(...(getScopedDisposers() ?? []));
         searchProviders.push(...(getScopedSearchProviders() ?? []));
+        commandBinaries.push(...(getScopedCommandBinaries() ?? []));
       } finally {
         endExtensionScope();
+      }
+      // A binary's rules live in the extension's config: its schema must
+      // give them (a default at the path).
+      for (const b of commandBinaries) {
+        if (!configSchema || !commandRulesAt(configDefaults(configSchema), b.config)) {
+          throw new Error(
+            `binary '${b.binary}': its config schema has no { allow, deny } default at '${b.config}'`,
+          );
+        }
       }
       if (configSchema) this._config.registerSchema(id, configSchema);
       if (procs) {
@@ -211,6 +237,7 @@ export class ExtensionHost {
       active: !error,
       handlers,
       searchProviders,
+      commandBinaries,
       error,
       _dispose: dispose,
     };
@@ -297,6 +324,20 @@ export class ExtensionHost {
               stderr: "",
               error: "git runs only for a call from a window with a workspace open",
             }),
+      commands: {
+        binaries: () => caller?.commands?.binaries() ?? Promise.resolve([]),
+        run: (request) =>
+          caller?.commands
+            ? caller.commands.run(request, extId)
+            : Promise.resolve<CommandResult>({
+                ok: false,
+                exitCode: null,
+                output: "",
+                truncated: false,
+                runId: "",
+                error: "commands run only for a call from a window with a workspace open",
+              }),
+      },
       config: { get: () => this._config.get(extId) },
       workspace: caller?.workspace
         ? {
@@ -310,6 +351,21 @@ export class ExtensionHost {
       windowId: caller?.windowId ?? null,
       log: this._loggerFor(extId),
     };
+  }
+
+  /** Every active extension's binaries, in activation order (a binary two
+   *  extensions define is listed twice; the platform picks one), each with
+   *  its rules read from the extension's config now. */
+  commandBinaries(): HostCommandBinary[] {
+    return this._order.flatMap((extId) => {
+      const config = this._config.get(extId);
+      return this._loaded.get(extId)!.commandBinaries.map((b) => ({
+        extensionId: extId,
+        binary: b.binary,
+        label: b.label,
+        rules: commandRulesAt(config, b.config),
+      }));
+    });
   }
 
   /** Every active extension's search providers, in activation order. */

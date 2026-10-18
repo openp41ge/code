@@ -2,8 +2,8 @@
  * tools/index.ts — the built-in agent tool set.
  *
  * Each tool exposes a `register(registry)` entry point (plugin-style); this
- * module registers them all with a single call. Shell-style command
- * execution (`run_command`) is not part of the set.
+ * module registers them all with a single call. `run_command` runs only the
+ * binaries extensions define, through the platform (no shell).
  */
 
 import { register as registerReadFile } from "./read-file.js";
@@ -12,6 +12,7 @@ import { register as registerEditFile } from "./edit-file.js";
 import { register as registerWriteFile } from "./write-file.js";
 import { register as registerCreateWorktree } from "./create-worktree.js";
 import { register as registerGitTools } from "./git.js";
+import { register as registerRunCommand } from "./run-command.js";
 import type { AgentToolRegistry } from "./types.js";
 
 /** Register the built-in tool set into a registry. */
@@ -22,4 +23,5 @@ export function registerBuiltinTools(registry: AgentToolRegistry): void {
   registerWriteFile(registry);
   registerCreateWorktree(registry);
   registerGitTools(registry);
+  registerRunCommand(registry);
 }

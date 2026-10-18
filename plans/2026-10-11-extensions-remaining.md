@@ -27,10 +27,11 @@ openp41ge:bundle-extensions` builds each as a self-contained extension
       `openp41ge-explorer-settings` tab, its `explorer.*` platform config keys
       and the `explorerSettings` context injection (existing values migrate to
       the extension's config section).
-- [ ] **Terminal**: handled later, before the public release (user, 2026-10-11).
-      Today nothing opens a terminal; the platform keeps an unregistered
-      renderer controller (knip-ignored), the main `TerminalManager` + IPC and
-      the `openp41ge-core-terminal` emulator library.
+- [x] **Terminal** (done 2026-10-18): the platform's scoped terminal — one
+      binary per tab, defined by extensions with rules in their own config,
+      run by agents through `ctx.commands` (AGENTS.md §2.9). The old shell
+      `TerminalManager` and its IPC are gone; `openp41ge-core-terminal`
+      (xterm) waits for the full terminal, which will need a PTY.
 
 Staying platform by design: the file editor (the default `openp41ge/file-path`
 consumer), the log viewer / Logs window, the config editor, the manager's
@@ -68,9 +69,8 @@ catalog `manifest.json` in the org (`id`, `version`, `asset`, `sha256`,
 
 ## 2. Toolkit components for render functions
 
-- [ ] Terminal, table, log view, form and diff as toolkit components a render
-      function can include (the toolkit has `tree`). The terminal stays
-      platform-owned but renders through a component.
+- [ ] Table, log view, form and diff as toolkit components a render
+      function can include (the toolkit has `tree`).
 - [ ] The old display-kind payload shapes become component props.
 - [ ] Tests: each renders and reconciles from a render function.
 

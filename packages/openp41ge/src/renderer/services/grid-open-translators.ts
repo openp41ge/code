@@ -15,6 +15,7 @@
  */
 
 import { configEditorTitle } from "../apps/config-editor/title";
+import { terminalTabKey, terminalTabTitle } from "../apps/terminal/target";
 
 /** How to open one drop. */
 export interface GridOpenSpec {
@@ -62,6 +63,22 @@ const TRANSLATORS: Readonly<Record<string, Translator>> = {
     const tag = str(c.tag);
     if (!tag) return null;
     return { title: tag, filePath: `release:${tag}`, config: { tag, path: `release:${tag}` } };
+  },
+
+  // One terminal per binary and worktree; a run (`runId`) is marked in it.
+  terminal: (c) => {
+    const binary = str(c.binary);
+    const repo = str(c.repo);
+    const worktree = str(c.worktree);
+    if (!binary || !repo || !worktree) return null;
+    const target = { binary, repo, worktree };
+    const path = terminalTabKey(target);
+    const runId = str(c.runId);
+    return {
+      title: terminalTabTitle(target),
+      filePath: path,
+      config: { ...target, path, ...(runId ? { runId } : {}) },
+    };
   },
 };
 

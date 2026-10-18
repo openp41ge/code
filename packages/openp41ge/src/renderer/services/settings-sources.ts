@@ -30,6 +30,8 @@ export const PLATFORM_SETTINGS_KEYS = [
   "editor/file",
   "editor/json",
   "dragConsumers",
+  "commandBinaries",
+  "terminal",
 ] as const;
 
 /** The platform config IPC (`window.openp41ge.config`), as far as used here. */

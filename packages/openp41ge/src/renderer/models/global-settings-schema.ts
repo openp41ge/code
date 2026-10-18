@@ -1,6 +1,7 @@
 /**
  * global-settings-schema — JSON Schema of the platform's own settings
- * (`{ appTheme, updateChannel, "editor/*", "editor/file", "editor/json", dragConsumers }`, a
+ * (`{ appTheme, updateChannel, "editor/*", "editor/file", "editor/json", dragConsumers,
+ * commandBinaries, terminal }`, a
  * subset of `UserConfig`): the "Platform" entry of the manager's Settings
  * list, edited in the settings editor (services/settings-sources.ts). It gives
  * the editor its key tooltips, and saves are checked against it.
@@ -113,6 +114,33 @@ export const GLOBAL_SETTINGS_SCHEMA = {
       additionalProperties: { type: "string" },
       description:
         "Which component opens a dropped item, for each kind of item that something registered can open. A kind opens in the first component registered for it (the platform's own, if it has one) unless another is chosen here. Applies immediately, in every window.",
+    },
+    commandBinaries: {
+      type: "object",
+      additionalProperties: { type: "string" },
+      description:
+        "Which extension's definition of a binary the terminal runs, when more than one extension defines it: binary → extension id. Unset, an official extension's definition is used (or the only one); a binary several other extensions define stays off until one is chosen.",
+    },
+    terminal: {
+      type: "object",
+      additionalProperties: false,
+      description: "The terminal's limits for every command it runs (for you and for agents).",
+      properties: {
+        timeoutSeconds: {
+          type: "number",
+          minimum: 1,
+          maximum: 3600,
+          default: 60,
+          description: "A command is stopped after this many seconds.",
+        },
+        maxOutputKb: {
+          type: "number",
+          minimum: 1,
+          maximum: 10240,
+          default: 256,
+          description: "Output past this many KB is dropped.",
+        },
+      },
     },
   },
 } as const;

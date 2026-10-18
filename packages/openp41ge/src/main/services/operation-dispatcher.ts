@@ -10,13 +10,12 @@ const log = createLogger("openp41ge", "operation-dispatcher");
 /**
  * Dispatches layout operations and manages workspace state.
  *
- * Applies named operations from operations.ts, tracks cleanup (terminal kill),
- * and broadcasts state changes to all windows.
+ * Applies named operations from operations.ts and broadcasts state changes
+ * to all windows.
  */
 export class OperationDispatcher implements IOperationDispatcher {
   private _workspace: Workspace;
   private _broadcast: BroadcastFn | null = null;
-  private _terminalCleanup: ((paneId: string) => void) | null = null;
   private _saveHandler: ((ws: Workspace) => void) | null = null;
 
   constructor(initialWorkspace?: Workspace) {
@@ -32,28 +31,10 @@ export class OperationDispatcher implements IOperationDispatcher {
       return false;
     }
     try {
-      const prevWorkspace = this._workspace;
       this._workspace = fn(this._workspace, ...args);
 
       // Strip any empty placements from the workspace
       this._workspace = cleanupWorkspace(this._workspace);
-
-      // Detect removed panes and kill their terminals
-      if (name === "removeColumnTab") {
-        const paneId = args[1] as string;
-        this._terminalCleanup?.(paneId);
-      }
-      if (name === "closeWindow") {
-        const windowId = args[0] as string;
-        const win = prevWorkspace.windows.find((w) => w.id === windowId);
-        if (win) {
-          for (const placement of win.grid.placements) {
-            for (const tid of placement.tabIds) {
-              this._terminalCleanup?.(tid as string);
-            }
-          }
-        }
-      }
 
       // After a successful mutation, invoke the save handler for persistence
       this._saveHandler?.(this._workspace);
@@ -84,10 +65,6 @@ export class OperationDispatcher implements IOperationDispatcher {
 
   setBroadcast(fn: BroadcastFn): void {
     this._broadcast = fn;
-  }
-
-  setTerminalCleanup(fn: (paneId: string) => void): void {
-    this._terminalCleanup = fn;
   }
 
   /**

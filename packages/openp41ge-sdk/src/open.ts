@@ -95,6 +95,17 @@ export const PLATFORM_OPEN_KINDS: readonly OpenKindDef[] = [
     // `path`: the workspace file.
     params: { type: "object", properties: { path: str, name: str }, required: ["path"] },
   },
+  {
+    name: "openp41ge/command-run",
+    label: "Command",
+    // A scoped terminal for `binary` (commands.ts) in a worktree; with a
+    // `runId` (and its `args`, a JSON array), showing that run.
+    params: {
+      type: "object",
+      properties: { binary: str, repo: str, worktree: str, args: str, runId: str },
+      required: ["binary"],
+    },
+  },
 ];
 
 /** An item that opens: its kind, its params (the tab's), and how it is shown. */

@@ -54,11 +54,7 @@
 
         "src/renderer/services/index.ts",
         "src/layout/index.ts",
-        "src/index.ts",
-
-        // Terminal tab app: unregistered for now but kept for easy re-enable.
-        "src/renderer/apps/terminal/index.ts",
-        "src/renderer/apps/terminal/terminal-controller.ts"
+        "src/index.ts"
       ],
       "ignoreExportsUsedInFile": {
         "interface": true,

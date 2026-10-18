@@ -389,6 +389,7 @@ export class ChatThreadStore {
                     ...s.toolCall,
                     status: tc.status,
                     ...(tc.error ? { error: tc.error } : {}),
+                    ...(tc.run ? { run: tc.run } : {}),
                   },
                 }
               : s,

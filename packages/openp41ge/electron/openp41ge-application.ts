@@ -19,7 +19,6 @@ import { addSentryBreadcrumb } from "../src/main/services/sentry.js";
 // ─── Service imports ─────────────────────────────────────────────────────
 import {
   OperationDispatcher,
-  TerminalManager,
   DragGhostManager,
   TabNameGenerator,
   NodeGitService,
@@ -70,7 +69,7 @@ import {
   serializeWorkspaceFile,
   withWorktree,
 } from "../src/layout/workspace-file.js";
-import type { CallerWorkspace, GitRequest } from "openp41ge-sdk";
+import type { CallerWorkspace, CommandRequest, GitRequest } from "openp41ge-sdk";
 
 import {
   registerExtensionSchemePrivileges,
@@ -109,7 +108,10 @@ import { registerDialogHandlers } from "./ipc-handlers/dialog-handlers.js";
 import { registerWindowHandlers } from "./ipc-handlers/window-handlers.js";
 import { registerWindowManagerHandlers } from "./ipc-handlers/window-manager-handlers.js";
 import { registerDragHandlers } from "./ipc-handlers/drag-handlers.js";
-import { registerTerminalHandlers } from "./ipc-handlers/terminal-handlers.js";
+import { broadcastCommandRun, registerCommandHandlers } from "./ipc-handlers/command-handlers.js";
+import { CommandService, type CommandScope } from "../src/main/services/command-service.js";
+import { NodeCommandProcess } from "../src/main/services/command-process.js";
+import { FileCommandRunStore } from "../src/main/services/command-run-store.js";
 import { registerWorkspaceHandlers } from "./ipc-handlers/workspace-handlers.js";
 import { registerConfigHandlers } from "./ipc-handlers/config-handlers.js";
 import { registerExtensionConfigHandlers } from "./ipc-handlers/extension-config-handlers.js";
@@ -157,6 +159,8 @@ const WORKSPACE_FILE_SETTLE_MS = 150;
 const CLEANUP_STARTUP_DELAY_MS = 15_000;
 /** Quiet time after a workspace file changes before the cleanup runs. */
 const CLEANUP_SETTLE_MS = 10_000;
+/** Where a workspace keeps its scoped-terminal runs (in its data folder). */
+const COMMAND_RUNS_FILE = "command-runs.json";
 
 const cleanupLog = createLogger("openp41ge", "repository-cleanup");
 const switchLog = createLogger("openp41ge", "workspace-switch");
@@ -175,7 +179,6 @@ export class Openp41geApplication {
   private _notifiedUpdateVersion: string | null = null;
   private dispatcher!: OperationDispatcher;
   private registry!: WorkspaceRegistry;
-  private terminalManager!: TerminalManager;
   private dragGhost!: DragGhostManager;
   private tabNames!: TabNameGenerator;
   /** The startup git check (see git-binary.ts). */
@@ -194,6 +197,10 @@ export class Openp41geApplication {
   private logStore!: LogFileStore;
   private openp41geDir!: string;
   private extensionManager!: ExtensionHostManager;
+  /** The scoped terminal's engine: the binaries extensions define, run. */
+  private commands!: CommandService;
+  /** Each workspace's data folder, by id (where its command runs are kept). */
+  private readonly workspaceDataDirs = new Map<string, string>();
   /** The open palette's files (every window's workspaces). */
   private readonly fileIndex = new WorkspaceFileIndex(new GitFileLister());
   /** Watch each repositories folder in use, so the Explorer auto-updates on
@@ -640,7 +647,6 @@ export class Openp41geApplication {
 
   private _initServices(): void {
     this.dispatcher = new OperationDispatcher();
-    this.terminalManager = new TerminalManager();
     this.dragGhost = new DragGhostManager(BrowserWindow);
     this.tabNames = new TabNameGenerator();
     this.fileSystem = new ElectronFileSystem();
@@ -703,7 +709,6 @@ export class Openp41geApplication {
       save: (workspacePath, ws) => {
         if (workspacePath) this.workspaceSessionStore.save(workspacePath, ws);
       },
-      terminalCleanup: (paneId) => this.terminalManager.killByPaneId(paneId),
     });
     this.logStore = new LogFileStore(this.openp41geDir);
     this.extensionConfig = new ExtensionConfigService(this.configService);
@@ -721,6 +726,56 @@ export class Openp41geApplication {
       onPublish: (topic, payload) => this._broadcastExtensionEvent(topic, payload),
       config: this.extensionConfig,
     });
+    this.commands = new CommandService({
+      binaries: () => this.extensionManager.commandBinaries(),
+      chosen: () =>
+        (this.configService.get("commandBinaries") as Record<string, string> | undefined) ?? {},
+      isOfficial: (id) => this.extensionManager.isOfficial(id),
+      limits: () => {
+        const t = (this.configService.get("terminal") ?? {}) as {
+          timeoutSeconds?: number;
+          maxOutputKb?: number;
+        };
+        return {
+          timeoutMs: (t.timeoutSeconds ?? 60) * 1000,
+          maxOutputBytes: (t.maxOutputKb ?? 256) * 1024,
+        };
+      },
+      process: new NodeCommandProcess(),
+      store: new FileCommandRunStore((id) =>
+        path.join(
+          this.workspaceDataDirs.get(id) ??
+            path.join(this.openp41geDir, ".config", "workspaces", id),
+          COMMAND_RUNS_FILE,
+        ),
+      ),
+      onRun: (workspaceId, run) => broadcastCommandRun(run, this._windowsOfWorkspace(workspaceId)),
+    });
+  }
+
+  /** The open windows showing the workspace `workspaceId`. */
+  private _windowsOfWorkspace(workspaceId: string): Electron.BrowserWindow[] {
+    return [...openp41geWindows].flatMap(([id, bw]) => {
+      const file = openp41geWindowMeta.get(id)?.workspacePath;
+      const workspace = file ? workspaceOfFile(file, this.openp41geDir) : null;
+      return workspace?.id === workspaceId ? [bw] : [];
+    });
+  }
+
+  /** The workspace of the window that sent `event`, for the scoped
+   *  terminal: its id, and its worktrees' folders. */
+  private _commandScopeFor(event: { sender: Electron.WebContents }): CommandScope | null {
+    const caller = this._callerWorkspaceFor(event);
+    const file = workspacePathForSender(event);
+    const workspace = file ? workspaceOfFile(file, this.openp41geDir) : null;
+    if (!caller || !workspace) return null;
+    this.workspaceDataDirs.set(workspace.id, workspace.dataDir);
+    return {
+      workspaceId: workspace.id,
+      worktreePath: async (repo, worktree) =>
+        (await caller.roots()).find((r) => r.repoName === repo && r.branch === worktree)?.path ??
+        null,
+    };
   }
 
   /** Pending `workspace:repository-changed` sends, per repositories folder + repo. */
@@ -792,9 +847,6 @@ export class Openp41geApplication {
   // ── Step 5: Wire cross-service dependencies ───────────────────────────
 
   private _wireServices(): void {
-    this.dispatcher.setTerminalCleanup((paneId: string) =>
-      this.terminalManager.killByPaneId(paneId),
-    );
     // The default dispatcher holds the windows with no workspace open: their
     // state goes to them only, and is never saved (it has no file; their tabs
     // live in memory). Each workspace's dispatcher (the registry's) saves its
@@ -849,7 +901,6 @@ export class Openp41geApplication {
     registerWindowHandlers(dispatcherForEvent, this.tabNames);
     registerWindowManagerHandlers();
     registerDragHandlers(this.dragGhost);
-    registerTerminalHandlers(this.terminalManager);
     // Git calls act on the repositories of the sender's workspace (or of the
     // workspace file a call names).
     const gitFor: WorkspaceGitResolver = (event, workspaceFile) => {
@@ -886,10 +937,17 @@ export class Openp41geApplication {
     // ctx.workspace is that workspace (worktrees, a data folder).
     const callerFor = (event: { sender: Electron.WebContents }) => ({
       git: (request: GitRequest) => runExtensionGit(this._gitScopeFor(event), request),
+      commands: {
+        binaries: async () => this.commands.binaries(),
+        run: (request: CommandRequest, extensionId: string) =>
+          this.commands.run(this._commandScopeFor(event), request, extensionId),
+      },
       workspace: this._callerWorkspaceFor(event),
       windowId: windowIdForSender(event) ?? undefined,
     });
     registerExtensionHandlers(this.extensionManager, callerFor);
+    // The scoped terminal: lines typed at a terminal's prompt, its runs.
+    registerCommandHandlers(this.commands, (event) => this._commandScopeFor(event));
     // The open palette (Cmd+N): providers run as the calling window, as
     // dispatches do; what it remembers is shared by every window.
     registerPaletteHandlers({

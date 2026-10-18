@@ -1,7 +1,6 @@
 export type * from "./interfaces/index.js";
 export { NodeGitService } from "./services/node-git-service.js";
 export { ElectronFileSystem } from "./services/electron-file-system.js";
-export { TerminalManager } from "./services/terminal-manager.js";
 export { DragGhostManager } from "./services/drag-ghost-manager.js";
 export { OperationDispatcher } from "./services/operation-dispatcher.js";
 export { TabNameGenerator } from "./services/tab-name-generator.js";

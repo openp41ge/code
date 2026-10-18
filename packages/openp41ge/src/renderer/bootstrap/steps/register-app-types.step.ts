@@ -18,6 +18,7 @@ import { fileViewerAppRegistration } from "../../apps/file-viewer/index";
 import { logViewerAppRegistration } from "../../apps/log-viewer/index";
 import { configEditorAppRegistration } from "../../apps/config-editor/index";
 import { releaseAppRegistration } from "../../apps/release/index";
+import { terminalAppRegistration } from "../../apps/terminal/index";
 import { registerExtensionsWithRefresh } from "../../apps/extension/index";
 import { registerManagementSidebarTabs } from "../../apps/management/index";
 import { registerLogSidebarTabs } from "../../apps/log-viewer/sidebar-tabs";
@@ -35,6 +36,7 @@ export class RegisterAppTypesStep implements IStartupStep {
     registerAppType(logViewerAppRegistration);
     registerAppType(configEditorAppRegistration);
     registerAppType(releaseAppRegistration);
+    registerAppType(terminalAppRegistration);
 
     // The management sidebar tabs (Workspaces, Settings, Releases, Cleanup,
     // Migrations) and the log tabs (Log Streams, Log Search).

@@ -32,6 +32,11 @@ import type { ILogger } from "openp41ge-core-logger";
 import type { HandlerFn, HandlerPayload } from "./context";
 import { validateConfigSchema, type ConfigSchema, type ExtensionConfig } from "./config";
 import {
+  parseCommandBinaries,
+  type CommandBinaryDef,
+  type CommandBinaryRegistrations,
+} from "./commands";
+import {
   parseOpenKinds,
   type OpenKind,
   type OpenKindDef,
@@ -396,6 +401,7 @@ interface ExtensionScope {
   };
   open: { kinds: OpenKindDef[] };
   searchProviders: SearchProvider[];
+  commands: { binaries: CommandBinaryDef[] };
   config: ConfigSchema | null;
   disposers: Array<() => void | Promise<void>>;
 }
@@ -545,4 +551,25 @@ export function registerSearchProvider(provider: SearchProvider): void {
     throw new Error(`duplicate search provider id '${provider.id}'`);
   }
   scope.searchProviders.push(provider);
+}
+
+/**
+ * Define binaries the platform's scoped terminal may run (`commands.ts`).
+ * Called at backend-entry load. Each names where its `{ allow, deny }` rules
+ * live in this extension's config, so the extension's config schema must
+ * define them. An invalid name, label or path, or a binary this extension
+ * already defined, throws.
+ */
+export function registerCommandBinaries(regs: CommandBinaryRegistrations): void {
+  const scope = currentScope();
+  if (!scope) {
+    throw new Error("registerCommandBinaries called outside an extension scope");
+  }
+  const parsed = parseCommandBinaries(regs);
+  for (const def of parsed) {
+    if (scope.commands.binaries.some((b) => b.binary === def.binary)) {
+      throw new Error(`binary '${def.binary}' is already defined by '${scope.id}'`);
+    }
+  }
+  scope.commands.binaries.push(...parsed);
 }

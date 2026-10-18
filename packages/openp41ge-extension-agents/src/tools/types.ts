@@ -10,7 +10,13 @@
  * tools (read_file, search_files, …) and the agent runtime share.
  */
 
-import type { GitRequest, GitResult } from "openp41ge-sdk";
+import type {
+  CommandBinaryInfo,
+  CommandRequest,
+  CommandResult,
+  GitRequest,
+  GitResult,
+} from "openp41ge-sdk";
 
 /** JSON Schema for a tool's parameters (subset of JSON Schema that vLLM/OpenAI accept). */
 export interface ToolParameters {
@@ -56,12 +62,32 @@ export interface ToolExecutionContext {
    * Resolves in-band, never throws.
    */
   git?(request: GitRequest): Promise<GitResult>;
+  /**
+   * The binaries extensions define, run in a worktree of the chat's
+   * workspace (the platform's `ctx.commands`, its scoped terminal). Absent
+   * when the chat has no workspace. Resolves in-band, never throws.
+   */
+  commands?: {
+    binaries(): Promise<readonly CommandBinaryInfo[]>;
+    run(request: CommandRequest): Promise<CommandResult>;
+  };
+}
+
+/** A command a tool ran (its tool call opens it in a terminal). */
+export interface ToolCommandRun {
+  binary: string;
+  args: string[];
+  repo: string;
+  worktree: string;
+  runId: string;
 }
 
 /** Result of a tool execution. Errors are reported in-band, never thrown. */
 export interface ToolExecutionResult {
   content: string;
   error?: string;
+  /** The command the tool ran, if any. */
+  run?: ToolCommandRun;
 }
 
 /** A fully-registered agent tool. */
