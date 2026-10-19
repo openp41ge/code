@@ -335,8 +335,9 @@ export function setOpenWorkspaceWindowHandler(fn: OpenWorkspaceWindowHandler): v
 
 /**
  * Open a window with no workspace (its tabs live in memory, in the default
- * dispatcher), with the Workspaces tab open on the left. With `launchLogs`, it
- * opens those logs once loaded. Returns its id.
+ * dispatcher), with nothing open in it: the title bar's picker opens a
+ * workspace. With `launchLogs`, it opens those logs once loaded. Returns its
+ * id.
  */
 export function openNewWindow(
   sourceWindow?: BrowserWindow,
@@ -348,7 +349,6 @@ export function openNewWindow(
   const ws = d.getWorkspace();
   const winId = ws.windows[ws.windows.length - 1]?.id;
   if (!winId) return null;
-  d.apply("openSystemTab", [winId, "left", "workspaces", "Workspaces"]);
   d.broadcast();
   createOpenp41geWindow(winId, false, sourceWindow, undefined, undefined, {
     workspacePath: null,

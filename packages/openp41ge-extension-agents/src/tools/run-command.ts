@@ -18,7 +18,7 @@ const isStrings = (v: unknown): v is string[] =>
 export const RUN_COMMAND_TOOL: AgentTool = {
   name: RUN_COMMAND_TOOL_NAME,
   description:
-    "Run a command-line binary (one the system prompt lists) with an argument list in a worktree of a connected repository, and get what it printed. There is no shell: no pipes, redirects, globs or variables — each argument is passed as it is. Only command lines the binary's rules allow run; others are refused.",
+    "Run a command-line binary (one the system prompt lists) with an argument list in a worktree of a connected repository, and get what it printed. There is no shell: no pipes, redirects, globs or variables — each argument is passed as it is. Nothing can be typed in and editors are off, so give what a command would ask for on the command line (e.g. `git commit -m <message>`, or `--no-edit` to keep git's message). Only command lines the binary's rules allow run; others are refused.",
   parameters: {
     type: "object",
     properties: {

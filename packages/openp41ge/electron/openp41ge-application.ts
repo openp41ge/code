@@ -1108,7 +1108,7 @@ export class Openp41geApplication {
       this._openWorkspaceSession(workspaceArg);
     } else {
       // No workspace argument — start in a window with no workspace open (the
-      // Workspaces tab and the title bar's picker open one).
+      // title bar's picker opens one).
       openNewWindow();
     }
   }

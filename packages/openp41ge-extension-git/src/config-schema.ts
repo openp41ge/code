@@ -6,9 +6,12 @@
  * a word), `**` (any number of arguments), `a|b` (either). A line runs when
  * an allow rule matches and no deny rule does.
  *
- * The defaults only read: status, log, show, diff, blame and listing
- * branches; options before the subcommand match no rule, and the deny rules
- * keep diff's `--output` (writes a file) and external diff programs out.
+ * The defaults read (status, log, show, diff, blame, listing branches) and
+ * sync: fetch, pull, finishing or abandoning a merge or rebase that stopped
+ * on a conflict (add, commit, continue / abort / skip) and push. Other writes
+ * (reset, checkout, stash, branches, starting a merge or rebase) are off;
+ * options before the subcommand match no rule, and the deny rules keep
+ * diff's `--output` (writes a file) and external diff programs out.
  */
 
 import type { ConfigSchema } from "openp41ge-sdk";
@@ -32,7 +35,21 @@ export const GIT_CONFIG_SCHEMA: ConfigSchema = {
       additionalProperties: true,
       default: {
         git: {
-          allow: ["status **", "log **", "show **", "diff **", "blame **", "branch --list **"],
+          allow: [
+            "status **",
+            "log **",
+            "show **",
+            "diff **",
+            "blame **",
+            "branch --list **",
+            "fetch **",
+            "pull **",
+            "add **",
+            "commit **",
+            "merge --continue|--abort",
+            "rebase --continue|--abort|--skip",
+            "push **",
+          ],
           deny: ["** --output*", "** --ext-diff **"],
         },
       },

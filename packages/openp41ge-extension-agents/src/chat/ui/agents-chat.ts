@@ -124,6 +124,9 @@ export const COMMAND_RUN_DRAG_SOURCE_ID = "command-run";
 
 // The bottom-bar find icon matches the Explorer sidebar's magnifier+list glyph
 // (same as the log viewer) so in-tab search looks consistent app-wide.
+/** Keys that scroll the focused transcript up. */
+const SCROLL_UP_KEYS = new Set(["ArrowUp", "PageUp", "Home"]);
+
 const ICON_FIND =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="20" height="20" fill="currentColor"><path d="M80-200v-80h400v80H80Zm0-200v-80h200v80H80Zm0-200v-80h200v80H80Zm744 400L670-354q-24 17-52.5 25.5T560-320q-83 0-141.5-58.5T360-520q0-83 58.5-141.5T560-720q83 0 141.5 58.5T760-520q0 29-8.5 57.5T726-410l154 154-56 56ZM560-400q50 0 85-35t35-85q0-50-35-85t-85-35q-50 0-85 35t-35 85q0 50 35 85t85 35Z"/></svg>';
 const ICON_REGEX =
@@ -206,12 +209,18 @@ class AgentsChat extends LitElement {
    *  true when the user scrolls back to the bottom or sends a new message. */
   private _pinnedToBottom = true;
   /** Last observed `scrollTop` of the transcript, for scroll-direction detect.
-   *  Upward movement means the user is reading earlier content and we must
-   *  stop auto-following. This is safe: our own auto-follow anchor only ever
-   *  increases `scrollTop` (it scrolls down to the bottom), so it can never be
-   *  mistaken for an upward user scroll — no programmatic counter needed (the
-   *  browser coalesces scroll events, so a counter leaked and kept pinning). */
+   *  Upward movement unpins only while the user is driving the scroll (see
+   *  `_userScrolling`): the position also moves up on its own — the browser
+   *  clamps it when the transcript shrinks or the viewport grows — and that
+   *  must not unpin. */
   private _prevScrollTop = 0;
+  /** A pointer is held on the transcript or its scrollbar (a drag). */
+  private _pointerHeld = false;
+  /** Until when a scroll key the user pressed counts as their scroll. */
+  private _keyScrollUntil = 0;
+  /** Re-anchors to the bottom when the transcript's layout changes while
+   *  pinned (late layout, a resized viewport), between the explicit anchors. */
+  private _listResizeObserver: ResizeObserver | null = null;
   /** Language overrides for code blocks, keyed by `${msgId}::${blockIndex}`. */
   @state() private _codeLangOverrides: Record<string, string> = {};
 
@@ -799,24 +808,26 @@ class AgentsChat extends LitElement {
   /** Track whether the user is reading at the bottom (auto-follow) vs. scrolled
    *  up (leave the viewport alone). The instant the user scrolls upward — even
    *  a few pixels of slow scrolling — we stop auto-following, so pinning never
-   *  fights the user. Scroll near the top → pull in the older page. Guarded so
-   *  concurrent scroll events don't stack fetches. */
+   *  fights the user. Only the user unpins: an upward move they did not make
+   *  (the transcript shrank, the viewport grew) re-anchors instead. Scroll near
+   *  the top → pull in the older page. Guarded so concurrent scroll events
+   *  don't stack fetches. */
   private _onScroll = (): void => {
     const el = this.renderRoot.querySelector<HTMLElement>(".chat-messages");
     if (!el) return;
-    // Upward movement (scrollTop decreased) means the user is navigating back
-    // to earlier content: stop auto-following, regardless of distance. Our own
-    // auto-follow anchor only scrolls DOWN to the bottom, so it can never trip
-    // this. (A separate `wheel` handler unpins synchronously as well, so the
-    // user's intent wins even before this event fires.)
+    // (A separate `wheel` handler unpins synchronously as well, so the user's
+    // intent wins even before this event fires.)
     const scrolledUp = el.scrollTop < this._prevScrollTop - 1;
-    this._prevScrollTop = el.scrollTop;
-    if (scrolledUp) {
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 8;
+    if (scrolledUp && this._userScrolling()) {
       this._setPinnedToBottom(false);
-    } else if (el.scrollHeight - el.scrollTop - el.clientHeight < 8) {
+    } else if (atBottom) {
       // The user (or an anchor) is back at the bottom — re-engage auto-follow.
       this._setPinnedToBottom(true);
+    } else if (scrolledUp && this._pinnedToBottom) {
+      el.scrollTop = el.scrollHeight;
     }
+    this._prevScrollTop = el.scrollTop;
     const nearTop = el.scrollTop < 40;
     if (nearTop && !this._loadingOlder && this._loadedStart > 0) {
       void this.loadOlderMessages();
@@ -829,8 +840,56 @@ class AgentsChat extends LitElement {
    *  auto-anchor could overwrite before it fires. Downward scrolling is left
    *  to `_onScroll`, which re-pins once the viewport reaches the bottom. */
   private _onWheel = (e: WheelEvent): void => {
-    if (e.deltaY < 0) this._setPinnedToBottom(false);
+    // Nothing above to scroll to: the gesture moves nothing, so stay pinned.
+    const el = e.currentTarget as HTMLElement;
+    if (e.deltaY < 0 && el.scrollTop > 0) this._setPinnedToBottom(false);
   };
+
+  /** A press on the transcript or its scrollbar: while it is held, an upward
+   *  scroll is the user's (dragging the thumb, a click on the track, selecting
+   *  text past the top). The thumb stops propagation, so this listens in the
+   *  capture phase. */
+  private _onScrollPointerDown = (): void => {
+    this._pointerHeld = true;
+    const release = (): void => {
+      this._pointerHeld = false;
+      window.removeEventListener("pointerup", release, true);
+      window.removeEventListener("pointercancel", release, true);
+    };
+    window.addEventListener("pointerup", release, true);
+    window.addEventListener("pointercancel", release, true);
+  };
+
+  private _onListKeyDown = (e: KeyboardEvent): void => {
+    if (SCROLL_UP_KEYS.has(e.key) || (e.key === " " && e.shiftKey)) {
+      this._keyScrollUntil = Date.now() + 1000;
+    }
+  };
+
+  /** Whether the user is driving the current scroll (a held pointer, a scroll
+   *  key just pressed) rather than layout moving it. */
+  private _userScrolling(): boolean {
+    return this._pointerHeld || Date.now() < this._keyScrollUntil;
+  }
+
+  /** Watch the transcript and its messages for size changes; while pinned, a
+   *  change keeps the newest message in view. Called after each render, so
+   *  new messages are observed too (observing twice is a no-op). */
+  private _observeListLayout(): void {
+    if (typeof ResizeObserver === "undefined") return;
+    const list = this.renderRoot.querySelector<HTMLElement>(".chat-messages");
+    if (!list) return;
+    if (!this._listResizeObserver) {
+      this._listResizeObserver = new ResizeObserver(() => {
+        if (!this._pinnedToBottom) return;
+        if (list.scrollHeight - list.scrollTop - list.clientHeight >= 2) {
+          list.scrollTop = list.scrollHeight;
+        }
+      });
+      this._listResizeObserver.observe(list);
+    }
+    for (const child of list.children) this._listResizeObserver.observe(child);
+  }
 
   /** Record the pinned-to-bottom state and mirror it onto the chat scrollbar's
    *  pin icon (which is shown only while auto-following is engaged). */
@@ -985,6 +1044,8 @@ class AgentsChat extends LitElement {
     this._composerResizeObserver = null;
     this._chatScrollbar?.destroy();
     this._chatScrollbar = null;
+    this._listResizeObserver?.disconnect();
+    this._listResizeObserver = null;
     this._destroyCodeBlockScrollbars();
   }
 
@@ -2175,6 +2236,7 @@ class AgentsChat extends LitElement {
   }
 
   protected updated(changed: PropertyValues): void {
+    this._observeListLayout();
     // Any re-render (e.g. a streaming delta, or a toggle) clears the imperative
     // composer content; repopulate it so typed text and caret survive re-renders.
     this._renderComposerContent();
@@ -2520,17 +2582,38 @@ class AgentsChat extends LitElement {
              open. The transcript is already paginated (messages load in
              windows), which bounds the DOM size without collapsing messages. */
         }
-        /* User messages are grey bubbles: 3 medium-rounded corners with a
-           smaller bottom-right, sized to their content (max 90% width). */
+        /* User messages are grey blocks running edge to edge of the pane
+           (the negative side margins undo the list's 12px padding; the same
+           inner padding keeps the text in line with the response), square
+           like the tool-call and reasoning blocks, spaced apart from the
+           response and tool calls around them (on top of the list's gap) so a
+           turn's start stands out. */
         .chat-message.user {
-          align-self: flex-end;
-          max-width: 90%;
-          width: fit-content;
-          padding: 4px 12px;
+          align-self: stretch;
+          padding: 14px 12px;
+          margin: 24px -12px;
           background: var(--bg-active, #37373d);
           color: var(--text-primary, #d4d4d4);
-          border-radius: 12px 12px 4px 12px;
+          border-radius: 0;
           white-space: normal;
+        }
+        .chat-message.user:first-child {
+          margin-top: 0;
+        }
+        /* The USER / AGENT label at the top of a message, in the monospace
+           face (the message text is the UI face). */
+        .msg-role::before {
+          content: attr(data-label);
+          display: block;
+          font-family: var(--font-mono, "JetBrains Mono", monospace);
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: var(--muted-color, #8b93a1);
+          user-select: none;
+        }
+        .chat-message.user .msg-role {
+          margin-bottom: 6px;
         }
         /* Assistant responses are inline text — no bubble — rendered as
            markdown, so they span the full width and flow like prose. */
@@ -3396,9 +3479,17 @@ class AgentsChat extends LitElement {
 
       ${statusText ? html`<div class="chat-status">${statusText}</div>` : html``}
 
-      <div class="chat-scroll">
-        <div class="chat-messages" @scroll=${this._onScroll} @wheel=${this._onWheel}>
-          ${this._messages.map((msg) => this._renderMessage(msg))}
+      <div
+        class="chat-scroll"
+        @pointerdown=${{ handleEvent: this._onScrollPointerDown, capture: true }}
+      >
+        <div
+          class="chat-messages"
+          @scroll=${this._onScroll}
+          @wheel=${this._onWheel}
+          @keydown=${this._onListKeyDown}
+        >
+          ${this._messages.map((msg, i) => this._renderMessage(msg, i))}
           ${this._waitingForReply() ? this._renderThinking() : html``}
         </div>
       </div>
@@ -3737,9 +3828,28 @@ class AgentsChat extends LitElement {
     </div>`;
   }
 
-  private _renderMessage(msg: ChatMessage): TemplateResult {
+  /** Whether the assistant message at `index` starts a run of responses (the
+   *  message before it, skipping tool results, is not a response), so it
+   *  carries the AGENT label. */
+  private _startsResponse(index: number): boolean {
+    for (let i = index - 1; i >= 0; i--) {
+      const role = this._messages[i].role;
+      if (role !== "tool") return role !== "assistant";
+    }
+    return true;
+  }
+
+  /** The USER / AGENT label heading a message. Its text is drawn by CSS from
+   *  `data-label`, so it is no text node: chat search, its highlights and
+   *  copying see only the message. */
+  private _renderRole(label: string): TemplateResult {
+    return html`<div class="msg-role" data-label=${label} aria-hidden="true"></div>`;
+  }
+
+  private _renderMessage(msg: ChatMessage, index: number): TemplateResult {
     if (msg.role === "user") {
       return html`<div class="chat-message user" data-msg-id=${msg.id}>
+        ${this._renderRole("User")}
         <div class="msg-content">${msg.content}</div>
       </div>`;
     }
@@ -3787,6 +3897,7 @@ class AgentsChat extends LitElement {
       }
       return html`
         <div class="chat-message assistant" data-msg-id=${msg.id}>
+          ${this._startsResponse(index) ? this._renderRole("Agent") : ""}
           ${this._renderReasoning(msg.reasoning, this._streaming && msg === this._messages[this._messages.length - 1], msg.id, overrides)}
           ${out}
         </div>
@@ -3798,6 +3909,7 @@ class AgentsChat extends LitElement {
       : [];
     return html`
       <div class="chat-message assistant" data-msg-id=${msg.id}>
+        ${this._startsResponse(index) ? this._renderRole("Agent") : ""}
         ${this._renderReasoning(msg.reasoning, this._streaming && msg === this._messages[this._messages.length - 1], msg.id, overrides)}
         <div class="msg-content" @click=${this._onMsgContentClick}>
           ${segments.map((seg) => this._renderSegment(seg))}
