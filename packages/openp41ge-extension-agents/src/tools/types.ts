@@ -27,6 +27,13 @@ export interface ToolDefinition {
   parameters: ToolParameters;
 }
 
+/** A worktree a tool may work in: a checkout of `branch` of `repo`. */
+export interface ToolWorktree {
+  repo: string;
+  branch: string;
+  path: string;
+}
+
 /** Execution context handed to a tool. */
 export interface ToolExecutionContext {
   /** Working directory for relative-path resolutions / command execution. */
@@ -41,6 +48,12 @@ export interface ToolExecutionContext {
    * (legacy callers / direct tool usage).
    */
   roots?: string[];
+  /**
+   * The worktrees in `roots` with the repository and branch each is a
+   * checkout of, so a tool can name them (search results are headed by
+   * them). Absent when unknown (legacy / direct tool usage).
+   */
+  worktrees?: ToolWorktree[];
   /**
    * Check out `branch` of the connected repository `repo` as a worktree of
    * the chat's workspace (then in `roots`). Absent when the chat has no

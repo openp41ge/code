@@ -19,6 +19,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "ignore": "^7.0.6",
     "lit": "^3.3.3",
     "openp41ge-sdk": "workspace:*",
     "openp41ge-sdk-uikit": "workspace:*"

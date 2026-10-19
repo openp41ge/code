@@ -300,7 +300,10 @@ export class AgentRuntime {
       if (signal.aborted) return;
       // Roots = the connected worktree paths; undefined when no scope is
       // configured (legacy behaviour). Empty when nothing is connected (deny).
-      const roots = connected?.flatMap((r) => r.worktrees.map((w) => w.path));
+      const worktrees = connected?.flatMap((r) =>
+        r.worktrees.map((w) => ({ repo: r.repo, branch: w.branch, path: w.path })),
+      );
+      const roots = worktrees?.map((w) => w.path);
       const binaries =
         commands && tools.some((t) => t.name === RUN_COMMAND_TOOL_NAME)
           ? await commands.binaries(chatId)
@@ -389,12 +392,15 @@ export class AgentRuntime {
       // Execute accumulated tool calls and feed results back to the provider.
       for (const tc of toolCalls) {
         if (signal.aborted) break;
-        const ctx: ToolExecutionContext = roots !== undefined ? { cwd, roots } : { cwd };
+        const ctx: ToolExecutionContext = roots !== undefined ? { cwd, roots, worktrees } : { cwd };
         if (addWorktree) {
           // A worktree checked out is in scope for the rest of this batch too.
           ctx.addWorktree = async (repo, branch) => {
             const added = await addWorktree(chatId, repo, branch);
-            if (added.ok && added.path) roots?.push(added.path);
+            if (added.ok && added.path) {
+              roots?.push(added.path);
+              worktrees?.push({ repo, branch, path: added.path });
+            }
             return added;
           };
         }

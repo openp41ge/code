@@ -292,6 +292,9 @@ importers:
 
   packages/openp41ge-extension-agents:
     dependencies:
+      ignore:
+        specifier: ^7.0.6
+        version: 7.0.6
       lit:
         specifier: ^3.3.3
         version: 3.3.3
