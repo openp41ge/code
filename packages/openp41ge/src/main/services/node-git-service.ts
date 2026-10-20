@@ -368,6 +368,15 @@ export class NodeGitService implements IGitService {
         repoName,
       );
       const branches = branchesOutput ? branchesOutput.split("\n") : [];
+      // A worktree's branch with no commits yet is not a ref, so `git branch`
+      // leaves it out; the worktree list still names it.
+      const listed = await this._execGit(["worktree", "list", "--porcelain"], repoName).catch(
+        () => "",
+      );
+      for (const line of listed.split("\n")) {
+        const unborn = /^branch refs\/heads\/(.+)$/.exec(line)?.[1];
+        if (unborn && !branches.includes(unborn)) branches.push(unborn);
+      }
       const worktrees: WorktreeInfo[] = [];
       for (const branch of branches) {
         if (!branch) continue;
@@ -385,7 +394,18 @@ export class NodeGitService implements IGitService {
     }
   }
 
+  /** Checks out `branch` as a worktree; a failure is logged with git's message, then thrown. */
   async checkoutWorktree(repoName: string, branch: string): Promise<WorktreeInfo> {
+    try {
+      return await this._checkoutWorktree(repoName, branch);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log.error(`could not check out '${branch}' of ${repoName} as a worktree: ${msg}`);
+      throw err;
+    }
+  }
+
+  private async _checkoutWorktree(repoName: string, branch: string): Promise<WorktreeInfo> {
     this._ensureDir();
     const repoDir = this._repoDir(repoName);
     const dirName = branch.replace(/\//g, "--");
@@ -471,6 +491,12 @@ export class NodeGitService implements IGitService {
         await this._execGit(["branch", branch], repoName);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
+        // A repository with no commits yet (a new, empty repo) has nothing to
+        // branch from: the branch starts unborn in its own worktree.
+        if (/not a valid object name/i.test(msg)) {
+          await this._addUnbornWorktree(repoName, branch, dirName);
+          return { branch, path: worktreePath, exists: true };
+        }
         if (!/already exists/i.test(msg)) throw err;
       }
       await addWt();
@@ -485,6 +511,25 @@ export class NodeGitService implements IGitService {
         fs.existsSync(worktreePath)
       ) {
         return { branch, path: worktreePath, exists: true };
+      }
+      throw err;
+    }
+  }
+
+  /** `git worktree add --orphan` (Git 2.42+): a worktree on a branch with no commits. */
+  private async _addUnbornWorktree(
+    repoName: string,
+    branch: string,
+    dirName: string,
+  ): Promise<void> {
+    try {
+      await this._execGit(["worktree", "add", "--orphan", "-b", branch, dirName], repoName);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/unknown option/i.test(msg)) {
+        throw new Error(
+          `${repoName} has no commits yet; adding a worktree to it needs Git 2.42 or newer (${msg})`,
+        );
       }
       throw err;
     }

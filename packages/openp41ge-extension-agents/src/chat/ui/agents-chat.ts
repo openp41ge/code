@@ -2611,6 +2611,9 @@ class AgentsChat extends LitElement {
         .chat-settings .cs-list {
           border: 1px solid var(--border-color, #2a2a2a);
         }
+        /* The app turns text selection off; the transcript turns it back on,
+           so messages, reasoning, tool output and code blocks can be selected
+           and copied. Its controls stay unselectable, with their own cursor. */
         .chat-messages {
           position: absolute;
           inset: 0;
@@ -2620,6 +2623,16 @@ class AgentsChat extends LitElement {
           display: flex;
           flex-direction: column;
           gap: 8px;
+          user-select: text;
+          -webkit-user-select: text;
+          cursor: text;
+        }
+        .chat-messages :is(button, summary, .code-block-toolbar, [class^="os-"]) {
+          user-select: none;
+          -webkit-user-select: none;
+        }
+        .chat-messages .code-block-toolbar {
+          cursor: default;
         }
         .chat-message {
           word-wrap: break-word;
