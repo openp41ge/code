@@ -10,6 +10,11 @@
  * chat data shape.
  */
 
+/** A reasoning-effort level's value, from the model's `thinking` map: a
+ *  string is sent as the request's `reasoning_effort`; an object's fields are
+ *  added to the request as written (e.g. `chat_template_kwargs`). */
+export type ThinkingValue = string | Record<string, unknown>;
+
 /** Status of a single tool call. */
 export type ToolCallStatus = "running" | "done" | "error";
 

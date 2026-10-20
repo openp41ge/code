@@ -29,6 +29,7 @@ import type {
   ChatTranscriptPage,
   ChatTranscriptSearch,
   ChatUsagePayload,
+  ThinkingValue,
   TokenUsage,
   ToolCall,
 } from "../chat/types.js";
@@ -46,6 +47,8 @@ export interface ChatPaneHost {
   readonly log: { error(...args: unknown[]): void };
   /** Open an error's log entry (`SurfaceHost.openLog`). */
   openLog(errorId: string): void;
+  /** Pin the chat's tab (`SurfaceHost.pin`). */
+  pin(): void;
 }
 
 /** The `<agents-chat>` methods the pane drives. */
@@ -93,6 +96,8 @@ export class ChatPane {
   private _offs: Array<() => void> = [];
   /** The composer's enabled tools (null until the tool list is known). */
   private _activeTools: string[] | null = null;
+  /** The tab was pinned (the first time the user worked in the chat). */
+  private _pinned = false;
   private _providerId = "";
 
   constructor(
@@ -163,7 +168,7 @@ export class ChatPane {
     if (this.chatId) void this._call("close", { id: this.chatId });
   }
 
-  send(text: string, thinkingLevel?: string): void {
+  send(text: string, thinkingLevel?: ThinkingValue): void {
     if (!text) return;
     void this._call("send", {
       id: this.chatId,
@@ -181,6 +186,13 @@ export class ChatPane {
   /** Open an error's log entry in a Logs tab (an error block's link). */
   openLog(errorId: string): void {
     this._host.openLog(errorId);
+  }
+
+  /** The user is working in the chat: pin its tab, once. */
+  engaged(): void {
+    if (this._pinned) return;
+    this._pinned = true;
+    this._host.pin();
   }
 
   toolsChanged(tools: string[]): void {

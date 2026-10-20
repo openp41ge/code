@@ -18,22 +18,36 @@ import type {
   ProviderDelta,
 } from "./chat-provider.js";
 import type { ToolDefinition } from "./tool.js";
-import type { ChatMessage } from "../chat/types.js";
+import type { ChatMessage, ThinkingValue } from "../chat/types.js";
 import { describeFetchError } from "./fetch-error.js";
 import { logFor } from "./log.js";
 
 const log = logFor("vllm-chat-provider");
 
-/** Resolve the composer's thinking level to the provider's reasoning_effort
- *  value. The value configured in the model's `thinking` map is passed through
- *  verbatim — the user defines the levels the provider understands in config.
- *  Only values that mean "off" (null, empty, "off", "none", "0") omit the
- *  field so the model applies its default behaviour. */
-function resolveReasoningEffort(level?: string | null): string | undefined {
-  if (level === undefined || level === null) return undefined;
+/** The request fields a thinking level never replaces. */
+const OWN_FIELDS = new Set([
+  "model",
+  "messages",
+  "stream",
+  "stream_options",
+  "tools",
+  "tool_choice",
+]);
+
+/** The request fields for the composer's thinking level, from the model's
+ *  `thinking` map — the user defines the levels the provider understands in
+ *  config. A string is sent verbatim as `reasoning_effort`; values that mean
+ *  "off" (null, empty, "off", "none", "0") send nothing, so the model applies
+ *  its default behaviour. An object's fields are sent as written (e.g.
+ *  `chat_template_kwargs`), except the request's own. */
+function thinkingFields(level?: ThinkingValue | null): Record<string, unknown> {
+  if (level === undefined || level === null) return {};
+  if (typeof level === "object") {
+    return Object.fromEntries(Object.entries(level).filter(([k]) => !OWN_FIELDS.has(k)));
+  }
   const t = level.trim();
-  if (t === "" || /^(off|none|0)$/i.test(t)) return undefined;
-  return t;
+  if (t === "" || /^(off|none|0)$/i.test(t)) return {};
+  return { reasoning_effort: t };
 }
 
 /** Convert our chat messages to the OpenAI chat-completions wire format. An
@@ -127,11 +141,9 @@ export class VllmChatProvider implements ChatProvider {
       body.tools = toOpenAITools(req.tools);
       body.tool_choice = "auto";
     }
-    // Pass the composer's thinking level straight through as the provider's
-    // reasoning_effort value (verbatim from config). Off/empty values leave
-    // the setting absent so the model applies its default behaviour.
-    const effort = resolveReasoningEffort(req.thinking);
-    if (effort) body.reasoning_effort = effort;
+    // The composer's thinking level, as configured: reasoning_effort, or the
+    // level's own request fields.
+    Object.assign(body, thinkingFields(req.thinking));
 
     // Log the request so a failure that follows has the context of the call
     // that produced it (model, prompt size, tool count).

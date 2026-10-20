@@ -102,9 +102,10 @@ export function addTabToCell(
 
 /** App types whose `config.filePath` is a real identity: a file, a log stream
  *  (`log:<system>`), a settings editor (`config:<id>`), a release
- *  (`release:<tag>`). Other apps reuse the slot for non-unique data (e.g. git
- *  tabs store the repo name for every worktree tab), so the no-duplicate rule
- *  applies to these only. */
+ *  (`release:<tag>`) — and every extension tab (`ext:…`), whose `filePath` is
+ *  the key it was opened with (`OpenTabRequest.key`). Other apps reuse the
+ *  slot for non-unique data (e.g. git tabs store the repo name for every
+ *  worktree tab), so the no-duplicate rule applies to these only. */
 const FILE_APP_TYPES: ReadonlySet<string> = new Set([
   "file-viewer",
   "log-viewer",
@@ -125,7 +126,7 @@ export function findFileTabInCell(
   filePath: string,
   excludeTabId?: string,
 ): TabId | null {
-  if (!FILE_APP_TYPES.has(appType)) return null;
+  if (!FILE_APP_TYPES.has(appType) && !appType.startsWith("ext:")) return null;
   const win = workspace.windows.find((w) => w.id === windowId);
   const placement = win?.grid.placements.find(
     (p) => p.position.row === 0 && p.position.col === col,

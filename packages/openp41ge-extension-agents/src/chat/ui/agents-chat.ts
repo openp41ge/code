@@ -14,6 +14,8 @@
  *   - `chat:add-content` — user clicked the “+ / add content” button.
  *   - `chat:open-log` detail `{ errorId }` — user clicked an error block's
  *     "View log" link.
+ *   - `chat:engage` — user is working in the chat: typed in the composer or
+ *     picked something in the settings (the tab pins itself).
  */
 
 import { LitElement, html, nothing, type TemplateResult, type PropertyValues } from "lit";
@@ -29,6 +31,7 @@ import type {
   ChatTranscriptPage,
   ChatTranscriptSearch,
   MessageSegment,
+  ThinkingValue,
   TokenUsage,
   ToolCall,
 } from "../types.js";
@@ -85,18 +88,18 @@ interface ComposerProvider {
   baseUrl?: string;
 }
 
-/** A selectable model shown in the composer's model dropdown. */
+/** A selectable model shown in the chat settings' Model section. */
 interface ComposerModel {
   id: string;
   /** Thinking config (key/value pairs) if the model declares one. */
-  thinking?: Record<string, string | null>;
+  thinking?: Record<string, ThinkingValue | null>;
   /** Context window size in tokens (optional). */
   contextWindow?: number;
   /** Max output tokens (optional). */
   maxTokens?: number;
 }
 
-/** A selectable tool shown in the composer's multi-select dropdown. */
+/** A selectable tool shown in the chat settings' Tools section. */
 interface ComposerTool {
   name: string;
   /** Optional one-line summary shown beneath the name. */
@@ -106,6 +109,12 @@ interface ComposerTool {
 /** The thinking-level options come from the active model's configured thinking
  *  entries (key/value pairs in the Agent settings). No entries → no selector
  *  and nothing is sent, so there is no fixed level set here. */
+
+/** A thinking level's value as its settings row shows it: an object of
+ *  request fields as compact JSON. */
+function thinkingText(value: ThinkingValue): string {
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
 
 /** Format a token count for display (e.g. 128000 → "128k", 1000000 → "1M"). */
 function formatTokens(n?: number): string {
@@ -281,8 +290,9 @@ class AgentsChat extends LitElement {
   @state() private _activeTools: string[] = [];
   /** The selected thinking entry's key (null → use the first available entry). */
   @state() private _thinkingKey: string | null = null;
-  /** Which custom dropdown (provider, model, thinking or tools) is open, or null. */
-  @state() private _menuOpen: "provider" | "model" | "thinking" | "tools" | null = null;
+  /** The chat settings (provider, model, reasoning effort, tools) are open
+   *  over the transcript (⋯ in the composer's bar). */
+  @state() private _settingsOpen = false;
   private _docListenerAttached = false;
   private _composerResizeObserver: ResizeObserver | null = null;
   private _chatScrollbar: OverlayScrollbar | null = null;
@@ -1082,12 +1092,10 @@ class AgentsChat extends LitElement {
     const composer = this.renderRoot?.querySelector(".composer") as HTMLElement | null;
     // Use the composed path instead of e.target: events crossing the shadow
     // boundary have their target retargeted to the host element, which would
-    // make `.contains(host)` fail even for clicks inside the composer (e.g.
-    // toggling a tool in the multi-select). `composedPath()` preserves the
-    // inner nodes, so clicks inside the composer (including its menus) are
-    // correctly treated as "inside" and never close the dropdown.
+    // make `.contains(host)` fail even for clicks inside the composer.
+    // `composedPath()` preserves the inner nodes, so clicks inside the
+    // composer are correctly treated as "inside".
     if (!composer || !e.composedPath().includes(composer)) {
-      if (this._menuOpen) this._menuOpen = null;
       if (this._composerFocused) {
         this._composerFocused = false;
         this._renderComposerContent();
@@ -1178,7 +1186,7 @@ class AgentsChat extends LitElement {
     this.requestUpdate();
   }
 
-  /** The provider list actually shown in the dropdown (keeps the active
+  /** The provider list actually shown in the settings (keeps the active
    *  provider valid even when it isn't in the configured table). */
   private _effectiveProviders(): ComposerProvider[] {
     const providers = [...this._providers];
@@ -1198,7 +1206,7 @@ class AgentsChat extends LitElement {
     return this._providerId || "Default provider";
   }
 
-  /** The second row shown under each provider in the dropdown: the base URL,
+  /** The second row shown under each provider in the settings: the base URL,
    *  plus the model count when the provider exposes its model list. */
   private _providerSub(p: ComposerProvider): string {
     const bits: string[] = [];
@@ -1274,22 +1282,27 @@ class AgentsChat extends LitElement {
     return bits.join(" · ");
   }
 
-  /** Toggle the given composer dropdown (provider, model, thinking or tools). */
-  private _toggleMenu(menu: "provider" | "model" | "thinking" | "tools"): void {
-    this._menuOpen = this._menuOpen === menu ? null : menu;
-    if (this._menuOpen) {
-      // Opening the dropdown moves focus onto the selector button. Drop the
-      // composer caret so typing doesn't go to a dead text-area and the caret
-      // doesn't blink behind the list.
-      this._composerFocused = false;
-      this._inputEl?.blur();
-      this._renderComposerContent();
-    } else {
-      this._focusComposer();
-    }
+  /** Open or close the chat settings over the transcript. The transcript
+   *  stays rendered underneath (a reply keeps streaming). */
+  private _toggleSettings(): void {
+    this._settingsOpen = !this._settingsOpen;
+    if (!this._settingsOpen) this._focusComposer();
+  }
+
+  private _onSettingsKeydown = (e: KeyboardEvent): void => {
+    if (e.key !== "Escape") return;
+    e.preventDefault();
+    e.stopPropagation();
+    this._toggleSettings();
+  };
+
+  /** The user is working in the chat (typing, a settings pick). */
+  private _engage(): void {
+    this.dispatchEvent(new CustomEvent("chat:engage", { bubbles: true, composed: true }));
   }
 
   private _selectProvider(id: string): void {
+    this._engage();
     if (id !== this._providerId) {
       this._providerId = id;
       // Reset the model to the provider's configured default when switching.
@@ -1304,11 +1317,11 @@ class AgentsChat extends LitElement {
         }),
       );
     }
-    // Keep the menu open (like the tools multi-select) so the user can compare
-    // options; it closes only when clicking outside the composer.
+    // The settings stay open so the user can compare options.
   }
 
   private _selectModel(model: string): void {
+    this._engage();
     if (model !== this._modelId) {
       this._modelId = model;
       this.dispatchEvent(
@@ -1319,12 +1332,11 @@ class AgentsChat extends LitElement {
         }),
       );
     }
-    // Keep the menu open (like the tools multi-select) so the user can compare
-    // options; it closes only when clicking outside the composer.
+    // The settings stay open so the user can compare options.
   }
 
   /** The thinking entry options for the active model ([] when none configured). */
-  private _thinkingOptions(): Array<{ key: string; value: string | null }> {
+  private _thinkingOptions(): Array<{ key: string; value: ThinkingValue | null }> {
     const model = this._effectiveModels().find((m) => m.id === this._currentModelId());
     const thinking = model?.thinking;
     if (!thinking) return [];
@@ -1332,7 +1344,7 @@ class AgentsChat extends LitElement {
   }
 
   /** The currently selected thinking entry, or null when the model has none. */
-  private _currentThinking(): { key: string; value: string | null } | null {
+  private _currentThinking(): { key: string; value: ThinkingValue | null } | null {
     const options = this._thinkingOptions();
     if (options.length === 0) return null;
     const selected =
@@ -1345,9 +1357,9 @@ class AgentsChat extends LitElement {
     return this._currentThinking()?.key ?? "";
   }
 
-  /** Select a thinking entry by its key. Keeps the menu open (like the tools
-   *  multi-select) so the user can compare options; closes on outside click. */
+  /** Select a thinking entry by its key (the settings stay open). */
   private _selectThinking(key: string): void {
+    this._engage();
     if (key !== this._thinkingKey) {
       this._thinkingKey = key;
       this.dispatchEvent(
@@ -1364,14 +1376,15 @@ class AgentsChat extends LitElement {
     this.dispatchEvent(new CustomEvent("chat:add-content", { bubbles: true, composed: true }));
   }
 
-  /** The tool list shown in the tools dropdown (the selectable universe). */
+  /** The tool list shown in the settings' Tools section (the selectable universe). */
   private _effectiveTools(): ComposerTool[] {
     if (this._availableTools.length) return this._availableTools;
     return this._activeTools.map((name) => ({ name }));
   }
 
-  /** Toggle a single tool on/off in the multi-select (keeps the menu open). */
+  /** Toggle a single tool on/off (the settings stay open). */
   private _toggleTool(name: string): void {
+    this._engage();
     const tools = this._activeTools.includes(name)
       ? this._activeTools.filter((t) => t !== name)
       : [...this._activeTools, name];
@@ -1413,6 +1426,7 @@ class AgentsChat extends LitElement {
     this._caretHint = 0;
     this._renderComposerContent();
     this._updateComposerState();
+    this._engage();
   }
 
   /** Mirror the text-area's own selection (keyboard: arrows, shift, cmd+a). */
@@ -2243,7 +2257,6 @@ class AgentsChat extends LitElement {
     this._updateComposerState();
     this._ensureComposerObserver();
     this._syncComposerInputWidth();
-    this._syncProviderMenuHeight();
     this._syncCodeBlockScrollbars();
     // Re-run the in-chat find against the fresh DOM only when the messages
     // themselves changed (a streaming/render pass wipes the injected <mark>s).
@@ -2314,24 +2327,6 @@ class AgentsChat extends LitElement {
   private _destroyCodeBlockScrollbars(): void {
     for (const [, sb] of this._codeScrollbars) sb.destroy();
     this._codeScrollbars.clear();
-  }
-
-  /** When a provider/model dropdown is open, size the text area so the composer
-   *  can grow to reveal the whole list (pushing the top border up when the text
-   *  is short). The list is positioned over the text area, so its measured
-   *  height becomes the content's minimum height; if the text is already taller
-   *  the list simply covers the top of it, aligned to the top. */
-  private _syncProviderMenuHeight(): void {
-    const content = this._contentEl;
-    if (!content) return;
-    if (!this._menuOpen) {
-      content.style.minHeight = "";
-      return;
-    }
-    const menu = this.renderRoot.querySelector<HTMLElement>(".composer-provider-menu");
-    if (menu) {
-      content.style.minHeight = `${menu.getBoundingClientRect().height}px`;
-    }
   }
 
   // ─── Rendering ──────────────────────────────────────────────────────
@@ -2562,6 +2557,60 @@ class AgentsChat extends LitElement {
           position: relative;
           overflow: hidden;
         }
+        /* The chat settings cover the transcript (above its floating
+           scrollbar); the transcript stays rendered underneath. */
+        .chat-settings {
+          position: absolute;
+          inset: 0;
+          z-index: 30;
+          overflow-y: auto;
+          box-sizing: border-box;
+          padding: 12px;
+          background: var(--bg-primary, #1e1e1e);
+          outline: none;
+        }
+        .chat-settings .cs-head {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 8px;
+        }
+        .chat-settings .cs-title {
+          font-size: 13px;
+          color: var(--text-primary, #d4d4d4);
+        }
+        .chat-settings .cs-close {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 24px;
+          height: 24px;
+          border: none;
+          border-radius: 4px;
+          background: transparent;
+          color: var(--text-secondary, #aaa);
+          cursor: pointer;
+        }
+        .chat-settings .cs-close:hover {
+          background: var(--bg-hover, #2a2d2e);
+          color: #fff;
+        }
+        .chat-settings .cs-section {
+          margin-top: 16px;
+        }
+        /* Section headings in the face of the USER / AGENT labels. */
+        .chat-settings .cs-heading {
+          margin: 0 0 6px;
+          font-family: var(--font-mono, "JetBrains Mono", monospace);
+          font-size: 11px;
+          font-weight: normal;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          color: var(--muted-color, #8b93a1);
+        }
+        .chat-settings .cs-list {
+          border: 1px solid var(--border-color, #2a2a2a);
+        }
         .chat-messages {
           position: absolute;
           inset: 0;
@@ -2597,8 +2646,11 @@ class AgentsChat extends LitElement {
           border-radius: 0;
           white-space: normal;
         }
+        /* The first message, when it is the user's, starts at the top edge
+           (the negative margin undoes the list's top padding), as the block
+           already runs to the side edges. */
         .chat-message.user:first-child {
-          margin-top: 0;
+          margin-top: -12px;
         }
         /* The USER / AGENT label at the top of a message, in the monospace
            face (the message text is the UI face). */
@@ -3141,30 +3193,12 @@ class AgentsChat extends LitElement {
              identical to body text and the highlight stays one uniform height. */
           padding: 0 3px;
         }
-        /* When the provider dropdown is open and the typed text is short, grow
-           the composer so the list is fully revealed (the top border is pushed
-           up). If the text already has many lines, the list simply covers the
-           top of it, aligned to the top. The min-height is set imperatively to
-           the measured menu height from updated().
-        */
-        .composer-provider-menu {
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          z-index: 10;
-          max-height: 200px;
-          overflow-y: auto;
-          box-sizing: border-box;
-          background: var(--bg-primary, #1e1e1e);
-          border-bottom: 1px solid var(--border-color, #2a2a2a);
-        }
-        .composer-provider-menu .provider-item {
+        .cs-list .provider-item {
           display: flex;
           align-items: flex-start;
           gap: 6px;
           width: 100%;
-          padding: 2px 10px;
+          padding: 8px 10px;
           border: none;
           background: transparent;
           color: var(--text-primary, #d4d4d4);
@@ -3176,19 +3210,19 @@ class AgentsChat extends LitElement {
           overflow: hidden;
           text-overflow: ellipsis;
         }
-        .composer-provider-menu .provider-item:hover {
+        .cs-list .provider-item:hover {
           background: var(--bg-hover, #2a2d2e);
           color: #fff;
         }
-        .composer-provider-menu .provider-item:first-child {
+        .cs-list .provider-item:first-child {
           margin-top: 0;
         }
-        .composer-provider-menu .provider-item:last-child {
+        .cs-list .provider-item:last-child {
           margin-bottom: 0;
         }
         /* Two-row layout: provider name on the first row, base URL + model
            count on the second. */
-        .composer-provider-menu .row-check {
+        .cs-list .row-check {
           flex: 0 0 auto;
           width: 16px;
           /* Height = the name line, so the icon sits centered in the first
@@ -3198,25 +3232,25 @@ class AgentsChat extends LitElement {
           align-items: center;
           justify-content: center;
         }
-        .composer-provider-menu .row-check svg,
-        .composer-tools-menu .tool-check svg {
+        .cs-list .row-check svg,
+        .cs-list .tool-check svg {
           width: 14px;
           height: 14px;
           flex: 0 0 auto;
         }
-        .composer-provider-menu .provider-item .row-body {
+        .cs-list .provider-item .row-body {
           display: flex;
           flex-direction: column;
           min-width: 0;
         }
-        .composer-provider-menu .provider-item .row-name {
+        .cs-list .provider-item .row-name {
           font-size: 11px;
           line-height: 18px;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
         }
-        .composer-provider-menu .provider-item .row-sub {
+        .cs-list .provider-item .row-sub {
           font-size: 10px;
           line-height: 14px;
           color: var(--text-secondary, #999);
@@ -3270,7 +3304,6 @@ class AgentsChat extends LitElement {
           display: flex;
           align-items: center;
           gap: 4px;
-          padding: 0 8px 0 0;
           font-size: 11.5px;
           font-weight: 500;
           color: var(--text-secondary, #9a9a9a);
@@ -3284,43 +3317,28 @@ class AgentsChat extends LitElement {
           }
         }
 
-        .composer-select {
-          flex: 0 0 auto;
-          display: inline-flex;
-          align-items: center;
-          gap: 4px;
-          max-width: 180px;
-          width: auto;
-          height: 26px;
-          background: transparent;
-          color: var(--text-secondary, #aaa);
-          border: none;
-          border-radius: 4px;
-          font-size: 11px;
-          padding: 0 6px;
-          outline: none;
-          cursor: pointer;
+        /* The provider and model in use: shown, not a control (⋯ changes
+           them); hovered like the token counts beside it, its tooltip names
+           the reasoning effort and tools. */
+        .composer-model-label {
+          flex: 0 1 auto;
+          min-width: 0;
+          max-width: 260px;
+          padding: 2px 6px;
+          border-radius: 6px;
+          font-size: 11.5px;
+          font-weight: 500;
+          line-height: 18px;
+          color: var(--text-secondary, #9a9a9a);
           white-space: nowrap;
-        }
-        .composer-select:hover {
-          background: var(--bg-hover, #2a2d2e);
-          color: #fff;
-        }
-        .composer-select-label {
           overflow: hidden;
           text-overflow: ellipsis;
+          cursor: not-allowed;
+          user-select: none;
         }
-        .composer-select.composer-model-select {
-          color: var(--text-secondary, #aaa);
-        }
-        .composer-select.composer-model-select:hover {
-          color: #fff;
-        }
-        .composer-select.composer-thinking-select {
-          color: var(--text-secondary, #aaa);
-        }
-        .composer-select.composer-thinking-select:hover {
-          color: #fff;
+        .composer-model-label:hover {
+          background: var(--bg-hover, #2a2d2e);
+          color: var(--text-primary, #ddd);
         }
         .composer-tool {
           flex: 0 0 auto;
@@ -3421,7 +3439,7 @@ class AgentsChat extends LitElement {
           line-height: 20px;
           font-family: inherit;
         }
-        .composer-tools-menu .tool-item {
+        .cs-list .tool-item {
           display: flex;
           align-items: flex-start;
           gap: 6px;
@@ -3429,17 +3447,17 @@ class AgentsChat extends LitElement {
         /* Enabled tools are indicated by the checkmark, not a persistent row
            background — otherwise every checked row stays highlighted and you
            can't tell which one the pointer is over. */
-        .composer-provider-menu .tool-item.active {
+        .cs-list .tool-item.active {
           background: transparent;
           color: var(--text-primary, #d4d4d4);
         }
         /* A clear, distinct hover highlight so you always know which row the
            pointer is on. Declared after the .active override so it wins. */
-        .composer-provider-menu .tool-item:hover {
+        .cs-list .tool-item:hover {
           background: var(--bg-hover, #2a2d2e);
           color: #fff;
         }
-        .composer-tools-menu .tool-check {
+        .cs-list .tool-check {
           flex: 0 0 auto;
           width: 16px;
           /* Height = the name line, so the icon sits centered in the first
@@ -3449,12 +3467,12 @@ class AgentsChat extends LitElement {
           align-items: center;
           justify-content: center;
         }
-        .composer-tools-menu .tool-body {
+        .cs-list .tool-body {
           display: flex;
           flex-direction: column;
           min-width: 0;
         }
-        .composer-tools-menu .tool-name {
+        .cs-list .tool-name {
           font-size: 11px;
           line-height: 18px;
           color: inherit;
@@ -3462,7 +3480,7 @@ class AgentsChat extends LitElement {
           overflow: hidden;
           text-overflow: ellipsis;
         }
-        .composer-tools-menu .tool-desc {
+        .cs-list .tool-desc {
           font-size: 10px;
           line-height: 14px;
           color: var(--text-secondary, #999);
@@ -3492,9 +3510,10 @@ class AgentsChat extends LitElement {
           ${this._messages.map((msg, i) => this._renderMessage(msg, i))}
           ${this._waitingForReply() ? this._renderThinking() : html``}
         </div>
+        ${this._settingsOpen ? this._renderSettings() : html``}
       </div>
 
-      <div class="composer ${this._menuOpen ? "menu-open" : ""}">
+      <div class="composer">
         <div
           class="composer-content"
           @mousedown=${this._onContentMouseDown}
@@ -3504,143 +3523,40 @@ class AgentsChat extends LitElement {
           @pointercancel=${this._onContentPointerUp}
           @dblclick=${this._onContentDoubleClick}
         ></div>
-        ${
-          this._menuOpen === "provider"
-            ? html`<div class="composer-provider-menu" role="listbox">
-                ${this._effectiveProviders().map((p) => {
-                  const active = p.id === this._providerId;
-                  return html`<button
-                    class="provider-item ${active ? "active" : ""}"
-                    role="option"
-                    aria-selected="${active}"
-                    @click=${() => this._selectProvider(p.id)}
-                  >
-                    <span class="row-check">${this._radioIcon(active)}</span
-                    ><span class="row-body">
-                      <span class="row-name">${p.label}</span>
-                      <span class="row-sub">${this._providerSub(p)}</span>
-                    </span>
-                  </button>`;
-                })}
-              </div>`
-            : ""
-        }
-        ${
-          this._menuOpen === "model"
-            ? html`<div class="composer-provider-menu" role="listbox">
-                ${this._effectiveModels().map((m) => {
-                  const active = m.id === this._currentModelId();
-                  return html`<button
-                    class="provider-item ${active ? "active" : ""}"
-                    role="option"
-                    aria-selected="${active}"
-                    @click=${() => this._selectModel(m.id)}
-                  >
-                    <span class="row-check">${this._radioIcon(active)}</span
-                    ><span class="row-body">
-                      <span class="row-name">${m.id || "Default model"}</span>
-                      <span class="row-sub">${this._modelSub(m)}</span>
-                    </span>
-                  </button>`;
-                })}
-              </div>`
-            : ""
-        }
-        ${
-          this._menuOpen === "thinking" && this._thinkingOptions().length > 0
-            ? html`<div class="composer-provider-menu" role="listbox">
-                ${this._thinkingOptions().map((option) => {
-                  const active = option.key === this._currentThinking()?.key;
-                  return html`<button
-                    class="provider-item ${active ? "active" : ""}"
-                    role="option"
-                    aria-selected="${active}"
-                    @click=${() => this._selectThinking(option.key)}
-                  >
-                    <span class="row-check">${this._radioIcon(active)}</span
-                    ><span class="row-body"
-                      ><span class="row-name">${option.key}</span
-                      >${option.value ? html`<span class="row-sub">${option.value}</span>` : ""}</span
-                    >
-                  </button>`;
-                })}
-              </div>`
-            : ""
-        }
-        ${
-          this._menuOpen === "tools"
-            ? html`<div
-                class="composer-provider-menu composer-tools-menu"
-                role="listbox"
-                aria-multiselectable="true"
-              >
-                ${this._effectiveTools().map((t) => {
-                  const active = this._activeTools.includes(t.name);
-                  return html`<button
-                    class="provider-item tool-item ${active ? "active" : ""}"
-                    role="option"
-                    aria-selected="${active}"
-                    @click=${() => this._toggleTool(t.name)}
-                  >
-                    <span class="tool-check">${this._checkboxIcon(active)}</span
-                    ><span class="tool-body"
-                      ><span class="tool-name">${t.name}</span
-                      >${t.description ? html`<span class="tool-desc">${t.description}</span>` : ""}</span
-                    >
-                  </button>`;
-                })}
-              </div>`
-            : ""
-        }
         <div class="composer-toolbar">
+          ${
+            this._usage
+              ? html`<div class="composer-tokenrow">${this._formatUsage(this._usage)}</div>`
+              : html``
+          }
+          <span
+            class="composer-model-label"
+            ${tooltipContent({
+              type: "detail",
+              title: this._modelInUse(),
+              subtitle: this._settingsSummary(),
+            })}
+            >${this._modelInUse()}</span
+          >
           <button
-            class="composer-tool"
+            class="composer-tool composer-add"
             ${tooltipContent({ type: "simple", text: "Add files or content" })}
             @click=${() => this._onAddContent()}
           >
             ＋
           </button>
           <button
-            class="composer-select"
-            ${tooltipContent({ type: "simple", text: "Provider" })}
-            @click=${() => this._toggleMenu("provider")}
-          >
-            <span class="composer-select-label">${this._currentProviderLabel()}</span>
-          </button>
-          <button
-            class="composer-select composer-model-select"
-            ${tooltipContent({ type: "simple", text: "Model" })}
-            @click=${() => this._toggleMenu("model")}
-          >
-            <span class="composer-select-label">${this._currentModelLabel()}</span>
-          </button>
-          ${
-            this._thinkingOptions().length > 0
-              ? html`<button
-                  class="composer-select composer-thinking-select"
-                  ${tooltipContent({ type: "simple", text: "Thinking level" })}
-                  @click=${() => this._toggleMenu("thinking")}
-                >
-                  <span class="composer-select-label">${this._currentThinkingLabel()}</span>
-                </button>`
-              : ""
-          }
-          <button
-            class="composer-tool ${this._menuOpen === "tools" ? "active" : ""}"
-            ${tooltipContent({ type: "simple", text: "Active tools" })}
-            @click=${() => this._toggleMenu("tools")}
+            class="composer-tool composer-more ${this._settingsOpen ? "active" : ""}"
+            aria-expanded=${this._settingsOpen ? "true" : "false"}
+            ${tooltipContent({ type: "simple", text: "Chat settings" })}
+            @click=${() => this._toggleSettings()}
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" fill="currentColor">
               <path
-                d="M756-120 537-339l84-84 219 219-84 84Zm-552 0-84-84 276-276-68-68-28 28-51-51v82l-28 28-121-121 28-28h82l-50-50 142-142q20-20 43-29t47-9q24 0 47 9t43 29l-92 92 50 50-28 28 68 68 90-90q-4-11-6.5-23t-2.5-24q0-59 40.5-99.5T701-841q15 0 28.5 3t27.5 9l-99 99 72 72 99-99q7 14 9.5 27.5T841-701q0 59-40.5 99.5T701-561q-12 0-24-2t-23-7L204-120Z"
+                d="M240-400q-33 0-56.5-23.5T160-480q0-33 23.5-56.5T240-560q33 0 56.5 23.5T320-480q0 33-23.5 56.5T240-400Zm240 0q-33 0-56.5-23.5T400-480q0-33 23.5-56.5T480-560q33 0 56.5 23.5T560-480q0 33-23.5 56.5T480-400Zm240 0q-33 0-56.5-23.5T640-480q0-33 23.5-56.5T720-560q33 0 56.5 23.5T800-480q0 33-23.5 56.5T720-400Z"
               />
             </svg>
           </button>
-          ${
-            this._usage
-              ? html`<div class="composer-tokenrow">${this._formatUsage(this._usage)}</div>`
-              : html``
-          }
           <span class="composer-spacer"></span>
           ${
             this._streaming
@@ -3825,6 +3741,134 @@ class AgentsChat extends LitElement {
           <div class="msg-content" @click=${this._onMsgContentClick}>${segs}</div>
         </div>
       </details>
+    </div>`;
+  }
+
+  /** The bar's label: the provider, then the model (`vLLM / model`). */
+  private _modelInUse(): string {
+    return `${this._currentProviderLabel()} / ${this._currentModelLabel()}`;
+  }
+
+  /** The model label's tooltip: the reasoning effort and tools. */
+  private _settingsSummary(): string {
+    const bits: string[] = [];
+    const thinking = this._currentThinkingLabel();
+    if (thinking) bits.push(`Reasoning effort: ${thinking}`);
+    const tools = this._effectiveTools();
+    if (tools.length > 0) {
+      const on = tools.filter((t) => this._activeTools.includes(t.name)).length;
+      bits.push(`${on} of ${tools.length} tools`);
+    }
+    return `${bits.length ? `${bits.join(" · ")}. ` : ""}Change them with ⋯.`;
+  }
+
+  /** The chat settings, over the transcript: one scrolling page of sections
+   *  (provider, model, reasoning effort when the model has entries, tools).
+   *  A pick applies at once and the page stays open; ⋯, the close button or
+   *  Escape closes it. */
+  private _renderSettings(): TemplateResult {
+    const thinking = this._thinkingOptions();
+    return html`<div
+      class="chat-settings"
+      role="dialog"
+      aria-label="Chat settings"
+      tabindex="-1"
+      @keydown=${this._onSettingsKeydown}
+    >
+      <div class="cs-head">
+        <span class="cs-title">Chat settings</span>
+        <button
+          class="cs-close"
+          ${tooltipContent({ type: "simple", text: "Close (Esc)" })}
+          @click=${() => this._toggleSettings()}
+        >
+          ${unsafeHTML(ICON_CHAT_CLOSE)}
+        </button>
+      </div>
+      <section class="cs-section">
+        <h3 class="cs-heading">Provider</h3>
+        <div class="cs-list" role="listbox">
+          ${this._effectiveProviders().map((p) => {
+            const active = p.id === this._providerId;
+            return html`<button
+              class="provider-item ${active ? "active" : ""}"
+              role="option"
+              aria-selected="${active}"
+              @click=${() => this._selectProvider(p.id)}
+            >
+              <span class="row-check">${this._radioIcon(active)}</span
+              ><span class="row-body">
+                <span class="row-name">${p.label}</span>
+                <span class="row-sub">${this._providerSub(p)}</span>
+              </span>
+            </button>`;
+          })}
+        </div>
+      </section>
+      <section class="cs-section">
+        <h3 class="cs-heading">Model</h3>
+        <div class="cs-list" role="listbox">
+          ${this._effectiveModels().map((m) => {
+            const active = m.id === this._currentModelId();
+            return html`<button
+              class="provider-item ${active ? "active" : ""}"
+              role="option"
+              aria-selected="${active}"
+              @click=${() => this._selectModel(m.id)}
+            >
+              <span class="row-check">${this._radioIcon(active)}</span
+              ><span class="row-body">
+                <span class="row-name">${m.id || "Default model"}</span>
+                <span class="row-sub">${this._modelSub(m)}</span>
+              </span>
+            </button>`;
+          })}
+        </div>
+      </section>
+      ${
+        thinking.length > 0
+          ? html`<section class="cs-section">
+              <h3 class="cs-heading">Reasoning effort</h3>
+              <div class="cs-list" role="listbox">
+                ${thinking.map((option) => {
+                  const active = option.key === this._currentThinking()?.key;
+                  return html`<button
+                    class="provider-item ${active ? "active" : ""}"
+                    role="option"
+                    aria-selected="${active}"
+                    @click=${() => this._selectThinking(option.key)}
+                  >
+                    <span class="row-check">${this._radioIcon(active)}</span
+                    ><span class="row-body"
+                      ><span class="row-name">${option.key}</span
+                      >${option.value ? html`<span class="row-sub">${thinkingText(option.value)}</span>` : ""}</span
+                    >
+                  </button>`;
+                })}
+              </div>
+            </section>`
+          : ""
+      }
+      <section class="cs-section">
+        <h3 class="cs-heading">Tools</h3>
+        <div class="cs-list" role="listbox" aria-multiselectable="true">
+          ${this._effectiveTools().map((t) => {
+            const active = this._activeTools.includes(t.name);
+            return html`<button
+              class="provider-item tool-item ${active ? "active" : ""}"
+              role="option"
+              aria-selected="${active}"
+              @click=${() => this._toggleTool(t.name)}
+            >
+              <span class="tool-check">${this._checkboxIcon(active)}</span
+              ><span class="tool-body"
+                ><span class="tool-name">${t.name}</span
+                >${t.description ? html`<span class="tool-desc">${t.description}</span>` : ""}</span
+              >
+            </button>`;
+          })}
+        </div>
+      </section>
     </div>`;
   }
 

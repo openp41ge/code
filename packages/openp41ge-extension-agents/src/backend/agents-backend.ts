@@ -28,7 +28,7 @@ import type {
   SearchOpenItem,
   SearchProvider,
 } from "openp41ge-sdk";
-import type { ChatSearchOptions } from "../chat/types.js";
+import type { ChatSearchOptions, ThinkingValue } from "../chat/types.js";
 import { AgentRuntime, type ConnectedRepository } from "./agent-runtime.js";
 import type { ChatProviderConfig } from "./chat-provider.js";
 import type { ChatProviderRegistry } from "./chat-provider-registry.js";
@@ -56,6 +56,15 @@ interface AgentsConfig {
 function str(payload: HandlerPayload, key: string): string | undefined {
   const value = payload[key];
   return typeof value === "string" ? value : undefined;
+}
+
+/** A thinking level from the composer: a string or a plain object. */
+function thinkingOf(payload: HandlerPayload): ThinkingValue | undefined {
+  const value = payload.thinkingLevel;
+  if (typeof value === "string") return value;
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
 }
 
 function chatId(payload: HandlerPayload): string {
@@ -188,7 +197,7 @@ export class AgentsBackend {
           str(p, "text") ?? "",
           str(p, "cwd"),
           tools,
-          str(p, "thinkingLevel"),
+          thinkingOf(p),
         );
       }),
       abort: command((p) => this._runtimeFor().abort(chatId(p))),

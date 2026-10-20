@@ -7,7 +7,7 @@
  * chat transcript.
  */
 
-import type { ChatMessage } from "../chat/types.js";
+import type { ChatMessage, ThinkingValue } from "../chat/types.js";
 import type { ToolDefinition } from "./tool.js";
 
 /** Provider connection config (the extension config's `providers`). */
@@ -47,8 +47,8 @@ export interface ChatStreamRequest {
   messages: ChatMessage[];
   tools?: ToolDefinition[];
   signal?: AbortSignal;
-  /** Reasoning-effort level selected in the composer ("Off"/"Low"/"Medium"/"High"). */
-  thinking?: string;
+  /** The value of the reasoning-effort level selected in the composer. */
+  thinking?: ThinkingValue;
 }
 
 /** A single provider implementation (registry/strategy based — Open/Closed). */

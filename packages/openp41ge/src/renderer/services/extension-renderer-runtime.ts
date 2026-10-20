@@ -56,6 +56,8 @@ export interface RendererSurfaceHostDeps {
   readonly openTab: (request: OpenTabRequest, from?: { readonly tabId: string }) => void;
   /** Open an error's log entry (`SurfaceHost.openLog`). Inert when absent. */
   readonly openLog?: (errorId: string) => void;
+  /** Pin the surface's grid tab (`SurfaceHost.pin`). Inert when absent. */
+  readonly pin?: () => void;
   /**
    * The extension's config (merged values, change notification, the editor).
    * Shared by every mount of the extension; each mount's subscriptions end
@@ -347,6 +349,9 @@ export function mountRendererSurface<S extends Record<string, unknown> = Record<
     },
     openLog(errorId) {
       deps.openLog?.(errorId);
+    },
+    pin() {
+      deps.pin?.();
     },
     config: {
       get: () => config.get(),

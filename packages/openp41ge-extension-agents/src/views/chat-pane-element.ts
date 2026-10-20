@@ -7,6 +7,7 @@
 import { html, type TemplateResult } from "lit";
 import { registerAgentsChat, type AgentsChat } from "../chat/ui/agents-chat.js";
 import { ChatPane, str, type ChatPaneHost } from "./chat-pane.js";
+import type { ThinkingValue } from "../chat/types.js";
 
 /** `<agents-chat-pane>`: an `<agents-chat>` run by a `ChatPane` while connected. */
 export class AgentsChatPane extends HTMLElement {
@@ -32,10 +33,11 @@ export class AgentsChatPane extends HTMLElement {
     this.replaceChildren(el);
     const pane = new ChatPane(this._host, el);
     el.addEventListener("chat:send", (e) => {
-      const detail = (e as CustomEvent<{ text?: string; thinkingLevel?: string }>).detail;
+      const detail = (e as CustomEvent<{ text?: string; thinkingLevel?: ThinkingValue }>).detail;
       pane.send(detail?.text ?? "", detail?.thinkingLevel);
     });
     el.addEventListener("chat:abort", () => pane.abort());
+    el.addEventListener("chat:engage", () => pane.engaged());
     el.addEventListener("chat:open-log", (e) => {
       const errorId = (e as CustomEvent<{ errorId?: string }>).detail?.errorId;
       if (errorId) pane.openLog(errorId);

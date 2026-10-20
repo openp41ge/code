@@ -370,7 +370,9 @@ persisted `errorId`, which `log.error(...)` returns (view and backend), and
 details open. Show a failure as a generic message linking to its log entry rather
 than putting the error text in the UI. The authoritative shape is `SurfaceHost` in the contract
 package (`registration.ts`), which also carries `surface`, `context`,
-`openTab`, `workspace` and `showContextMenu`.
+`openTab`, `pin` (a grid tab opened as a preview pins itself once the user
+works in it, as a file editor's does on its first edit), `workspace` and
+`showContextMenu`.
 
 ---
 

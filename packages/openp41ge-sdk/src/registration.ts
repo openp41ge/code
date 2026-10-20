@@ -192,6 +192,13 @@ export interface SurfaceHost<S = Readonly<Record<string, unknown>>> {
    * the entry with its details open.
    */
   openLog(errorId: string): void;
+  /**
+   * Pin this surface's tab: a grid tab opened as a preview stays when the
+   * next preview opens, as a file editor's does once edited. Call it when the
+   * user starts working in the surface. Inert for a pinned tab and for a
+   * sidebar surface.
+   */
+  pin(): void;
   /** The extension's config (its registered schema's defaults + the user's values). */
   readonly config: SurfaceConfigHost;
   /** Drag & drop: in-place drop receivers for this mount. */

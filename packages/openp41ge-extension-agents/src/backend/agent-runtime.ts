@@ -23,6 +23,7 @@ import type {
   ChatMessage,
   ChatRuntimeStatus,
   MessageSegment,
+  ThinkingValue,
   ToolCallStatus,
 } from "../chat/types.js";
 import type { AgentRuntimeHooks } from "./agent-runtime-hooks.js";
@@ -163,7 +164,7 @@ export class AgentRuntime {
     userText: string,
     cwd?: string,
     enabledTools?: string[],
-    thinkingLevel?: string,
+    thinkingLevel?: ThinkingValue,
   ): Promise<void> {
     const text = userText.trim();
     if (!text) return;
@@ -272,7 +273,7 @@ export class AgentRuntime {
     signal: AbortSignal,
     cwd?: string,
     enabledTools?: string[],
-    thinkingLevel?: string,
+    thinkingLevel?: ThinkingValue,
   ): Promise<void> {
     const addWorktree = this._config.addWorktree;
     const commands = this._config.commands;

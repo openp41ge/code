@@ -109,11 +109,12 @@ export const AGENTS_CONFIG_SCHEMA: ConfigSchema = {
                 thinking: {
                   type: "object",
                   title: "Thinking levels",
-                  // Values are sent verbatim as the provider's reasoning_effort;
-                  // `null` means off (field omitted).
-                  additionalProperties: { type: ["string", "null"] },
+                  // A string is sent verbatim as the provider's reasoning_effort
+                  // (`null` means off: field omitted); an object's fields are
+                  // added to the request.
+                  additionalProperties: { type: ["string", "null", "object"] },
                   description:
-                    "Each key is a level in the composer; its value is sent as the request's `reasoning_effort`, as is. An empty value (or `null`, `off`, `none`, `0`) turns thinking off for that level.",
+                    "Each key is a level in the composer. A text value is sent as the request's `reasoning_effort`, as is; an empty value (or `null`, `off`, `none`, `0`) sends nothing. An object's fields are added to the request as written, such as `chat_template_kwargs`.",
                 },
                 maxTokens: {
                   type: "number",

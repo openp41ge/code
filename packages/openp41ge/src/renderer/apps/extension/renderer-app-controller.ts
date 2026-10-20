@@ -53,10 +53,23 @@ export class RendererAppController extends BaseController {
     `;
     const content = container.querySelector("div.flex-1");
     if (content instanceof HTMLElement) {
-      // The surface's openTab names this tab (for `placement: "next-column"`).
+      // The surface's openTab names this tab (for `placement: "next-column"`);
+      // its pin pins this tab, as an edit pins a file editor's preview.
       const deps: RendererSurfaceHostDeps = {
         ...this.deps,
         openTab: (request) => this.deps.openTab(request, { tabId: this.tabId }),
+        pin: () =>
+          container.dispatchEvent(
+            new CustomEvent("grid-pin", {
+              bubbles: true,
+              composed: true,
+              detail: {
+                winId: window.openp41ge.workspace.getWindowId(),
+                tabId: this.tabId,
+                pinned: true,
+              },
+            }),
+          ),
       };
       this._instance = mountRendererSurface(this.spec, content, deps, this._config);
     }
